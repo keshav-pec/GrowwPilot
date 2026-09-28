@@ -1,0 +1,24 @@
+@import 'tailwindcss';
+
+/* Our colour theme (plan section 5).
+   Each colour becomes Tailwind classes, e.g. --color-gold gives bg-gold, text-gold, border-gold. */
+@theme {
+  --color-bg: #ffffff;
+  --color-surface: #f7f7f5;
+  --color-border: #e5e5e0;
+  --color-ink: #111111;
+  --color-muted: #6b6b6b;
+  --color-gold: #c9a227;
+  --color-gold-dark: #b08d1f;
+  --color-yellow: #facc15;
+  --color-yellow-soft: #fef9c3;
+  --color-orange: #ea7a1a;
+  --color-brown: #6b4226;
+  --color-danger: #dc2626;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
