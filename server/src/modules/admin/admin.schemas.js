@@ -1,17 +1,6 @@
 import { z } from 'zod';
 import { PLANS } from '../../config/constants.js';
-import { isValidTimezone } from '../../utils/time.js';
-import { normalizePhone, PHONE_REGEX } from '../../utils/phone.js';
-
-const email = z.string().trim().toLowerCase().pipe(z.email('Enter a valid email'));
-
-// Phone is optional, but if given it must be a valid 10-digit mobile number
-const optionalPhone = z
-  .string()
-  .trim()
-  .transform(normalizePhone)
-  .refine((v) => v === '' || PHONE_REGEX.test(v), 'Enter a valid 10-digit mobile number')
-  .optional();
+import { email, optionalPhone, timezone } from '../../utils/schemas.js';
 
 export const listOrgsSchema = z.object({
   search: z.string().trim().optional(),
@@ -30,7 +19,7 @@ export const createOrgSchema = z.object({
 
   branchName: z.string().trim().min(2, 'Branch name is required'),
   branchAddress: z.string().trim().optional(),
-  timezone: z.string().refine(isValidTimezone, 'Choose a valid timezone').default('Asia/Kolkata'),
+  timezone: timezone.default('Asia/Kolkata'),
 });
 
 export const setStatusSchema = z.object({

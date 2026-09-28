@@ -9,6 +9,10 @@ import { notFound, errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import branchRoutes from './modules/branches/branches.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
+import staffRoutes from './modules/staff/staff.routes.js';
+import userRoutes from './modules/users/users.routes.js';
+import serviceRoutes from './modules/services/services.routes.js';
+import comboRoutes from './modules/combos/combos.routes.js';
 
 const app = express();
 
@@ -30,6 +34,10 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/branches', branchRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/combos', comboRoutes);
 
 // --- Errors (must come after all routes) ---
 app.use(notFound);

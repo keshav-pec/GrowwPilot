@@ -8,6 +8,9 @@ import LoginPage from '../features/auth/LoginPage';
 import SalonsPage from '../features/admin/SalonsPage';
 import NewSalonPage from '../features/admin/NewSalonPage';
 import SalonDetailPage from '../features/admin/SalonDetailPage';
+import BranchesPage from '../features/branches/BranchesPage';
+import TeamPage from '../features/team/TeamPage';
+import CatalogPage from '../features/catalog/CatalogPage';
 import NotFoundPage from './NotFoundPage';
 import Placeholder from '../components/Placeholder';
 
@@ -65,9 +68,9 @@ export const router = createBrowserRouter([
             children: [
               { path: 'dashboard', element: <Placeholder title="Dashboard" subtitle="How is the salon doing today?" phase={13} /> },
               { path: 'analytics', element: <Placeholder title="Analytics" phase={14} /> },
-              { path: 'branches', element: <Placeholder title="Branches" phase={6} /> },
-              { path: 'team', element: <Placeholder title="Team" phase={6} /> },
-              { path: 'catalog', element: <Placeholder title="Services & combos" phase={6} /> },
+              { path: 'branches', element: <BranchesPage /> },
+              { path: 'team', element: <TeamPage /> },
+              { path: 'catalog', element: <CatalogPage /> },
               { path: 'settings/salary', element: <Placeholder title="Salary" message="Staff salary: coming soon." /> },
             ],
           },

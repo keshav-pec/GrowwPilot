@@ -25,6 +25,7 @@ export async function tenantContext(req, res, next) {
     userId: String(user._id),
     role: user.role,
     orgId: user.orgId ? String(user.orgId) : null,
+    isPrimaryOwner: user.role === 'OWNER' && user.allBranches,
     allowedBranchIds,
     activeBranchId: requested || allowedBranchIds[0] || null,
   };

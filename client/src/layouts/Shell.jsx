@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Menu, Sparkles } from 'lucide-react';
+import { LifeBuoy, LogOut, Menu, Sparkles } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { ROLE_LABEL } from '../lib/constants';
 
@@ -52,6 +52,14 @@ export default function Shell({ navItems, topBarRight }) {
         <div className="border-t border-white/15 px-5 py-4">
           <p className="text-sm font-medium">{user.name}</p>
           <p className="text-xs text-white/60">{ROLE_LABEL[user.role]}</p>
+          {user.role !== 'SUPER_ADMIN' && (
+            <a
+              href="mailto:support@growwpilot.com?subject=Help%20with%20GrowwPilot"
+              className="mt-3 flex items-center gap-2 text-sm text-white/80 hover:text-white"
+            >
+              <LifeBuoy size={16} /> Need help?
+            </a>
+          )}
           <button
             onClick={handleLogout}
             className="mt-3 flex items-center gap-2 text-sm text-white/80 hover:text-white"

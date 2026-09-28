@@ -11,3 +11,6 @@ export const LEAD_SOURCES = ['Instagram', 'Facebook', 'Google', 'WhatsApp', 'Web
 export const PAYMENT_METHODS = ['CASH', 'UPI', 'CARD'];
 export const ATTENDANCE_STATUSES = ['present', 'absent', 'leave'];
 export const PLANS = ['trial', 'basic', 'pro'];
+
+// Appointments that still "hold" a stylist's time (not finished, not cancelled)
+export const OPEN_APPOINTMENT_STATUSES = ['BOOKED', 'ARRIVED', 'IN_SERVICE'];

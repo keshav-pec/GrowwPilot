@@ -9,3 +9,11 @@ export function requireRole(...roles) {
     next();
   };
 }
+
+// Only the primary owner (the one who sees all branches). Must run after tenantContext.
+export function requirePrimaryOwner(req, res, next) {
+  if (!req.ctx.isPrimaryOwner) {
+    throw new AppError(403, 'FORBIDDEN', 'Only the main owner can do this');
+  }
+  next();
+}

@@ -9,3 +9,8 @@ export function formatMoney(paise) {
 export function toPaise(rupees) {
   return Math.round(Number(rupees) * 100);
 }
+
+// Checks what the user typed in a ₹ field: "500", "499.5" or "499.50"
+export function isValidRupees(text) {
+  return /^\d+(\.\d{1,2})?$/.test(String(text).trim());
+}

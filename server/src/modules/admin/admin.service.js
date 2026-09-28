@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
 import { Branch, Customer, Organization, Staff, User } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
+import { generateTempPassword, hashPassword } from '../../utils/password.js';
 
 // Makes user input safe to use inside a regular expression ("a.b" should match a dot, not any character)
 function escapeRegex(text) {
@@ -46,8 +46,8 @@ export async function getOrg(id) {
 // Onboarding: creates the salon, its first branch and its primary owner.
 // It runs in a TRANSACTION: if any step fails (e.g. the email is taken), nothing is saved.
 export async function createOrg(input) {
-  const temporaryPassword = crypto.randomBytes(6).toString('base64url'); // 8 random characters
-  const passwordHash = await bcrypt.hash(temporaryPassword, 10);
+  const temporaryPassword = generateTempPassword();
+  const passwordHash = await hashPassword(temporaryPassword);
 
   const org = await mongoose.connection.transaction(async (session) => {
     const emailTaken = await User.exists({ email: input.ownerEmail }).session(session);
