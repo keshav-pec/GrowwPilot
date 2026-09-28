@@ -6,8 +6,14 @@ import morgan from 'morgan';
 import { env } from './config/env.js';
 import { isDBConnected } from './config/db.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
+import authRoutes from './modules/auth/auth.routes.js';
+import branchRoutes from './modules/branches/branches.routes.js';
 
 const app = express();
+
+// In production the API sits behind a proxy (Render/Vercel). This lets Express see the
+// real visitor IP, which the login rate limiter needs.
+app.set('trust proxy', 1);
 
 // --- Global middleware ---
 app.use(helmet()); // sets safe HTTP headers
@@ -20,6 +26,8 @@ if (env.NODE_ENV === 'development') app.use(morgan('dev')); // logs each request
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, db: isDBConnected() ? 'connected' : 'disconnected' });
 });
+app.use('/api/auth', authRoutes);
+app.use('/api/branches', branchRoutes);
 
 // --- Errors (must come after all routes) ---
 app.use(notFound);

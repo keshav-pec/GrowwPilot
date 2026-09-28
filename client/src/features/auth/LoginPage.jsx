@@ -1,23 +1,35 @@
 import { Navigate, useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation } from '@tanstack/react-query';
+import { z } from 'zod';
 import { Sparkles } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
-import { useHealth } from '../../api/health';
-import { ROLE_HOME, ROLE_LABEL } from '../../lib/constants';
-import { Badge, Button, Card } from '../../components/ui';
+import { ROLE_HOME } from '../../lib/constants';
+import { Button, Card, Input } from '../../components/ui';
 
-// TEMPORARY (Phase 2): pick a role to preview its screens.
-// Phase 4 replaces the buttons with a real email + password form.
+const loginSchema = z.object({
+  email: z.email('Enter a valid email'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+// One login page for everyone. After login, each role goes to its own home page.
 export default function LoginPage() {
-  const { user, loginAs } = useAuth();
+  const { user, login } = useAuth();
   const navigate = useNavigate();
-  const health = useHealth();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({ resolver: zodResolver(loginSchema) });
+
+  const loginMutation = useMutation({
+    mutationFn: ({ email, password }) => login(email, password),
+    onSuccess: (loggedInUser) => navigate(ROLE_HOME[loggedInUser.role], { replace: true }),
+  });
 
   if (user) return <Navigate to={ROLE_HOME[user.role]} replace />;
-
-  function handlePick(role) {
-    loginAs(role);
-    navigate(ROLE_HOME[role]);
-  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface p-4">
@@ -25,26 +37,34 @@ export default function LoginPage() {
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
           <Sparkles size={28} className="text-gold" />
           <h1 className="text-2xl font-bold text-brown">GrowwPilot</h1>
-          <p className="text-sm text-muted">Preview mode: choose a role to explore.</p>
+          <p className="text-sm text-muted">Log in to manage your salon</p>
         </div>
 
-        <div className="flex flex-col gap-2">
-          {['SUPER_ADMIN', 'OWNER', 'FRONT_DESK'].map((role) => (
-            <Button key={role} variant={role === 'OWNER' ? 'primary' : 'secondary'} onClick={() => handlePick(role)}>
-              Continue as {ROLE_LABEL[role]}
-            </Button>
-          ))}
-        </div>
+        <form onSubmit={handleSubmit((values) => loginMutation.mutate(values))} className="flex flex-col gap-4" noValidate>
+          <Input
+            label="Email"
+            type="email"
+            autoComplete="email"
+            autoFocus
+            error={errors.email?.message}
+            {...register('email')}
+          />
+          <Input
+            label="Password"
+            type="password"
+            autoComplete="current-password"
+            error={errors.password?.message}
+            {...register('password')}
+          />
 
-        {/* Shows that the frontend can reach the backend and database */}
-        {/* <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted">
-          API:
-          {health.isPending && <Badge>checking…</Badge>}
-          {health.isError && <Badge tone="danger">{health.error.message}</Badge>}
-          {health.data && (
-            <Badge tone={health.data.db === 'connected' ? 'brown' : 'orange'}>database {health.data.db}</Badge>
+          {loginMutation.isError && (
+            <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{loginMutation.error.message}</p>
           )}
-        </div> */}
+
+          <Button type="submit" loading={loginMutation.isPending}>
+            Log in
+          </Button>
+        </form>
       </Card>
     </div>
   );
