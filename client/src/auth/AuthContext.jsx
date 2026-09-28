@@ -49,8 +49,9 @@ export function AuthProvider({ children }) {
 
   async function logout() {
     await api.post('/auth/logout').catch(() => {}); // log out locally even if the server can't be reached
-    queryClient.removeQueries(); // forget all cached data from this user
-    queryClient.setQueryData(['me'], null);
+    queryClient.setQueryData(['me'], null); // nobody is logged in now
+    // Forget all other cached data from this user (keep 'me' itself, the app is watching it)
+    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' });
   }
 
   // First page load: wait until we know whether someone is logged in
