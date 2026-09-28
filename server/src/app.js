@@ -8,6 +8,7 @@ import { isDBConnected } from './config/db.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import branchRoutes from './modules/branches/branches.routes.js';
+import adminRoutes from './modules/admin/admin.routes.js';
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.get('/api/health', (req, res) => {
 });
 app.use('/api/auth', authRoutes);
 app.use('/api/branches', branchRoutes);
+app.use('/api/admin', adminRoutes);
 
 // --- Errors (must come after all routes) ---
 app.use(notFound);

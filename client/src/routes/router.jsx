@@ -5,6 +5,9 @@ import ProtectedRoute from './ProtectedRoute';
 import AdminLayout from '../layouts/AdminLayout';
 import AppLayout from '../layouts/AppLayout';
 import LoginPage from '../features/auth/LoginPage';
+import SalonsPage from '../features/admin/SalonsPage';
+import NewSalonPage from '../features/admin/NewSalonPage';
+import SalonDetailPage from '../features/admin/SalonDetailPage';
 import NotFoundPage from './NotFoundPage';
 import Placeholder from '../components/Placeholder';
 
@@ -28,9 +31,9 @@ export const router = createBrowserRouter([
         element: <AdminLayout />,
         children: [
           { index: true, element: <Navigate to="salons" replace /> },
-          { path: 'salons', element: <Placeholder title="Salons" subtitle="Search and manage onboarded salons" phase={5} /> },
-          { path: 'salons/new', element: <Placeholder title="Onboard a salon" phase={5} /> },
-          { path: 'salons/:id', element: <Placeholder title="Salon details" phase={5} /> },
+          { path: 'salons', element: <SalonsPage /> },
+          { path: 'salons/new', element: <NewSalonPage /> },
+          { path: 'salons/:id', element: <SalonDetailPage /> },
         ],
       },
     ],

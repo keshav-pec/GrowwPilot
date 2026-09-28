@@ -19,3 +19,19 @@ export const ROLE_LABEL = {
 
 // localStorage key for the branch picked in the branch switcher
 export const BRANCH_STORAGE_KEY = 'gp_branch';
+
+export const PLANS = [
+  { value: 'trial', label: 'Trial' },
+  { value: 'basic', label: 'Basic' },
+  { value: 'pro', label: 'Pro' },
+];
+
+// Common timezones for branches (the server accepts any valid IANA timezone)
+export const TIMEZONES = [
+  { value: 'Asia/Kolkata', label: 'India (Asia/Kolkata)' },
+  { value: 'Asia/Dubai', label: 'UAE (Asia/Dubai)' },
+  { value: 'Asia/Singapore', label: 'Singapore (Asia/Singapore)' },
+  { value: 'Asia/Kathmandu', label: 'Nepal (Asia/Kathmandu)' },
+  { value: 'Europe/London', label: 'UK (Europe/London)' },
+  { value: 'America/New_York', label: 'US East (America/New_York)' },
+];
