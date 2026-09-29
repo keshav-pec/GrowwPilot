@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DateTime } from 'luxon';
 import toast from 'react-hot-toast';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Target } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useSaveAppointment } from '../../api/appointments';
+import { useConvertLead } from '../../api/leads';
 import { useCombos, useServices } from '../../api/catalog';
 import { useStaff } from '../../api/staff';
 import { formatMoney } from '../../lib/money';
@@ -19,7 +20,8 @@ const SOURCES = [
 ];
 
 // initial: starting values (empty for a new booking, filled in when editing)
-export default function BookingForm({ initial, appointmentId }) {
+// leadInfo: { lead, matchingCustomer } when converting a lead (the customer comes from the lead's phone)
+export default function BookingForm({ initial, appointmentId, leadInfo }) {
   const navigate = useNavigate();
   const { activeBranch, activeBranchId } = useAuth();
   const zone = activeBranch.timezone;
@@ -29,6 +31,8 @@ export default function BookingForm({ initial, appointmentId }) {
   const combos = useCombos().data ?? [];
   const staff = (useStaff().data ?? []).filter((s) => s.status === 'active');
   const saveAppointment = useSaveAppointment();
+  const convertLead = useConvertLead();
+  const lead = leadInfo?.lead;
 
   // ----- Form state -----
   const [customer, setCustomer] = useState(initial.customer ?? null);
@@ -92,7 +96,7 @@ export default function BookingForm({ initial, appointmentId }) {
   const totalMinutes = items.reduce((sum, item) => sum + item.duration, 0);
   const totalPrice = combo ? combo.comboPrice : items.reduce((sum, item) => sum + (item.service?.price ?? 0), 0);
 
-  const missing = !customer ? 'Choose a customer' : items.length === 0 ? 'Choose a service' : !defaultStaffId ? 'Choose a stylist' : !startTime ? 'Pick a time' : null;
+  const missing = !customer && !lead ? 'Choose a customer' : items.length === 0 ? 'Choose a service' : !defaultStaffId ? 'Choose a stylist' : !startTime ? 'Pick a time' : null;
 
   function submit() {
     setConflict(null);
@@ -107,23 +111,45 @@ export default function BookingForm({ initial, appointmentId }) {
       })),
       comboId: combo?._id,
       notes: notes.trim() || undefined,
-      ...(isEdit ? {} : { customerId: customer._id, source }),
+      ...(isEdit || lead ? {} : { customerId: customer._id, source }), // a lead's customer is found by phone on the server
     };
+
+    const when = `${formatDay(date)} at ${DateTime.fromFormat(startTime, 'HH:mm').toFormat('h:mm a')}`;
+    const onError = (err) => {
+      if (err.code === 'SLOT_TAKEN') {
+        // Another desk booked it first. The free times refresh automatically.
+        setConflict(err.message);
+        resetTime();
+      } else {
+        toast.error(err.message);
+      }
+    };
+
+    // Converting a lead: one request books, links or creates the customer, and closes the lead
+    if (lead) {
+      convertLead.mutate(
+        { ...payload, _id: lead._id },
+        {
+          onSuccess: (result) => {
+            toast.success(
+              result.isExistingCustomer
+                ? `Booked ${when}, linked to ${result.customer.name}'s profile`
+                : `Booked ${when}. New customer ${result.customer.name} created`
+            );
+            navigate(`/app/today?date=${date}`);
+          },
+          onError,
+        }
+      );
+      return;
+    }
 
     saveAppointment.mutate(payload, {
       onSuccess: () => {
-        toast.success(`${isEdit ? 'Updated' : 'Booked'}: ${customer.name}, ${formatDay(date)} at ${DateTime.fromFormat(startTime, 'HH:mm').toFormat('h:mm a')}`);
+        toast.success(`${isEdit ? 'Updated' : 'Booked'}: ${customer.name}, ${when}`);
         navigate(`/app/today?date=${date}`);
       },
-      onError: (err) => {
-        if (err.code === 'SLOT_TAKEN') {
-          // Another desk booked it first. The free times refresh automatically.
-          setConflict(err.message);
-          resetTime();
-        } else {
-          toast.error(err.message);
-        }
-      },
+      onError,
     });
   }
 
@@ -133,7 +159,26 @@ export default function BookingForm({ initial, appointmentId }) {
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="flex flex-col gap-4 lg:col-span-2">
         <Card title="1. Customer">
-          <CustomerPicker customer={customer} onChange={setCustomer} locked={isEdit} />
+          {lead ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+                <Target size={16} className="text-gold-dark" />
+                <div>
+                  <p className="font-medium">{lead.name}</p>
+                  <p className="text-xs text-muted">From lead · {lead.phone}</p>
+                </div>
+              </div>
+              {leadInfo.matchingCustomer ? (
+                <p className="rounded-lg bg-yellow-soft px-3 py-2 text-sm">
+                  Existing customer found: <strong>{leadInfo.matchingCustomer.name}</strong>. The booking will be linked to their profile.
+                </p>
+              ) : (
+                <p className="text-sm text-muted">A new customer profile will be created for {lead.name} when you confirm.</p>
+              )}
+            </div>
+          ) : (
+            <CustomerPicker customer={customer} onChange={setCustomer} locked={isEdit} />
+          )}
         </Card>
 
         <Card
@@ -267,15 +312,15 @@ export default function BookingForm({ initial, appointmentId }) {
             </span>
           </div>
 
-          {!isEdit && (
+          {!isEdit && !lead && (
             <div className="mb-3">
               <Select label="How did they book?" options={SOURCES} value={source} onChange={(e) => setSource(e.target.value)} />
             </div>
           )}
           <Textarea label="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
 
-          <Button className="mt-4 w-full" onClick={submit} disabled={Boolean(missing)} loading={saveAppointment.isPending}>
-            {missing || (isEdit ? 'Save changes' : 'Confirm booking')}
+          <Button className="mt-4 w-full" onClick={submit} disabled={Boolean(missing)} loading={saveAppointment.isPending || convertLead.isPending}>
+            {missing || (isEdit ? 'Save changes' : lead ? 'Book and convert lead' : 'Confirm booking')}
           </Button>
         </Card>
       </div>

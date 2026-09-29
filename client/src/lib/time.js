@@ -31,3 +31,13 @@ export function formatDay(date) {
 export function addDays(date, days) {
   return DateTime.fromISO(date).plus({ days }).toISODate();
 }
+
+// For <input type="datetime-local">: UTC ISO -> "2026-09-30T11:00" in the branch's time
+export function toLocalInput(iso, zone) {
+  return iso ? DateTime.fromISO(iso, { zone }).toFormat("yyyy-MM-dd'T'HH:mm") : '';
+}
+
+// And back: "2026-09-30T11:00" at the branch -> UTC ISO for the server ('' -> null)
+export function fromLocalInput(value, zone) {
+  return value ? DateTime.fromISO(value, { zone }).toUTC().toISO() : null;
+}

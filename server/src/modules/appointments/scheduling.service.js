@@ -26,8 +26,12 @@ async function loadBookingRefs(ctx, payload) {
   const branch = await Branch.findOne(scoped(ctx, { _id: payload.branchId, status: 'active' })).lean();
   if (!branch) throw new AppError(404, 'NOT_FOUND', 'Branch not found');
 
-  const customer = await Customer.findOne(scoped(ctx, { _id: payload.customerId })).lean();
-  if (!customer) throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+  // The customer is optional here: converting a lead may create the customer inside the transaction
+  let customer = null;
+  if (payload.customerId) {
+    customer = await Customer.findOne(scoped(ctx, { _id: payload.customerId })).lean();
+    if (!customer) throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+  }
 
   // Services: active, in this salon, and offered at this branch (empty branchIds = every branch)
   const serviceIds = payload.items.map((item) => item.serviceId);
@@ -231,33 +235,33 @@ export function withStaffLock(ctx, branch, items, write, { excludeAppointmentId 
   });
 }
 
+// The new appointment document (used by a normal booking and by "convert lead")
+export function newAppointment(ctx, { branch, customer, items, comboId, totalPrice }, payload) {
+  return {
+    orgId: ctx.orgId,
+    branchId: branch._id,
+    customerId: customer._id,
+    customerSnapshot: { name: customer.name, phone: customer.phone },
+    items,
+    comboId,
+    startAt: items[0].startAt,
+    endAt: items.at(-1).endAt,
+    totalPrice,
+    status: 'BOOKED',
+    statusHistory: [{ to: 'BOOKED', by: ctx.userId }],
+    source: payload.source ?? 'phone',
+    leadId: payload.leadId,
+    notes: payload.notes,
+    createdBy: ctx.userId,
+  };
+}
+
 // Book a new appointment
 export async function bookWithLock(ctx, payload) {
-  const { branch, customer, items, comboId, totalPrice } = await prepareBooking(ctx, payload);
+  const booking = await prepareBooking(ctx, payload);
 
-  return withStaffLock(ctx, branch, items, async (session) => {
-    const [appointment] = await Appointment.create(
-      [
-        {
-          orgId: ctx.orgId,
-          branchId: branch._id,
-          customerId: customer._id,
-          customerSnapshot: { name: customer.name, phone: customer.phone },
-          items,
-          comboId,
-          startAt: items[0].startAt,
-          endAt: items.at(-1).endAt,
-          totalPrice,
-          status: 'BOOKED',
-          statusHistory: [{ to: 'BOOKED', by: ctx.userId }],
-          source: payload.source ?? 'phone',
-          leadId: payload.leadId,
-          notes: payload.notes,
-          createdBy: ctx.userId,
-        },
-      ],
-      { session }
-    );
+  return withStaffLock(ctx, booking.branch, booking.items, async (session) => {
+    const [appointment] = await Appointment.create([newAppointment(ctx, booking, payload)], { session });
     return appointment;
   });
 }

@@ -16,6 +16,8 @@ import AppointmentsPage from '../features/appointments/AppointmentsPage';
 import BookingPage from '../features/appointments/BookingPage';
 import CustomersPage from '../features/customers/CustomersPage';
 import CustomerProfilePage from '../features/customers/CustomerProfilePage';
+import LeadsPage from '../features/leads/LeadsPage';
+import LeadConvertPage from '../features/leads/LeadConvertPage';
 import NotFoundPage from './NotFoundPage';
 import Placeholder from '../components/Placeholder';
 
@@ -64,7 +66,8 @@ export const router = createBrowserRouter([
           { path: 'appointments/:id/edit', element: <BookingPage /> },
           { path: 'customers', element: <CustomersPage /> },
           { path: 'customers/:id', element: <CustomerProfilePage /> },
-          { path: 'leads', element: <Placeholder title="Leads" phase={10} /> },
+          { path: 'leads', element: <LeadsPage /> },
+          { path: 'leads/:id/convert', element: <LeadConvertPage /> },
           { path: 'checkout/:appointmentId', element: <Placeholder title="Checkout" phase={11} /> },
           { path: 'attendance', element: <Placeholder title="Staff attendance" phase={12} /> },
 
