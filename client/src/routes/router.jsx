@@ -22,6 +22,7 @@ import CheckoutPage from '../features/checkout/CheckoutPage';
 import InvoicePage from '../features/checkout/InvoicePage';
 import AttendancePage from '../features/attendance/AttendancePage';
 import DashboardPage from '../features/dashboard/DashboardPage';
+import AnalyticsPage from '../features/analytics/AnalyticsPage';
 import NotFoundPage from './NotFoundPage';
 import Placeholder from '../components/Placeholder';
 
@@ -81,7 +82,7 @@ export const router = createBrowserRouter([
             element: <ProtectedRoute roles={['OWNER']} />,
             children: [
               { path: 'dashboard', element: <DashboardPage /> },
-              { path: 'analytics', element: <Placeholder title="Analytics" phase={14} /> },
+              { path: 'analytics', element: <AnalyticsPage /> },
               { path: 'branches', element: <BranchesPage /> },
               { path: 'team', element: <TeamPage /> },
               { path: 'catalog', element: <CatalogPage /> },
