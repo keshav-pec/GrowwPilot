@@ -66,7 +66,7 @@ export async function getAllowedBranches(user) {
   if (!(user.role === 'OWNER' && user.allBranches)) {
     filter._id = { $in: user.branchIds };
   }
-  return Branch.find(filter).select('name city timezone').sort('name').lean();
+  return Branch.find(filter).select('name city timezone openTime closeTime defaultServiceMinutes').sort('name').lean();
 }
 
 // What the frontend receives about the logged-in user (never the password hash)

@@ -11,6 +11,9 @@ import SalonDetailPage from '../features/admin/SalonDetailPage';
 import BranchesPage from '../features/branches/BranchesPage';
 import TeamPage from '../features/team/TeamPage';
 import CatalogPage from '../features/catalog/CatalogPage';
+import DayBoardPage from '../features/appointments/DayBoardPage';
+import AppointmentsPage from '../features/appointments/AppointmentsPage';
+import BookingPage from '../features/appointments/BookingPage';
 import NotFoundPage from './NotFoundPage';
 import Placeholder from '../components/Placeholder';
 
@@ -53,9 +56,10 @@ export const router = createBrowserRouter([
           { index: true, element: <HomeRedirect /> },
 
           // Owner and front desk
-          { path: 'today', element: <Placeholder title="Day board" subtitle="Who is free right now" phase={8} /> },
-          { path: 'appointments', element: <Placeholder title="Appointments" phase={8} /> },
-          { path: 'appointments/new', element: <Placeholder title="New appointment" phase={8} /> },
+          { path: 'today', element: <DayBoardPage /> },
+          { path: 'appointments', element: <AppointmentsPage /> },
+          { path: 'appointments/new', element: <BookingPage /> },
+          { path: 'appointments/:id/edit', element: <BookingPage /> },
           { path: 'customers', element: <Placeholder title="Customers" phase={9} /> },
           { path: 'customers/:id', element: <Placeholder title="Customer profile" phase={9} /> },
           { path: 'leads', element: <Placeholder title="Leads" phase={10} /> },

@@ -266,7 +266,7 @@ export async function bookWithLock(ctx, payload) {
 // Free start times for one stylist on one day, in 15-minute steps (branch local time).
 // This only HELPS the front desk pick a time; bookWithLock still makes the final decision.
 // ---------------------------------------------------------------------------
-export async function getAvailability(ctx, { date, staffId, duration }) {
+export async function getAvailability(ctx, { date, staffId, duration, excludeAppointmentId }) {
   const branch = await Branch.findOne(scoped(ctx, { _id: ctx.activeBranchId })).lean();
   const staff = await Staff.findOne(scoped(ctx, { _id: staffId, branchId: ctx.activeBranchId })).lean();
   if (!branch || !staff) throw new AppError(404, 'NOT_FOUND', 'Stylist not found at this branch');
@@ -289,6 +289,7 @@ export async function getAvailability(ctx, { date, staffId, duration }) {
       'items.staffId': staffId,
       startAt: { $lt: closes.toJSDate() },
       endAt: { $gt: opens.toJSDate() },
+      ...(excludeAppointmentId && { _id: { $ne: excludeAppointmentId } }),
     })
   ).lean();
   const busy = appointments.flatMap((a) => a.items.filter((item) => sameId(item.staffId, staffId)));

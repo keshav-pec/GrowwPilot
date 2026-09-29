@@ -3,11 +3,7 @@ import mongoose from 'mongoose';
 import { Branch, Customer, Organization, Staff, User } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { generateTempPassword, hashPassword } from '../../utils/password.js';
-
-// Makes user input safe to use inside a regular expression ("a.b" should match a dot, not any character)
-function escapeRegex(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+import { escapeRegex } from '../../utils/regex.js';
 
 // "Glamour Studio!" -> "glamour-studio"
 function slugify(text) {

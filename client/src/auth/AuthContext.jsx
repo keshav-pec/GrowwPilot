@@ -31,6 +31,7 @@ export function AuthProvider({ children }) {
   // Use the saved branch if this user may still use it, otherwise their first branch
   const branches = user?.branches ?? [];
   const activeBranchId = branches.some((b) => b._id === storedBranchId) ? storedBranchId : (branches[0]?._id ?? null);
+  const activeBranch = branches.find((b) => b._id === activeBranchId) ?? null; // { name, timezone, openTime, ... }
 
   // Keep localStorage in step, because the API client reads the branch from there
   if (activeBranchId) localStorage.setItem(BRANCH_STORAGE_KEY, activeBranchId);
@@ -64,7 +65,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, activeBranchId, setActiveBranchId, login, logout }}>
+    <AuthContext.Provider value={{ user, activeBranchId, activeBranch, setActiveBranchId, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

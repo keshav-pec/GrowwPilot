@@ -14,6 +14,8 @@ import userRoutes from './modules/users/users.routes.js';
 import serviceRoutes from './modules/services/services.routes.js';
 import comboRoutes from './modules/combos/combos.routes.js';
 import availabilityRoutes from './modules/appointments/availability.routes.js';
+import appointmentRoutes from './modules/appointments/appointments.routes.js';
+import customerRoutes from './modules/customers/customers.routes.js';
 
 const app = express();
 
@@ -40,6 +42,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/combos', comboRoutes);
 app.use('/api/availability', availabilityRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/customers', customerRoutes);
 
 // --- Errors (must come after all routes) ---
 app.use(notFound);

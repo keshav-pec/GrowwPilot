@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { DateTime } from 'luxon';
 import { Appointment, Attendance } from '../src/models/index.js';
 import { bookWithLock, getAvailability } from '../src/modules/appointments/scheduling.service.js';
+import { setAppointmentStatus, updateAppointment } from '../src/modules/appointments/appointments.service.js';
 import { dayRangeUTC, localToUTC } from '../src/utils/time.js';
 import { createFixtures, startDb, stopDb } from './testDb.js';
 
@@ -237,5 +238,73 @@ describe('Availability (free start times)', () => {
     expect(timezone).toBe('Asia/Dubai');
     expect(slots[0]).toBe('09:00');
     expect(slots.at(-1)).toBe('21:30');
+  });
+});
+
+describe('Edit, reschedule and status changes (Phase 8)', () => {
+  const haircutWith = (staff) => [{ serviceId: f.haircut._id, staffId: staff._id }];
+  const reschedule = (id, startTime, staff = f.rahul) =>
+    updateAppointment(f.ctxGlamour, id, { date: tomorrowIn(INDIA), startTime, items: haircutWith(staff) });
+  const localStart = (appt) => DateTime.fromJSDate(appt.startAt, { zone: INDIA }).toFormat('HH:mm');
+
+  it('can move a booking into a time that overlaps its OWN old slot', async () => {
+    const appt = await book({ startTime: '14:00' });
+    const moved = await reschedule(appt._id, '14:15'); // overlaps 2:00–2:45, but that's itself
+    expect(localStart(moved)).toBe('14:15');
+  });
+
+  it("still can't be moved onto someone else's booking", async () => {
+    await book({ startTime: '14:00' });
+    const other = await book({ startTime: '16:00' });
+    await expectError(reschedule(other._id, '14:30'), 409, 'SLOT_TAKEN');
+  });
+
+  it('can switch to another stylist', async () => {
+    const appt = await book({ startTime: '14:00' });
+    const moved = await reschedule(appt._id, '14:00', f.neha);
+    expect(moved.items[0].staffName).toBe('Neha');
+  });
+
+  it('follows the status rules and records every change', async () => {
+    const appt = await book();
+    await expectError(setAppointmentStatus(f.ctxGlamour, appt._id, { status: 'COMPLETED' }), 409, 'INVALID_STATUS_CHANGE');
+
+    await setAppointmentStatus(f.ctxGlamour, appt._id, { status: 'ARRIVED' });
+    await setAppointmentStatus(f.ctxGlamour, appt._id, { status: 'IN_SERVICE' });
+    const done = await setAppointmentStatus(f.ctxGlamour, appt._id, { status: 'COMPLETED' });
+
+    expect(done.statusHistory.map((h) => h.to)).toEqual(['BOOKED', 'ARRIVED', 'IN_SERVICE', 'COMPLETED']);
+    expect(done.statusHistory[1].from).toBe('BOOKED');
+  });
+
+  it('only lets Booked appointments be edited', async () => {
+    const appt = await book();
+    await setAppointmentStatus(f.ctxGlamour, appt._id, { status: 'ARRIVED' });
+    await expectError(reschedule(appt._id, '15:00'), 409, 'NOT_EDITABLE');
+  });
+
+  it('frees the slot when cancelled, and keeps the reason', async () => {
+    const appt = await book({ startTime: '14:00' });
+    const cancelled = await setAppointmentStatus(f.ctxGlamour, appt._id, { status: 'CANCELLED', reason: 'Customer called' });
+    expect(cancelled.statusHistory.at(-1)).toMatchObject({ to: 'CANCELLED', reason: 'Customer called' });
+    await expect(book({ startTime: '14:00' })).resolves.toBeDefined();
+  });
+
+  it('when two people change the status at once, only one wins', async () => {
+    const appt = await book();
+    const results = await Promise.allSettled([
+      setAppointmentStatus(f.ctxGlamour, appt._id, { status: 'ARRIVED' }),
+      setAppointmentStatus(f.ctxGlamour, appt._id, { status: 'CANCELLED' }),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+  });
+});
+
+describe('Availability while rescheduling', () => {
+  it("counts the appointment's own slot as free", async () => {
+    const appt = await book({ startTime: '14:00' });
+    const query = { date: tomorrowIn(INDIA), staffId: String(f.rahul._id), duration: 45 };
+    expect((await getAvailability(f.ctxGlamour, query)).slots).not.toContain('14:00');
+    expect((await getAvailability(f.ctxGlamour, { ...query, excludeAppointmentId: String(appt._id) })).slots).toContain('14:00');
   });
 });
