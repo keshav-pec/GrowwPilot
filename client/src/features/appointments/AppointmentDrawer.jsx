@@ -59,13 +59,21 @@ export default function AppointmentDrawer({ appointment, onClose }) {
                 {next.label}
               </Button>
             )}
-            {status === 'COMPLETED' && <Button onClick={() => navigate(`/app/checkout/${appointment._id}`)}>Checkout</Button>}
+            {status === 'COMPLETED' &&
+              (appointment.invoiceId ? (
+                <Button variant="secondary" onClick={() => navigate(`/app/invoices/${appointment.invoiceId}`)}>
+                  View invoice
+                </Button>
+              ) : (
+                <Button onClick={() => navigate(`/app/checkout/${appointment._id}`)}>Checkout</Button>
+              ))}
           </div>
         }
       >
         <div className="flex flex-col gap-5 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <AppointmentStatusBadge status={status} />
+            {appointment.invoiceId && <Badge tone="brown">Paid</Badge>}
             {alert && <Badge tone="orange">{alert}</Badge>}
           </div>
 

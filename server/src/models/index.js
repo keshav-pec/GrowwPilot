@@ -10,3 +10,4 @@ export { default as Customer } from './Customer.js';
 export { default as Lead } from './Lead.js';
 export { default as Appointment } from './Appointment.js';
 export { default as Invoice } from './Invoice.js';
+export { default as Counter } from './Counter.js';

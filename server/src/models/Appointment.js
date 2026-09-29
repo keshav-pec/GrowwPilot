@@ -48,6 +48,7 @@ const appointmentSchema = new mongoose.Schema(
     statusHistory: [statusChangeSchema],
     source: { type: String, enum: APPOINTMENT_SOURCES, default: 'phone' },
     leadId: ref('Lead'),
+    invoiceId: ref('Invoice'), // set at checkout; an appointment is paid only once
     notes: { type: String, trim: true },
     createdBy: ref('User'),
   },

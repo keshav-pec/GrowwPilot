@@ -173,11 +173,11 @@ export default function DayBoardPage() {
                                 role="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  navigate(`/app/checkout/${appointment._id}`);
+                                  navigate(appointment.invoiceId ? `/app/invoices/${appointment.invoiceId}` : `/app/checkout/${appointment._id}`);
                                 }}
-                                className="shrink-0 rounded bg-brown px-1.5 py-0.5 text-[11px] font-medium text-white"
+                                className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium ${appointment.invoiceId ? 'border border-brown text-brown' : 'bg-brown text-white'}`}
                               >
-                                Checkout
+                                {appointment.invoiceId ? 'Paid ✓' : 'Checkout'}
                               </span>
                             )}
                           </div>

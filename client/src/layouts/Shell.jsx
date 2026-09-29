@@ -22,7 +22,7 @@ export default function Shell({ navItems, topBarRight }) {
       {menuOpen && <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setMenuOpen(false)} />}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-brown text-white transition-transform md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-brown text-white transition-transform print:hidden md:translate-x-0 ${
           menuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -69,8 +69,8 @@ export default function Shell({ navItems, topBarRight }) {
         </div>
       </aside>
 
-      <div className="md:pl-64">
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-border bg-bg px-4 md:px-8">
+      <div className="md:pl-64 print:pl-0">
+        <header className="sticky top-0 z-20 flex h-14 print:hidden items-center justify-between border-b border-border bg-bg px-4 md:px-8">
           <button
             onClick={() => setMenuOpen(true)}
             className="rounded p-1 text-ink hover:bg-surface md:hidden"
@@ -81,7 +81,7 @@ export default function Shell({ navItems, topBarRight }) {
           <div className="ml-auto">{topBarRight}</div>
         </header>
 
-        <main className="p-4 md:p-8">
+        <main className="p-4 md:p-8 print:p-0">
           <Outlet />
         </main>
       </div>

@@ -18,6 +18,8 @@ import CustomersPage from '../features/customers/CustomersPage';
 import CustomerProfilePage from '../features/customers/CustomerProfilePage';
 import LeadsPage from '../features/leads/LeadsPage';
 import LeadConvertPage from '../features/leads/LeadConvertPage';
+import CheckoutPage from '../features/checkout/CheckoutPage';
+import InvoicePage from '../features/checkout/InvoicePage';
 import NotFoundPage from './NotFoundPage';
 import Placeholder from '../components/Placeholder';
 
@@ -68,7 +70,8 @@ export const router = createBrowserRouter([
           { path: 'customers/:id', element: <CustomerProfilePage /> },
           { path: 'leads', element: <LeadsPage /> },
           { path: 'leads/:id/convert', element: <LeadConvertPage /> },
-          { path: 'checkout/:appointmentId', element: <Placeholder title="Checkout" phase={11} /> },
+          { path: 'checkout/:appointmentId', element: <CheckoutPage /> },
+          { path: 'invoices/:id', element: <InvoicePage /> },
           { path: 'attendance', element: <Placeholder title="Staff attendance" phase={12} /> },
 
           // Owner only
