@@ -14,6 +14,8 @@ import CatalogPage from '../features/catalog/CatalogPage';
 import DayBoardPage from '../features/appointments/DayBoardPage';
 import AppointmentsPage from '../features/appointments/AppointmentsPage';
 import BookingPage from '../features/appointments/BookingPage';
+import CustomersPage from '../features/customers/CustomersPage';
+import CustomerProfilePage from '../features/customers/CustomerProfilePage';
 import NotFoundPage from './NotFoundPage';
 import Placeholder from '../components/Placeholder';
 
@@ -60,8 +62,8 @@ export const router = createBrowserRouter([
           { path: 'appointments', element: <AppointmentsPage /> },
           { path: 'appointments/new', element: <BookingPage /> },
           { path: 'appointments/:id/edit', element: <BookingPage /> },
-          { path: 'customers', element: <Placeholder title="Customers" phase={9} /> },
-          { path: 'customers/:id', element: <Placeholder title="Customer profile" phase={9} /> },
+          { path: 'customers', element: <CustomersPage /> },
+          { path: 'customers/:id', element: <CustomerProfilePage /> },
           { path: 'leads', element: <Placeholder title="Leads" phase={10} /> },
           { path: 'checkout/:appointmentId', element: <Placeholder title="Checkout" phase={11} /> },
           { path: 'attendance', element: <Placeholder title="Staff attendance" phase={12} /> },

@@ -41,6 +41,7 @@ function useRefreshAppointments() {
     queryClient.invalidateQueries({ queryKey: ['appointments'] });
     queryClient.invalidateQueries({ queryKey: ['appointment'] });
     queryClient.invalidateQueries({ queryKey: ['availability'] });
+    queryClient.invalidateQueries({ queryKey: ['customers'] }); // profile numbers and history
   };
 }
 

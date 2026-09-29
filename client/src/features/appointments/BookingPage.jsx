@@ -2,6 +2,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { DateTime } from 'luxon';
 import { useAuth } from '../../auth/AuthContext';
 import { useAppointment } from '../../api/appointments';
+import { useCustomerProfile } from '../../api/customers';
 import { todayIn } from '../../lib/time';
 import { EmptyState, PageHeader, Spinner } from '../../components/ui';
 import BookingForm from './BookingForm';
@@ -26,12 +27,15 @@ function formValuesFrom(appointment, zone) {
   };
 }
 
-// /app/appointments/new (optionally ?date=2026-09-28) and /app/appointments/:id/edit
+// /app/appointments/new and /app/appointments/:id/edit
+// A new booking can be pre-filled from the URL: ?date=2026-09-28&customerId=...&staffId=... ("Book again")
 export default function BookingPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const { activeBranch } = useAuth();
   const appointmentQuery = useAppointment(id);
+  const customerId = searchParams.get('customerId');
+  const customerQuery = useCustomerProfile(id ? null : customerId);
 
   if (id) {
     if (appointmentQuery.isPending) {
@@ -52,12 +56,26 @@ export default function BookingPage() {
     }
   }
 
-  const initial = id ? formValuesFrom(appointmentQuery.data, activeBranch.timezone) : { date: searchParams.get('date') || todayIn(activeBranch.timezone) };
+  if (!id && customerId && customerQuery.isPending) {
+    return (
+      <div className="flex justify-center py-12">
+        <Spinner size={28} />
+      </div>
+    );
+  }
+
+  const initial = id
+    ? formValuesFrom(appointmentQuery.data, activeBranch.timezone)
+    : {
+        date: searchParams.get('date') || todayIn(activeBranch.timezone),
+        customer: customerQuery.data?.customer ?? null,
+        defaultStaffId: searchParams.get('staffId') ?? '',
+      };
 
   return (
     <>
       <PageHeader title={id ? 'Edit appointment' : 'New booking'} subtitle={activeBranch.name} />
-      <BookingForm key={id ?? 'new'} initial={initial} appointmentId={id} />
+      <BookingForm key={id ?? `new-${customerId ?? ''}`} initial={initial} appointmentId={id} />
     </>
   );
 }

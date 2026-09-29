@@ -35,7 +35,7 @@ export default function BookingForm({ initial, appointmentId }) {
   const [mode, setMode] = useState(initial.mode ?? 'services'); // 'services' or 'combo'
   const [serviceIds, setServiceIds] = useState(initial.serviceIds ?? []);
   const [comboId, setComboId] = useState(initial.comboId ?? '');
-  const [defaultStaffId, setDefaultStaffId] = useState(initial.defaultStaffId ?? '');
+  const [chosenStaffId, setDefaultStaffId] = useState(initial.defaultStaffId ?? '');
   const [overrides, setOverrides] = useState(initial.overrides ?? {}); // per service: { staffId, durationMinutes }
   const [date, setDate] = useState(initial.date);
   const [startTime, setStartTime] = useState(initial.startTime ?? '');
@@ -48,6 +48,8 @@ export default function BookingForm({ initial, appointmentId }) {
   const bookableServices = services.filter(offeredHere);
   const bookableCombos = combos.filter((c) => offeredHere(c) && c.serviceIds.every((s) => s.status === 'active'));
   const combo = mode === 'combo' ? combos.find((c) => c._id === comboId) : null;
+  // A stylist passed in (e.g. the customer's preferred one) only counts if they're active at this branch
+  const defaultStaffId = staff.some((s) => s._id === chosenStaffId) ? chosenStaffId : '';
 
   // Anything that changes the length or stylist makes the chosen time out of date
   const resetTime = () => setStartTime('');

@@ -9,6 +9,7 @@ export { default as EmptyState } from './EmptyState';
 export { default as Input } from './Input';
 export { default as Modal } from './Modal';
 export { default as PageHeader } from './PageHeader';
+export { default as Pagination } from './Pagination';
 export { default as Select } from './Select';
 export { default as Spinner } from './Spinner';
 export { default as Table } from './Table';
