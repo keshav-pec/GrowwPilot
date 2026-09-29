@@ -40,7 +40,7 @@ export default function DayBoardPage() {
     return ['absent', 'leave'].includes(status) ? status : null;
   };
   const setStatus = useSetAppointmentStatus();
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState(searchParams.get('open')); // ?open=<id> opens that appointment (from the dashboard)
 
   // Opening hours of this branch on this day, in the branch's timezone
   const opens = DateTime.fromISO(`${date}T${activeBranch.openTime}`, { zone });

@@ -48,7 +48,7 @@ export default function LeadsPage() {
   });
   const assignees = useAssignees().data ?? [];
   const [adding, setAdding] = useState(false);
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState(searchParams.get('open')); // ?open=<id> opens that lead (from the dashboard)
 
   const columns = [
     {

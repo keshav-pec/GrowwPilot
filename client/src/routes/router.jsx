@@ -21,6 +21,7 @@ import LeadConvertPage from '../features/leads/LeadConvertPage';
 import CheckoutPage from '../features/checkout/CheckoutPage';
 import InvoicePage from '../features/checkout/InvoicePage';
 import AttendancePage from '../features/attendance/AttendancePage';
+import DashboardPage from '../features/dashboard/DashboardPage';
 import NotFoundPage from './NotFoundPage';
 import Placeholder from '../components/Placeholder';
 
@@ -79,7 +80,7 @@ export const router = createBrowserRouter([
           {
             element: <ProtectedRoute roles={['OWNER']} />,
             children: [
-              { path: 'dashboard', element: <Placeholder title="Dashboard" subtitle="How is the salon doing today?" phase={13} /> },
+              { path: 'dashboard', element: <DashboardPage /> },
               { path: 'analytics', element: <Placeholder title="Analytics" phase={14} /> },
               { path: 'branches', element: <BranchesPage /> },
               { path: 'team', element: <TeamPage /> },

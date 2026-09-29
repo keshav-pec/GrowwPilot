@@ -38,6 +38,12 @@ Every account uses the password `Password@123`.
 ## Product and UX decisions
 
 - **The day board is the receptionist's home screen.** It answers "who is free right now?" at a glance: one column per stylist, time running down the page, and one-click buttons to move a booking along (Mark arrived → Start → Complete → Checkout). The **list view** is for searching and filtering (by date, status, stylist, or customer name/phone), and its filters live in the URL so a refresh keeps them.
+- **The owner's dashboard gives one verdict and a short to-do list, not ten reports.** An owner opening the app wants to know *"Is my salon doing fine, and what needs me?"*. So the top card, **Salon Pulse**, gives one verdict (Doing well / Keep an eye / Needs action) from three simple signals, each with a one-line reason:
+  1. **Revenue vs usual:** today so far, compared with the average of the same weekday over the last 4 weeks up to the same time of day (a quiet Monday morning isn't compared with a busy Saturday evening).
+  2. **Chairs filled:** booked stylist time as a share of the stylist time available today.
+  3. **Attention count:** how many urgent items are waiting.
+
+  Below it, **Requires attention** lists what to do, most urgent first, each with a one-click action: customers waiting or not showing up, bills not collected, bookings whose stylist is absent or inactive, overdue follow-ups and leads nobody has contacted in 24 hours. Every number is calculated live from the data, so it's always current.
 - **The server decides every booking conflict.** The free times shown in the booking form refresh every 60 seconds and only help the receptionist pick a slot. If two desks book the same stylist at the same moment, the first one to save wins and the other sees *"This slot was just booked by another desk. Please pick another time."*
 
 ## Technical decisions (short)
