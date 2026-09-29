@@ -8,6 +8,7 @@ import { useSaveAppointment } from '../../api/appointments';
 import { useConvertLead } from '../../api/leads';
 import { useCombos, useServices } from '../../api/catalog';
 import { useStaff } from '../../api/staff';
+import { useAttendance } from '../../api/attendance';
 import { formatMoney } from '../../lib/money';
 import { formatDay } from '../../lib/time';
 import { Button, Card, Input, Select, Textarea } from '../../components/ui';
@@ -29,7 +30,7 @@ export default function BookingForm({ initial, appointmentId, leadInfo }) {
 
   const services = useServices().data ?? [];
   const combos = useCombos().data ?? [];
-  const staff = (useStaff().data ?? []).filter((s) => s.status === 'active');
+  const activeStaff = (useStaff().data ?? []).filter((s) => s.status === 'active');
   const saveAppointment = useSaveAppointment();
   const convertLead = useConvertLead();
   const lead = leadInfo?.lead;
@@ -46,6 +47,12 @@ export default function BookingForm({ initial, appointmentId, leadInfo }) {
   const [source, setSource] = useState('phone');
   const [notes, setNotes] = useState(initial.notes ?? '');
   const [conflict, setConflict] = useState(null); // message when another desk took the slot
+
+  // Stylists marked absent or on leave for the chosen day can't be booked, so they're hidden
+  const attendanceRows = useAttendance(date).data?.rows ?? [];
+  const isAway = (staffId) => attendanceRows.some((r) => r.staff._id === staffId && ['absent', 'leave'].includes(r.attendance?.status));
+  const staff = activeStaff.filter((s) => !isAway(s._id));
+  const awayNames = activeStaff.filter((s) => isAway(s._id)).map((s) => s.name);
 
   // Only what can be booked at this branch
   const offeredHere = (x) => x.status === 'active' && (x.branchIds.length === 0 || x.branchIds.includes(activeBranchId));
@@ -241,6 +248,7 @@ export default function BookingForm({ initial, appointmentId, leadInfo }) {
             }}
           />
           <p className="mt-2 text-xs text-muted">The same stylist does every service. You can change it for a single service below.</p>
+          {awayNames.length > 0 && <p className="mt-1 text-xs text-orange">Not available on this day: {awayNames.join(', ')}</p>}
         </Card>
 
         <Card title="4. Date and time">

@@ -20,6 +20,7 @@ import LeadsPage from '../features/leads/LeadsPage';
 import LeadConvertPage from '../features/leads/LeadConvertPage';
 import CheckoutPage from '../features/checkout/CheckoutPage';
 import InvoicePage from '../features/checkout/InvoicePage';
+import AttendancePage from '../features/attendance/AttendancePage';
 import NotFoundPage from './NotFoundPage';
 import Placeholder from '../components/Placeholder';
 
@@ -72,7 +73,7 @@ export const router = createBrowserRouter([
           { path: 'leads/:id/convert', element: <LeadConvertPage /> },
           { path: 'checkout/:appointmentId', element: <CheckoutPage /> },
           { path: 'invoices/:id', element: <InvoicePage /> },
-          { path: 'attendance', element: <Placeholder title="Staff attendance" phase={12} /> },
+          { path: 'attendance', element: <AttendancePage /> },
 
           // Owner only
           {
@@ -83,7 +84,15 @@ export const router = createBrowserRouter([
               { path: 'branches', element: <BranchesPage /> },
               { path: 'team', element: <TeamPage /> },
               { path: 'catalog', element: <CatalogPage /> },
-              { path: 'settings/salary', element: <Placeholder title="Salary" message="Staff salary: coming soon." /> },
+              {
+                path: 'settings/salary',
+                element: (
+                  <Placeholder
+                    title="Salary & payouts"
+                    message="You’ll be able to set fixed pay and commission per stylist, and get a monthly payout sheet built from attendance and completed services."
+                  />
+                ),
+              },
             ],
           },
         ],

@@ -6,6 +6,7 @@ import { CalendarPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useAppointments, useSetAppointmentStatus } from '../../api/appointments';
 import { useStaff } from '../../api/staff';
+import { useAttendance } from '../../api/attendance';
 import { NEXT_STEP, STATUS_LABEL, getAlert } from '../../lib/appointments';
 import { addDays, formatDay, formatTime, todayIn } from '../../lib/time';
 import { Button, EmptyState, PageHeader, Spinner } from '../../components/ui';
@@ -33,6 +34,11 @@ export default function DayBoardPage() {
 
   const appointmentsQuery = useAppointments({ date });
   const staffQuery = useStaff();
+  const attendanceRows = useAttendance(date).data?.rows ?? [];
+  const awayStatus = (staffId) => {
+    const status = attendanceRows.find((r) => r.staff._id === staffId)?.attendance?.status;
+    return ['absent', 'leave'].includes(status) ? status : null;
+  };
   const setStatus = useSetAppointmentStatus();
   const [selectedId, setSelectedId] = useState(null);
 
@@ -48,10 +54,9 @@ export default function DayBoardPage() {
   const appointments = (appointmentsQuery.data ?? []).filter((a) => a.status !== 'CANCELLED');
   const selected = appointments.find((a) => a._id === selectedId);
 
-  // Columns: active stylists, plus anyone who has a booking today (e.g. deactivated since)
-  const columns = (staffQuery.data ?? []).filter(
-    (s) => s.status === 'active' || appointments.some((a) => a.items.some((i) => i.staffId === s._id))
-  );
+  // Columns: active stylists who are in today, plus anyone who has a booking (e.g. deactivated or absent since)
+  const hasBooking = (s) => appointments.some((a) => a.items.some((i) => i.staffId === s._id));
+  const columns = (staffQuery.data ?? []).filter((s) => (s.status === 'active' && !awayStatus(s._id)) || hasBooking(s));
 
   function nextStep(e, appointment) {
     e.stopPropagation(); // don't also open the drawer
@@ -134,6 +139,7 @@ export default function DayBoardPage() {
                   <div className="sticky top-0 flex h-10 items-center border-b border-border bg-surface px-3 text-sm font-medium">
                     {staff.name}
                     {staff.status !== 'active' && <span className="ml-1 text-xs text-orange">(inactive)</span>}
+                    {awayStatus(staff._id) && <span className="ml-1 text-xs text-orange">({awayStatus(staff._id)})</span>}
                   </div>
                   <div className="relative" style={{ height: dayMinutes * PX_PER_MINUTE }}>
                     {/* Hour lines */}

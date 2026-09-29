@@ -124,6 +124,11 @@ export default function StaffFormModal({ staff, onClose }) {
             {...register('branchId')}
           />
           {saveStaff.isError && <p className="text-sm text-danger sm:col-span-2">{saveStaff.error.message}</p>}
+          {staff && (
+            <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted sm:col-span-2">
+              Salary &amp; payouts: coming soon.
+            </p>
+          )}
         </form>
       </Modal>
 
