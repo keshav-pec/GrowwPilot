@@ -13,6 +13,7 @@ import staffRoutes from './modules/staff/staff.routes.js';
 import userRoutes from './modules/users/users.routes.js';
 import serviceRoutes from './modules/services/services.routes.js';
 import comboRoutes from './modules/combos/combos.routes.js';
+import availabilityRoutes from './modules/appointments/availability.routes.js';
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/combos', comboRoutes);
+app.use('/api/availability', availabilityRoutes);
 
 // --- Errors (must come after all routes) ---
 app.use(notFound);

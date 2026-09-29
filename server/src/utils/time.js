@@ -19,6 +19,11 @@ export function toBranchTime(date, zone) {
   return DateTime.fromJSDate(date, { zone });
 }
 
+// A UTC Date -> "2:30 PM" in the branch's timezone (for messages like "booked from 2:00 PM to 2:45 PM")
+export function formatTime(date, zone) {
+  return toBranchTime(date, zone).toFormat('h:mm a');
+}
+
 // Today's date in the branch's timezone, e.g. '2026-09-28'.
 // Late at night in Dubai it can already be tomorrow in Kolkata, so "today" depends on the branch.
 export function todayInZone(zone) {
