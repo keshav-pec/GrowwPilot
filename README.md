@@ -4,8 +4,8 @@
 
 GrowwPilot runs many salons on one platform. Each salon (an *organization*) has one or more branches, its own staff, services, customers, leads, bookings and payments, and it can never see another salon's data.
 
-- **Live demo:** _add your Vercel URL here after deploying_
-- **Demo password for every account:** `Password@123` (the login page also has a clickable "Demo accounts" list)
+- **Live demo:** growwpilot.vercel.app
+- **Demo accounts:** login page has a clickable "Demo accounts" list
 
 | Role | Email | What to try |
 |---|---|---|
@@ -49,6 +49,8 @@ GrowwPilot runs many salons on one platform. Each salon (an *organization*) has 
 | **Customer** | No | A record: created by the front desk or by converting a lead |
 
 There are **two kinds of owner**: the **primary owner** sees and manages every branch, and a **branch owner** only sees the branches the primary owner gives them.
+
+**Help assistant:** owners and front desk users also get a round chat button at the bottom right. Ask it *"how do I take a split payment?"* or *"what does Salon Pulse mean?"* and it answers with the steps **for your role**, links you to the right screen, and tells a front desk user who to ask for owner-only tasks. The **Need help?** link in the sidebar still emails GrowwPilot support.
 
 ---
 
@@ -156,7 +158,7 @@ npm run dev
 
 ```bash
 cd server
-npm test                  # 60 Vitest tests, on a temporary in-memory MongoDB replica set (never your real data)
+npm test                  # 94 Vitest tests, on a temporary in-memory MongoDB replica set (never your real data)
 npm run smoke:isolation   # tenant isolation check against a running API with the demo seed (see section 12)
 ```
 
@@ -167,6 +169,7 @@ The tests cover the parts where a bug would cost money or trust:
 - **Lead conversion:** links to an existing customer by phone; a clash rolls back everything (no customer, no booking, lead unchanged).
 - **Checkout:** ₹1,530 = 1,000 + 500 + 30 works; ₹30 short fails; discount larger than the bill fails; paying twice (including two desks at the same moment) fails; invoice numbers never skip.
 - **Dashboard warnings:** no-show, waiting and running-late rules.
+- **Help assistant:** 26 typical questions land on the right topic; answers are limited to the asker's role (front desk vs owner, main owner vs branch owner); unknown questions get an honest "not sure" with suggestions.
 
 ---
 
@@ -210,6 +213,7 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 - **Checkout makes mistakes hard:** a live "Remaining ₹30" bar, a "Rest" button that fills in what's left, and the Pay button only works at exactly ₹0.
 - **Deactivating a stylist who has future bookings** first shows those bookings and asks to confirm; they then appear in Requires attention so they get reassigned.
 - **Converting a lead** reuses the booking form and says upfront whether the customer already exists (*"Existing customer found: Priya S. The booking will be linked to her profile."*).
+- **The help assistant feels like a chat, but stays honest.** It shows typing dots, then the answer types itself out, like an AI chat. Every answer says which help article it came from and offers a button to open that screen. It answers for *your* role only: a front desk user asking how to add a stylist is told that owners do that, not given steps for a page they can't open. When it doesn't understand, it says so and suggests questions instead of guessing. It stays open with its history as you move between pages, and it doesn't replace the **Need help?** email link.
 - **Charts:** every chart shows one series in one colour, the heatmap uses a single hue from light to dark (checked with a palette validator), and every chart has a table of the same numbers, so nothing depends on hovering or on colour alone. Statuses always pair an icon with a text label.
 
 ---
@@ -228,6 +232,12 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 - **Auth:** JWT (holding only the user id) in an httpOnly, SameSite=Lax cookie (Secure in production); passwords hashed with bcrypt; the user and their salon are reloaded on every request, so deactivating a user or a salon logs them out on their next click. Failed logins are rate-limited.
 - **Validation twice:** Zod on the server for every request (the source of truth), and on the client for instant feedback.
 - **Security basics:** helmet headers, CORS limited to the client URL, a 100 kB body limit, env vars checked at start-up, error responses without stack traces in production, and no secrets in the repo.
+- **Help assistant = the simplest possible retrieval** (`server/src/modules/help/`). There's no AI model, no document upload and no chunking: the "documents" are 36 hand-written help topics in `help.knowledge.js`, each with keywords, the roles it's for, and an answer (optionally a different answer per role). For each question the server:
+  1. **cleans the text:** lower case, no punctuation, drops filler words ("how do I…"), trims plurals and maps synonyms (stylist / barber / beautician → *staff*, appointment → *booking*);
+  2. **scores every topic:** a keyword counts when all its words are in the question, worth 1 point per word (strong single words like *checkout* are worth 2); on a tie a specific topic ("cancel a booking") beats a general one ("booking");
+  3. **answers for the asker:** the role comes from the session, never from the request. If the role is allowed it gets the steps (and a link); if not, it gets *who* can do it instead; below 2 points it says it isn't sure and suggests questions.
+
+  The matching is a pure function, so it's unit-tested without a database.
 
 ---
 
@@ -239,6 +249,7 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 - **Revenue signal compares with the last 4 same weekdays.** Simple and explainable, but it says "No data" for a new salon's first month.
 - **Some pages load all rows for the selected day or branch** (with a limit) instead of full pagination. Customers are paginated because that list grows forever.
 - **Server-side PDF** uses pdfkit's built-in fonts, so amounts show as "Rs." instead of "₹".
+- **Keyword matching instead of a real AI model for the help assistant.** It's free, instant, can't make things up, and every answer is written and checked by us, but it only understands questions whose words overlap its keywords, and it has no memory of the conversation. Swapping the matcher for an LLM later only changes `help.matcher.js`; the role rules and the chat window stay the same.
 
 ---
 
@@ -289,4 +300,4 @@ This project was built with **Claude Code** (Anthropic's AI coding assistant) as
 
 ## 14. Future scope
 
-Ordered roughly by value (from the plan's bonus phases): automated API/E2E test suite, walk-in quick add, an audit log (who changed what), drag-to-reschedule and a week view, a staff free/busy view, real-time sync with WebSockets, a "win back" list of customers who haven't returned, WhatsApp confirmations and reminders, before/after photos, emailing the sales PDF, an in-app help chatbot, a staff salary module (fixed pay + commission from attendance and completed services), and no-show tracking with reminders.
+Ordered roughly by value (from the plan's bonus phases): automated API/E2E test suite, walk-in quick add, an audit log (who changed what), drag-to-reschedule and a week view, a staff free/busy view, real-time sync with WebSockets, a "win back" list of customers who haven't returned, WhatsApp confirmations and reminders, before/after photos, emailing the sales PDF, an LLM-backed help assistant that can also answer questions about your own data (the current one matches keywords over a fixed help knowledge base), a staff salary module (fixed pay + commission from attendance and completed services), and no-show tracking with reminders.

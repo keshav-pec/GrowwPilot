@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Shell from './Shell';
 import BranchSwitcher from './BranchSwitcher';
+import ChatAssistant from '../components/ChatAssistant';
 import { useAuth } from '../auth/AuthContext';
 
 // Sidebar menu. `roles` says who sees each item.
@@ -34,5 +35,11 @@ export default function AppLayout() {
   const { user } = useAuth();
   const navItems = APP_NAV.filter((item) => item.roles.includes(user.role));
 
-  return <Shell navItems={navItems} topBarRight={<BranchSwitcher />} />;
+  return (
+    <>
+      <Shell navItems={navItems} topBarRight={<BranchSwitcher />} />
+      {/* Help assistant for owners and front desk (it stays open while you move between pages) */}
+      <ChatAssistant />
+    </>
+  );
 }

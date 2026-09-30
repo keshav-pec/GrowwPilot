@@ -81,7 +81,7 @@ export default function Shell({ navItems, topBarRight }) {
           <div className="ml-auto">{topBarRight}</div>
         </header>
 
-        <main className="p-4 md:p-8 print:p-0">
+        <main className="p-4 pb-24 md:p-8 md:pb-24 print:p-0">
           <Outlet />
         </main>
       </div>

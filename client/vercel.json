@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://YOUR-RENDER-SERVICE.onrender.com/api/$1"
+      "destination": "https://growwpilot-api.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",

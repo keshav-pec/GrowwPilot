@@ -21,6 +21,7 @@ import invoiceRoutes from './modules/invoices/invoices.routes.js';
 import attendanceRoutes from './modules/attendance/attendance.routes.js';
 import dashboardRoutes from './modules/dashboard/dashboard.routes.js';
 import analyticsRoutes from './modules/analytics/analytics.routes.js';
+import helpRoutes from './modules/help/help.routes.js';
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/help', helpRoutes);
 
 // --- Errors (must come after all routes) ---
 app.use(notFound);
