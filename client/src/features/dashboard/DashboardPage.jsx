@@ -6,11 +6,6 @@ import { formatTime } from '../../lib/time';
 import { Card, EmptyState, PageHeader, Spinner } from '../../components/ui';
 
 // Each status always has an icon AND a label, so colour is never the only signal
-const VERDICT = {
-  good: { icon: CheckCircle2, color: 'text-good', label: 'Doing well', note: 'Nothing needs you right now.' },
-  watch: { icon: AlertTriangle, color: 'text-gold-dark', label: 'Keep an eye', note: 'A few things could go better today.' },
-  action: { icon: OctagonAlert, color: 'text-danger', label: 'Needs action', note: 'Something needs your attention now.' },
-};
 const SIGNAL = {
   good: { icon: CircleCheck, color: 'text-good', label: 'Good' },
   watch: { icon: CircleAlert, color: 'text-gold-dark', label: 'Watch' },
@@ -30,34 +25,22 @@ function StatTile({ label, value, note }) {
 }
 
 function SalonPulse({ pulse }) {
-  const verdict = VERDICT[pulse.verdict];
-  const Icon = verdict.icon;
   return (
     <Card className="mb-4">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center">
-        <div className="flex items-center gap-3 md:w-72">
-          <Icon size={40} className={verdict.color} aria-hidden />
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted">Salon pulse</p>
-            <p className="text-2xl font-bold text-ink">{verdict.label}</p>
-            <p className="text-sm text-muted">{verdict.note}</p>
-          </div>
-        </div>
-        <ul className="flex flex-1 flex-col gap-2 border-t border-border pt-3 md:border-l md:border-t-0 md:pl-4 md:pt-0">
-          {pulse.signals.map((signal) => {
-            const s = SIGNAL[signal.status];
-            const SignalIcon = s.icon;
-            return (
-              <li key={signal.key} className="flex items-start gap-2 text-sm">
-                <SignalIcon size={18} className={`mt-0.5 shrink-0 ${s.color}`} aria-label={s.label} />
-                <p>
-                  <span className="font-medium">{signal.label}:</span> <span className="text-muted">{signal.reason}</span>
-                </p>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+      <ul className="flex flex-col gap-2">
+        {pulse.signals.map((signal) => {
+          const s = SIGNAL[signal.status];
+          const SignalIcon = s.icon;
+          return (
+            <li key={signal.key} className="flex items-start gap-2 text-sm">
+              <SignalIcon size={18} className={`mt-0.5 shrink-0 ${s.color}`} aria-label={s.label} />
+              <p>
+                <span className="font-medium">{signal.label}:</span> <span className="text-muted">{signal.reason}</span>
+              </p>
+            </li>
+          );
+        })}
+      </ul>
     </Card>
   );
 }

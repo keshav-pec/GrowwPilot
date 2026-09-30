@@ -11,6 +11,8 @@ const envSchema = z.object({
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
   CLIENT_ORIGIN: z.url().default('http://localhost:5173'),
+  // How many proxies sit in front of the API (Vercel -> Render = 2). Needed to see the real visitor IP.
+  TRUST_PROXY: z.coerce.number().int().min(0).default(1),
 });
 
 const result = envSchema.safeParse(process.env);

@@ -7,7 +7,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "seed": "node src/scripts/seed.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "smoke:isolation": "node src/scripts/isolation-smoke-test.js"
   },
   "author": "",
   "license": "ISC",

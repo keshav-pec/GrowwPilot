@@ -24,9 +24,9 @@ import analyticsRoutes from './modules/analytics/analytics.routes.js';
 
 const app = express();
 
-// In production the API sits behind a proxy (Render/Vercel). This lets Express see the
-// real visitor IP, which the login rate limiter needs.
-app.set('trust proxy', 1);
+// In production the API sits behind proxies (Vercel -> Render). Trusting that many hops lets Express
+// see the real visitor IP, which the login rate limiter needs (otherwise every visitor looks like Vercel).
+app.set('trust proxy', env.TRUST_PROXY);
 
 // --- Global middleware ---
 app.use(helmet()); // sets safe HTTP headers

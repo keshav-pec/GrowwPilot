@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { DateTime } from 'luxon';
 import toast from 'react-hot-toast';
@@ -52,6 +52,7 @@ export default function DayBoardPage() {
   for (let t = opens; t < closes; t = t.plus({ hours: 1 })) hours.push(t);
 
   const appointments = (appointmentsQuery.data ?? []).filter((a) => a.status !== 'CANCELLED');
+  const firstStart = appointments.flatMap((a) => a.items.map((i) => i.startAt)).sort()[0]; // earliest booking of the day
   const selected = appointments.find((a) => a._id === selectedId);
 
   // Columns: active stylists who are in today, plus anyone who has a booking (e.g. deactivated or absent since)
@@ -71,6 +72,13 @@ export default function DayBoardPage() {
   }
 
   const isLoading = appointmentsQuery.isPending || staffQuery.isPending;
+
+  // When the board opens, scroll to "now" (today) or to the first booking, instead of opening time
+  useEffect(() => {
+    if (isLoading) return;
+    const target = document.querySelector('[data-now-line]') ?? document.querySelector('[data-first-block]');
+    target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [isLoading, date]);
 
   return (
     <>
@@ -149,17 +157,21 @@ export default function DayBoardPage() {
 
                     {/* "Now" line */}
                     {isToday && DateTime.now() > opens && DateTime.now() < closes && (
-                      <div className="absolute inset-x-0 z-10 border-t-2 border-orange" style={{ top: DateTime.now().diff(opens, 'minutes').minutes * PX_PER_MINUTE }} />
+                      <div data-now-line className="absolute inset-x-0 z-10 border-t-2 border-good" style={{ top: DateTime.now().diff(opens, 'minutes').minutes * PX_PER_MINUTE }} />
                     )}
 
                     {blocks.map(({ appointment, item }) => {
                       const alert = getAlert(appointment);
                       const next = NEXT_STEP[appointment.status];
+                      // Short blocks only have room for 2 lines; their warning shows as the orange ring + tooltip
+                      const roomForAlert = item.durationMinutes * PX_PER_MINUTE >= 64;
                       return (
                         <button
                           key={item._id}
+                          data-first-block={item.startAt === firstStart || undefined}
                           type="button"
                           onClick={() => setSelectedId(appointment._id)}
+                          title={`${appointment.customerSnapshot.name} · ${item.serviceName} · ${formatTime(item.startAt, zone)}–${formatTime(item.endAt, zone)}${alert ? ` · ${alert}` : ''}`}
                           className={`absolute inset-x-1 overflow-hidden rounded-md border-l-4 px-2 py-1 text-left text-xs shadow-sm hover:shadow ${BLOCK_STYLE[appointment.status]} ${alert ? 'ring-2 ring-orange' : ''}`}
                           style={{ top: minutesFromOpen(item.startAt) * PX_PER_MINUTE, height: Math.max(item.durationMinutes * PX_PER_MINUTE, 24) }}
                         >
@@ -190,7 +202,7 @@ export default function DayBoardPage() {
                           <p className="truncate text-muted">
                             {item.serviceName} · {formatTime(item.startAt, zone)}–{formatTime(item.endAt, zone)}
                           </p>
-                          {alert && <p className="font-medium text-orange">{alert}</p>}
+                          {alert && roomForAlert && <p className="font-medium text-orange">{alert}</p>}
                         </button>
                       );
                     })}

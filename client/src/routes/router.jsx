@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { ROLE_HOME } from '../lib/constants';
@@ -22,9 +23,12 @@ import CheckoutPage from '../features/checkout/CheckoutPage';
 import InvoicePage from '../features/checkout/InvoicePage';
 import AttendancePage from '../features/attendance/AttendancePage';
 import DashboardPage from '../features/dashboard/DashboardPage';
-import AnalyticsPage from '../features/analytics/AnalyticsPage';
 import NotFoundPage from './NotFoundPage';
 import Placeholder from '../components/Placeholder';
+import { Spinner } from '../components/ui';
+
+// Analytics uses a big chart library, so it's only downloaded when an owner opens that page
+const AnalyticsPage = lazy(() => import('../features/analytics/AnalyticsPage'));
 
 // "/" sends you to your home page, or to login if you are not logged in
 function HomeRedirect() {
@@ -82,7 +86,14 @@ export const router = createBrowserRouter([
             element: <ProtectedRoute roles={['OWNER']} />,
             children: [
               { path: 'dashboard', element: <DashboardPage /> },
-              { path: 'analytics', element: <AnalyticsPage /> },
+              {
+                path: 'analytics',
+                element: (
+                  <Suspense fallback={<Spinner size={28} />}>
+                    <AnalyticsPage />
+                  </Suspense>
+                ),
+              },
               { path: 'branches', element: <BranchesPage /> },
               { path: 'team', element: <TeamPage /> },
               { path: 'catalog', element: <CatalogPage /> },

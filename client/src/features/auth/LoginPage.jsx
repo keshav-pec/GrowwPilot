@@ -8,6 +8,15 @@ import { useAuth } from '../../auth/AuthContext';
 import { ROLE_HOME } from '../../lib/constants';
 import { Button, Card, Input } from '../../components/ui';
 
+const DEMO_PASSWORD = 'Password@123';
+const DEMO_ACCOUNTS = [
+  ['Super Admin', 'admin@growwpilot.com'],
+  ['Owner · Glamour Studio (all branches)', 'owner@glamour.com'],
+  ['Branch owner · Bandra only', 'bandra.owner@glamour.com'],
+  ['Front desk · Andheri', 'desk.andheri@glamour.com'],
+  ['Owner · Desert Rose (Dubai)', 'owner@desertrose.com'],
+];
+
 const loginSchema = z.object({
   email: z.email('Enter a valid email'),
   password: z.string().min(1, 'Password is required'),
@@ -21,8 +30,15 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm({ resolver: zodResolver(loginSchema) });
+
+  // Demo: click an account to fill in the form
+  function fillDemo(email) {
+    setValue('email', email, { shouldValidate: true });
+    setValue('password', DEMO_PASSWORD, { shouldValidate: true });
+  }
 
   const loginMutation = useMutation({
     mutationFn: ({ email, password }) => login(email, password),
@@ -65,6 +81,22 @@ export default function LoginPage() {
             Log in
           </Button>
         </form>
+
+        {/* Demo accounts from the seed script (npm run seed). Click one to fill in the form. */}
+        <details className="mt-6 rounded-lg border border-border px-3 py-2 text-sm">
+          <summary className="cursor-pointer font-medium text-ink">Demo accounts</summary>
+          <p className="mt-2 text-xs text-muted">Password for all: {DEMO_PASSWORD}</p>
+          <ul className="mt-2 flex flex-col gap-1">
+            {DEMO_ACCOUNTS.map(([label, email]) => (
+              <li key={email}>
+                <button type="button" onClick={() => fillDemo(email)} className="w-full rounded px-2 py-1 text-left hover:bg-surface">
+                  <span className="font-medium">{label}</span>
+                  <span className="block text-xs text-muted">{email}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
       </Card>
     </div>
   );

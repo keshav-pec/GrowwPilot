@@ -1,18 +1,9 @@
-import Spinner from './Spinner';
 import EmptyState from './EmptyState';
 
 // columns: [{ key: 'name', header: 'Name', render: (row) => ... }]
 // If a column has no render function, row[key] is shown as it is.
 export default function Table({ columns, rows = [], rowKey = '_id', loading = false, empty, onRowClick }) {
-  if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner size={28} />
-      </div>
-    );
-  }
-
-  if (rows.length === 0) {
+  if (!loading && rows.length === 0) {
     return empty || <EmptyState title="Nothing here yet" />;
   }
 
@@ -30,19 +21,30 @@ export default function Table({ columns, rows = [], rowKey = '_id', loading = fa
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row[rowKey]}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={`border-t border-border ${onRowClick ? 'cursor-pointer hover:bg-yellow-soft' : ''}`}
-            >
-              {columns.map((col) => (
-                <td key={col.key} className="whitespace-nowrap px-4 py-3">
-                  {col.render ? col.render(row) : row[col.key]}
-                </td>
+          {loading
+            ? // Loading: grey placeholder rows in the table's own shape (no layout jump when data arrives)
+              [1, 2, 3, 4].map((n) => (
+                <tr key={n} className="border-t border-border">
+                  {columns.map((col) => (
+                    <td key={col.key} className="px-4 py-3">
+                      <div className="h-4 animate-pulse rounded bg-surface" />
+                    </td>
+                  ))}
+                </tr>
+              ))
+            : rows.map((row) => (
+                <tr
+                  key={row[rowKey]}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  className={`border-t border-border ${onRowClick ? 'cursor-pointer hover:bg-yellow-soft' : ''}`}
+                >
+                  {columns.map((col) => (
+                    <td key={col.key} className="whitespace-nowrap px-4 py-3">
+                      {col.render ? col.render(row) : row[col.key]}
+                    </td>
+                  ))}
+                </tr>
               ))}
-            </tr>
-          ))}
         </tbody>
       </table>
     </div>

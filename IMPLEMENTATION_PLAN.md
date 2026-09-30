@@ -660,8 +660,8 @@ The suggested commit messages are there to give your git history a clear shape.
 - **Full seed:**
   - 2 salons, 3 branches in total
   - 8 staff, 10 services, 2 combos
-  - 25 customers, 18 leads (all statuses and sources, some overdue)
-  - 30 appointments spread over past, today and future, in every status, some with several services, some already paid with split payments
+  - 13 customers, 9 leads (all statuses and sources, some overdue)
+  - about 100 appointments spread over past, today and future, in every status, some with several services, some already paid with split payments
   - Today's appointments are generated **relative to the current time**, so the dashboard always looks alive.
 - **Polish:** loading skeletons, empty states with a clear next action, success toasts, form validation messages, confirm dialogs for destructive actions, and responsive checks at phone, tablet and desktop widths.
 - **Security pass:**

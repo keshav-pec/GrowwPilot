@@ -1,0 +1,22 @@
+# Render Blueprint for the API (Render dashboard -> New -> Blueprint -> pick this repo).
+# Secrets are NOT stored here: Render asks for the values marked "sync: false" when you create it.
+services:
+  - type: web
+    name: growwpilot-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI # your Atlas connection string, ending in /growwpilot?...
+        sync: false
+      - key: JWT_SECRET # Render generates a long random value
+        generateValue: true
+      - key: CLIENT_ORIGIN # your Vercel URL, e.g. https://growwpilot.vercel.app
+        sync: false
+      - key: TRUST_PROXY # requests arrive through Vercel, then Render's own proxy
+        value: 2
