@@ -23,8 +23,8 @@ import CheckoutPage from '../features/checkout/CheckoutPage';
 import InvoicePage from '../features/checkout/InvoicePage';
 import AttendancePage from '../features/attendance/AttendancePage';
 import DashboardPage from '../features/dashboard/DashboardPage';
+import PayrollPage from '../features/payroll/PayrollPage';
 import NotFoundPage from './NotFoundPage';
-import Placeholder from '../components/Placeholder';
 import { Spinner } from '../components/ui';
 
 // Analytics uses a big chart library, so it's only downloaded when an owner opens that page
@@ -36,7 +36,7 @@ function HomeRedirect() {
   return <Navigate to={user ? ROLE_HOME[user.role] : '/login'} replace />;
 }
 
-// The screen map (plan, Phase 2). Each Placeholder is replaced by a real page in its phase.
+// The screen map (plan, Phase 2).
 export const router = createBrowserRouter([
   { path: '/', element: <HomeRedirect /> },
   { path: '/login', element: <LoginPage /> },
@@ -80,6 +80,7 @@ export const router = createBrowserRouter([
           { path: 'checkout/:appointmentId', element: <CheckoutPage /> },
           { path: 'invoices/:id', element: <InvoicePage /> },
           { path: 'attendance', element: <AttendancePage /> },
+          { path: 'payroll', element: <PayrollPage /> }, // front desk: pay setup + requests only
 
           // Owner only
           {
@@ -97,15 +98,7 @@ export const router = createBrowserRouter([
               { path: 'branches', element: <BranchesPage /> },
               { path: 'team', element: <TeamPage /> },
               { path: 'catalog', element: <CatalogPage /> },
-              {
-                path: 'settings/salary',
-                element: (
-                  <Placeholder
-                    title="Salary & payouts"
-                    message="You’ll be able to set fixed pay and commission per stylist, and get a monthly payout sheet built from attendance and completed services."
-                  />
-                ),
-              },
+              { path: 'settings/salary', element: <Navigate to="/app/payroll" replace /> }, // old link
             ],
           },
         ],

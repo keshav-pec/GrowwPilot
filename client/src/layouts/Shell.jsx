@@ -51,7 +51,9 @@ export default function Shell({ navItems, topBarRight }) {
 
         <div className="border-t border-white/15 px-5 py-4">
           <p className="text-sm font-medium">{user.name}</p>
-          <p className="text-xs text-white/60">{ROLE_LABEL[user.role]}</p>
+          <p className="text-xs text-white/60">
+            {user.role === 'OWNER' ? (user.allBranches ? 'Business owner' : 'Branch owner') : ROLE_LABEL[user.role]}
+          </p>
           {user.role !== 'SUPER_ADMIN' && (
             <a
               href="mailto:support@growwpilot.com?subject=Help%20with%20GrowwPilot"

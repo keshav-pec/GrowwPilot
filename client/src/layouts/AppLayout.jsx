@@ -14,6 +14,7 @@ import {
 import Shell from './Shell';
 import BranchSwitcher from './BranchSwitcher';
 import ChatAssistant from '../components/ChatAssistant';
+import NotificationBell from '../components/NotificationBell';
 import { useAuth } from '../auth/AuthContext';
 
 // Sidebar menu. `roles` says who sees each item.
@@ -28,7 +29,9 @@ const APP_NAV = [
   { to: '/app/team', label: 'Team', icon: UserCog, roles: ['OWNER'] },
   { to: '/app/branches', label: 'Branches', icon: Building2, roles: ['OWNER'] },
   { to: '/app/catalog', label: 'Services & combos', icon: Scissors, roles: ['OWNER'] },
-  { to: '/app/settings/salary', label: 'Salary', icon: Wallet, roles: ['OWNER'] },
+  // Same screen: owners get all of payroll, the front desk only pay setup and requests
+  { to: '/app/payroll', label: 'Payroll', icon: Wallet, roles: ['OWNER'] },
+  { to: '/app/payroll', label: 'Staff pay', icon: Wallet, roles: ['FRONT_DESK'] },
 ];
 
 export default function AppLayout() {
@@ -37,7 +40,15 @@ export default function AppLayout() {
 
   return (
     <>
-      <Shell navItems={navItems} topBarRight={<BranchSwitcher />} />
+      <Shell
+        navItems={navItems}
+        topBarRight={
+          <div className="flex items-center gap-3">
+            <BranchSwitcher />
+            <NotificationBell />
+          </div>
+        }
+      />
       {/* Help assistant for owners and front desk (it stays open while you move between pages) */}
       <ChatAssistant />
     </>

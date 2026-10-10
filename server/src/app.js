@@ -22,6 +22,9 @@ import attendanceRoutes from './modules/attendance/attendance.routes.js';
 import dashboardRoutes from './modules/dashboard/dashboard.routes.js';
 import analyticsRoutes from './modules/analytics/analytics.routes.js';
 import helpRoutes from './modules/help/help.routes.js';
+import payrollRoutes from './modules/payroll/payroll.routes.js';
+import activityRoutes from './modules/activity/activity.routes.js';
+import notificationRoutes from './modules/notifications/notifications.routes.js';
 
 const app = express();
 
@@ -56,6 +59,9 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/help', helpRoutes);
+app.use('/api/payroll', payrollRoutes);
+app.use('/api/activity', activityRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // --- Errors (must come after all routes) ---
 app.use(notFound);

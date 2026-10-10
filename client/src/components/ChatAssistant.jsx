@@ -141,7 +141,7 @@ export default function ChatAssistant() {
       {open && (
         <section
           aria-label="GrowwPilot assistant"
-          className="fixed bottom-24 right-4 z-50 flex h-[min(34rem,calc(100vh-8rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-border bg-bg shadow-2xl sm:right-6"
+          className="fixed bottom-24 right-4 z-40 flex h-[min(34rem,calc(100vh-8rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-border bg-bg shadow-2xl sm:right-6"
         >
           {/* Header */}
           <div className="flex items-center gap-3 bg-brown px-4 py-3 text-white">
@@ -230,7 +230,7 @@ export default function ChatAssistant() {
       {/* The round button */}
       <button
         onClick={() => (open ? setOpen(false) : openChat())}
-        className="fixed bottom-5 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gold text-ink shadow-lg transition hover:scale-105 hover:bg-gold-dark sm:right-6"
+        className="fixed bottom-5 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gold text-ink shadow-lg transition hover:scale-105 hover:bg-gold-dark sm:right-6"
         aria-label={open ? 'Close assistant' : 'Open help assistant'}
         title="Ask the GrowwPilot assistant"
       >

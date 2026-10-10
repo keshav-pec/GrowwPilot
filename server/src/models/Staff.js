@@ -1,7 +1,8 @@
 import mongoose from 'mongoose';
-import { ref, money } from './fields.js';
+import { ref } from './fields.js';
 
 // A stylist or beautician. They don't log in; they are assigned to appointments.
+// How they are paid lives in PayPlan (one row per pay setup, with a start date).
 const staffSchema = new mongoose.Schema(
   {
     orgId: ref('Organization', { required: true }),
@@ -15,12 +16,6 @@ const staffSchema = new mongoose.Schema(
     // Bumped inside every booking transaction. Two bookings for the same stylist
     // at the same moment both try to change this, so one of them has to wait/retry (plan 4.1).
     scheduleVersion: { type: Number, default: 0 },
-
-    // Reserved for the future salary module (not used yet)
-    salary: {
-      monthlyBase: money(),
-      commissionPercent: { type: Number, min: 0, max: 100 },
-    },
   },
   { timestamps: true }
 );

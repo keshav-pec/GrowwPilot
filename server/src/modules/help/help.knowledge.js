@@ -354,11 +354,42 @@ export const KNOWLEDGE = [
   },
   {
     id: 'salary',
-    title: 'Staff salary',
+    title: 'Setting or changing someone’s pay',
+    audiences: EVERYONE,
+    keywords: ['*salary', '*payroll', '*commission', 'staff salary', 'change pay', 'set pay', 'pay setup', 'staff pay', '*raise', '*increment', '*wage', 'per day pay', 'hourly pay'],
+    answer:
+      'Open **Payroll → Pay setup** and click the person. Click **Set up pay** or **Change pay**, choose how they’re paid (monthly salary, salary + commission, commission only, per day, per hour, per service, or a mix), enter the amounts and the start date, then **Save**. The old pay stays in their history, and every change goes in the **Activity log**.',
+    for: {
+      BRANCH_OWNER:
+        'Open **Payroll → Pay setup** and click the person (you can only see your own branches). Click **Set up pay** or **Change pay**, choose how they’re paid, enter the amounts and the start date, then **Save**. The change is logged and the business owner is notified.',
+      FRONT_DESK:
+        'Open **Staff pay**, click the person and click **Request a change**. Choose how they’re paid, the amounts, the start date and a reason, then **Send for approval**. Nothing changes until an owner approves it; you’ll see the answer in the bell at the top.',
+    },
+    link: { label: 'Pay setup', to: '/app/payroll' },
+  },
+  {
+    id: 'pay-requests',
+    title: 'Approving pay change requests',
     audiences: OWNERS,
-    keywords: ['*salary', '*payroll', '*commission', '*payout'],
-    answer: 'Staff salary and payouts are coming soon: fixed pay plus commission per service, with a monthly payout sheet from attendance and completed services.',
-    denied: 'Salary is an owner feature, and it’s coming soon.',
+    keywords: ['approve pay', 'pay request', 'approve request', 'salary request', 'approve salary', '*approval', '*approve'],
+    answer:
+      'When the front desk asks to change someone’s pay, you get a message in the **bell** at the top. Open **Payroll → Requests**, check what was asked and why, then click **Approve** or **Don’t approve** (you can add a note). The front desk sees your answer.',
+    denied: 'Pay change requests are approved by the owner of your branch. You can send one from **Staff pay → Request a change**, and you’ll see the answer in the bell.',
+    link: { label: 'Requests', to: '/app/payroll?tab=requests' },
+  },
+  {
+    id: 'activity-log',
+    title: 'Activity log and notifications',
+    audiences: OWNERS,
+    keywords: ['activity log', '*activity', 'who changed', '*notifications', '*bell', 'audit'],
+    answer:
+      'Every pay change and request is written to **Payroll → Activity log**: who did it, when, and what changed. Nothing in the log can be edited. The **bell** at the top shows changes made by others and requests waiting for you.',
+    for: {
+      BRANCH_OWNER:
+        'Every pay change and request at your branches is written to **Payroll → Activity log**: who did it, when, and what changed. The business owner is notified of your changes. The **bell** at the top shows requests waiting for you.',
+    },
+    denied: 'The activity log is for owners. Your **bell** at the top shows the answers to your pay change requests.',
+    link: { label: 'Activity log', to: '/app/payroll?tab=activity' },
   },
 ];
 

@@ -5,7 +5,7 @@ import { assertAllowedBranches } from '../branches/branches.service.js';
 import { findFutureBookings } from '../appointments/appointments.service.js';
 
 // Loads one staff member, but only if they are in this salon AND in a branch this user may use
-async function findStaff(ctx, id) {
+export async function findStaff(ctx, id) {
   const staff = await Staff.findOne(scoped(ctx, { _id: id }));
   if (!staff || !ctx.allowedBranchIds.includes(String(staff.branchId))) {
     throw new AppError(404, 'NOT_FOUND', 'Staff member not found');

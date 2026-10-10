@@ -10,6 +10,7 @@ import { connectDB } from '../config/db.js';
 import { toPaise } from '../utils/money.js';
 import { hashPassword } from '../utils/password.js';
 import * as models from '../models/index.js';
+import * as payroll from '../modules/payroll/payroll.service.js';
 import { DESERT_ROSE_CUSTOMERS, DESERT_ROSE_SERVICES, GLAMOUR_CUSTOMERS, GLAMOUR_SERVICES, LEADS } from './seed-data.js';
 
 const { Organization, Branch, User, Staff, Service, Combo, Customer, Appointment, Invoice, Lead, Attendance, Counter } = models;
@@ -325,10 +326,43 @@ mark('Andheri', staff.Neha, 1, 'leave');
 await Attendance.insertMany(attendance);
 
 // ===========================================================================
+// 6. Payroll: pay setups (made through the real payroll rules, so the activity log and bell fill up too)
+// ===========================================================================
+// What tenantContext would build for a logged-in user
+const asUser = (user) => ({
+  orgId: String(user.orgId),
+  userId: String(user._id),
+  userName: user.name,
+  role: user.role,
+  isPrimaryOwner: user.role === 'OWNER' && user.allBranches,
+  allowedBranchIds: (user.allBranches ? [branch.Andheri, branch.Bandra] : user.branchIds.map((id) => ({ _id: id }))).map((b) => String(b._id)),
+});
+const [anita, vikram, kavya] = users;
+const monthStart = (monthsAgo) => A.minus({ months: monthsAgo }).startOf('month').toISODate();
+const rupees = (amount) => toPaise(amount);
+
+await payroll.createPlan(asUser(anita), staff.Rahul._id, { model: 'FIXED', monthlyBase: rupees(20000), effectiveFrom: monthStart(3) });
+await payroll.createPlan(asUser(anita), staff.Rahul._id, { model: 'FIXED_COMMISSION', monthlyBase: rupees(22000), commissionBps: 1000, effectiveFrom: monthStart(1), note: 'Promoted to senior stylist' });
+await payroll.createPlan(asUser(anita), staff.Neha._id, { model: 'FIXED', monthlyBase: rupees(18000), effectiveFrom: monthStart(3) });
+await payroll.createPlan(asUser(anita), staff.Kabir._id, { model: 'COMMISSION', commissionBps: 3500, effectiveFrom: monthStart(2) });
+await payroll.createPlan(asUser(vikram), staff.Arjun._id, { model: 'HYBRID', dailyRate: rupees(700), commissionBps: 800, effectiveFrom: monthStart(2) });
+await payroll.createPlan(asUser(vikram), staff.Zoya._id, { model: 'ASSIGNMENT', assignmentRate: rupees(250), effectiveFrom: monthStart(1) });
+// A front desk request waiting for approval
+await payroll.createRequest(asUser(kavya), {
+  staffId: String(staff.Neha._id),
+  model: 'FIXED',
+  monthlyBase: rupees(20000),
+  effectiveFrom: A.plus({ months: 1 }).startOf('month').toISODate(),
+  note: 'Neha completed one year; raise agreed at the review',
+});
+// (Desert Rose staff have no pay setup yet, to show the "not set up" state)
+
+// ===========================================================================
 // Done
 // ===========================================================================
 console.log(`\nSeeded: 2 salons, 3 branches, ${Object.keys(staff).length} staff, ${GLAMOUR_SERVICES.length + DESERT_ROSE_SERVICES.length} services, 2 combos,`);
 console.log(`        ${glamourCustomers.length + desertCustomers.length} customers, ${LEADS.length} leads, ${appointments.length} appointments, ${invoices.length} invoices, ${attendance.length} attendance records`);
+console.log('        6 pay setups, 1 pay change request waiting for approval');
 console.log(`Today is centred on ${A.toFormat('h:mm a')} at Andheri (${A.zoneName}).`);
 console.log('\nEvery account uses the password:', DEMO_PASSWORD);
 console.table([

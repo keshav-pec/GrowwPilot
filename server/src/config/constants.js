@@ -12,5 +12,9 @@ export const PAYMENT_METHODS = ['CASH', 'UPI', 'CARD'];
 export const ATTENDANCE_STATUSES = ['present', 'absent', 'leave'];
 export const PLANS = ['trial', 'basic', 'pro'];
 
+// How a staff member is paid (payroll). HYBRID = any mix of the pay parts.
+export const PAY_MODELS = ['FIXED', 'FIXED_COMMISSION', 'COMMISSION', 'DAILY', 'HOURLY', 'ASSIGNMENT', 'HYBRID'];
+export const PAY_REQUEST_STATUSES = ['pending', 'approved', 'rejected', 'cancelled'];
+
 // Appointments that still "hold" a stylist's time (not finished, not cancelled)
 export const OPEN_APPOINTMENT_STATUSES = ['BOOKED', 'ARRIVED', 'IN_SERVICE'];

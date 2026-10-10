@@ -23,6 +23,7 @@ export async function tenantContext(req, res, next) {
 
   req.ctx = {
     userId: String(user._id),
+    userName: user.name, // for the activity log
     role: user.role,
     orgId: user.orgId ? String(user.orgId) : null,
     isPrimaryOwner: user.role === 'OWNER' && user.allBranches,

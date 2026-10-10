@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -125,9 +126,9 @@ export default function StaffFormModal({ staff, onClose }) {
           />
           {saveStaff.isError && <p className="text-sm text-danger sm:col-span-2">{saveStaff.error.message}</p>}
           {staff && (
-            <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted sm:col-span-2">
-              Salary &amp; payouts: coming soon.
-            </p>
+            <Link to={`/app/payroll?staff=${staff._id}`} className="text-sm text-gold-dark hover:underline sm:col-span-2">
+              See or change {staff.name}’s pay in Payroll →
+            </Link>
           )}
         </form>
       </Modal>

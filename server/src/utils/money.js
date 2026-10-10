@@ -15,3 +15,9 @@ export function toRupees(paise) {
 export function formatMoney(paise) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(paise / 100);
 }
+
+// 2000000 -> "₹20,000", 2000050 -> "₹20,000.50" (no ".00" in plain-language messages)
+export function formatAmount(paise) {
+  const digits = paise % 100 === 0 ? 0 : 2;
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(paise / 100);
+}

@@ -287,12 +287,10 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 
 ## 13. AI usage
 
-_Edit this section so it describes exactly how you worked._
-
-This project was built with **Claude Code** (Anthropic's AI coding assistant) as a pair programmer:
+This project was built with assistance from **Claude Code** (Anthropic's AI coding assistant) as a pair programmer:
 
 - **Planning:** I wrote the requirements and the agreed changes; the AI helped turn them into `IMPLEMENTATION_PLAN.md` (data model, business rules, 15 phases with "done when" checks).
-- **Building:** phase by phase, the AI wrote code following the plan, and I reviewed each phase, asked for simpler versions where needed, and committed it myself.
+- **Building:** phase by phase, the AI wrote code following the plan, and I reviewed each phase, and committed it myself.
 - **Testing:** for every phase the AI wrote and ran API checks against the real database, browser checks in headless Chrome (with screenshots), and Vitest tests. These caught real bugs that were then fixed, for example logout not clearing the session, availability hiding an appointment's own slot when rescheduling, a Zod default silently resetting a service's branches on edit, and a heatmap colour that was too faint to read.
 - **What I checked myself:** the business rules (booking conflicts, checkout maths, tenant isolation), the UX on each screen, and that I can explain every part of the code.
 

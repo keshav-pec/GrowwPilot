@@ -11,3 +11,7 @@ export { default as Lead } from './Lead.js';
 export { default as Appointment } from './Appointment.js';
 export { default as Invoice } from './Invoice.js';
 export { default as Counter } from './Counter.js';
+export { default as PayPlan } from './PayPlan.js';
+export { default as PayChangeRequest } from './PayChangeRequest.js';
+export { default as ActivityLog } from './ActivityLog.js';
+export { default as Notification } from './Notification.js';
