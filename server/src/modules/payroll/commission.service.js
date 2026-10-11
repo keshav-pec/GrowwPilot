@@ -65,33 +65,37 @@ export async function recordInvoiceCommissions({ invoice, appointment, timezone 
   return entries;
 }
 
-// Catches up commission for bills paid between two days (branch-local, inclusive) that don't have it yet,
-// e.g. after an owner sets up pay starting in the past. Lines already written are never changed.
+// Bills paid between two branch-local days (inclusive), each with its appointment, branch timezone and paid day.
 // staffId: only bills where that person did a service.
-export async function syncCommissions(orgId, { from, to, staffId }) {
-  const apptFilter = { orgId, invoiceId: { $ne: null } };
-  if (staffId) apptFilter['items.staffId'] = staffId;
-
+export async function paidBillsBetween(orgId, { from, to, staffId }) {
   // A day either side covers every timezone; the exact branch day is checked below
   const invoices = await Invoice.find({
     orgId,
     paidAt: { $gte: DateTime.fromISO(from).minus({ days: 1 }).toJSDate(), $lt: DateTime.fromISO(to).plus({ days: 2 }).toJSDate() },
   }).lean();
-  if (invoices.length === 0) return 0;
+  if (invoices.length === 0) return [];
 
-  const [appointments, branches] = await Promise.all([
-    Appointment.find({ ...apptFilter, _id: { $in: invoices.map((i) => i.appointmentId) } }).lean(),
-    Branch.find({ orgId }).select('timezone').lean(),
-  ]);
+  const apptFilter = { orgId, _id: { $in: invoices.map((i) => i.appointmentId) } };
+  if (staffId) apptFilter['items.staffId'] = staffId;
+  const [appointments, branches] = await Promise.all([Appointment.find(apptFilter).lean(), Branch.find({ orgId }).select('timezone').lean()]);
   const zoneOf = Object.fromEntries(branches.map((b) => [String(b._id), b.timezone]));
 
-  let written = 0;
+  const bills = [];
   for (const appointment of appointments) {
     const invoice = invoices.find((i) => String(i.appointmentId) === String(appointment._id));
     const timezone = zoneOf[String(invoice.branchId)];
     const day = DateTime.fromJSDate(invoice.paidAt, { zone: timezone }).toISODate();
-    if (day < from || day > to) continue;
-    written += (await recordInvoiceCommissions({ invoice, appointment, timezone })).length;
+    if (day >= from && day <= to) bills.push({ invoice, appointment, timezone, day });
+  }
+  return bills;
+}
+
+// Catches up commission for bills paid between two days that don't have it yet,
+// e.g. after an owner sets up pay starting in the past. Lines already written are never changed.
+export async function syncCommissions(orgId, { from, to, staffId }) {
+  let written = 0;
+  for (const bill of await paidBillsBetween(orgId, { from, to, staffId })) {
+    written += (await recordInvoiceCommissions(bill)).length;
   }
   return written;
 }

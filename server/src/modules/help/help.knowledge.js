@@ -378,6 +378,16 @@ export const KNOWLEDGE = [
     link: { label: 'Payroll', to: '/app/payroll' },
   },
   {
+    id: 'monthly-payroll',
+    title: 'Monthly payroll, bonuses and locking the month',
+    audiences: OWNERS,
+    keywords: ['monthly payroll', 'month payroll', 'lock month', 'lock payroll', '*lock', '*bonus', '*deduction', 'things check', 'salary sheet', 'how much pay', 'export payroll'],
+    answer:
+      'Open **Payroll → Monthly payroll** and pick the month. It works out everyone’s pay from their pay setup, attendance and commission. Fix anything marked **Must fix** (e.g. no pay setup, attendance not marked for per-day staff), click a person to add a **bonus or deduction** with a reason, then **Lock month** from its last day. A locked month can’t change: corrections go into a later month. **Export** downloads a spreadsheet.',
+    denied: 'Monthly payroll is for owners. You can see how each person is paid in **Staff pay**.',
+    link: { label: 'Monthly payroll', to: '/app/payroll?tab=month' },
+  },
+  {
     id: 'pay-requests',
     title: 'Approving pay change requests',
     audiences: OWNERS,

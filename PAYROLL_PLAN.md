@@ -58,13 +58,20 @@ Money is stored in whole paise, commission in basis points (10% = 1000).
 - Owners see **Commission this month** in the list and **Commission earned** per month (each line linked to its bill) when they open a person. Special rates are set there too (owners), and shown read-only to the front desk.
 - Not possible yet: splitting one service between two stylists (a booking has one stylist per service), refunds (the app has none).
 
-### Part 3: Monthly payroll
-- One payroll per branch per month: base pay (from the pay setup and attendance), commission, per-service pay, bonuses and deductions.
-- **Things to check** list (blocking ones stop the lock): no pay setup, attendance not marked, hourly staff missing check-out, net pay below zero.
-- Fixed monthly salary is **not** cut automatically for missing attendance; an owner adds a deduction if needed.
-- **Lock the month** with a confirmation. After locking, nothing changes; corrections go into the next month as adjustments with a reason.
-
----
+### Part 3: Monthly payroll ✅ done
+- **Payroll → Monthly payroll** (owners; branch owners for their branches): one payroll per branch per month, worked out from pay setups, attendance, commission and per-service pay, plus bonuses and deductions.
+- Opening a month works it out; a draft is worked out again when it's a few minutes old, or on **Recalculate**. The same data always gives the same amounts.
+- **Things to check.** Must fix (stops the lock): no pay setup for someone still working, attendance not marked for per-day / per-hour staff, a present day without times for per-hour staff, pay below zero. Reminders only: attendance not marked for others, finished services not paid yet.
+- Click a person: every line of their pay, notes (absences), and **Add bonus or deduction** (with a reason, logged, business owner notified).
+- **Lock month** from the month's last day, with a confirmation. A locked month never changes (its amounts are fingerprinted). Corrections are added to a later month, marked "correction for <month>".
+- **Export** downloads the month as a spreadsheet (CSV).
+- Defaults to confirm with the owner (easy to change later):
+  - Monthly salary is **not** cut automatically for absences; absences are shown, and an owner adds a deduction if needed.
+  - When a pay setup covers only part of a month (joined, left, pay changed mid-month), monthly salary is split by calendar days.
+  - Per-day pay counts days marked present (leave is unpaid for per-day staff). Per-hour pay counts check-in to check-out.
+  - Per-service pay counts completed and paid services, like commission.
+  - A month can be locked from its last day.
+  - Early in a month (1st–7th), the screen opens on last month, since that's usually the one being paid.
 
 ### Part 4: Payments, payslips, advances
 - Record full or part payments (cash / UPI / bank, reference, date). Can't pay more than what's owed.

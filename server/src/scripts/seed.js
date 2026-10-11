@@ -11,6 +11,7 @@ import { toPaise } from '../utils/money.js';
 import { hashPassword } from '../utils/password.js';
 import * as models from '../models/index.js';
 import * as payroll from '../modules/payroll/payroll.service.js';
+import * as monthlyPayroll from '../modules/payroll/monthlyPayroll.service.js';
 import { DESERT_ROSE_CUSTOMERS, DESERT_ROSE_SERVICES, GLAMOUR_CUSTOMERS, GLAMOUR_SERVICES, LEADS } from './seed-data.js';
 
 const { Organization, Branch, User, Staff, Service, Combo, Customer, Appointment, Invoice, Lead, Attendance, Counter } = models;
@@ -358,13 +359,23 @@ await payroll.createRequest(asUser(kavya), {
   note: 'Neha completed one year; raise agreed at the review',
 });
 // (Desert Rose staff have no pay setup yet, to show the "not set up" state)
+// Monthly payroll: two months ago is locked at Andheri; last month has a bonus and is still a draft
+const anitaAtAndheri = { ...asUser(anita), activeBranchId: String(branch.Andheri._id) };
+await monthlyPayroll.lockRun(anitaAtAndheri, A.minus({ months: 2 }).toFormat('yyyy-MM'));
+await monthlyPayroll.addAdjustment(anitaAtAndheri, {
+  staffId: String(staff.Neha._id),
+  month: A.minus({ months: 1 }).toFormat('yyyy-MM'),
+  kind: 'bonus',
+  amount: rupees(1500),
+  reason: 'Best customer reviews',
+});
 
 // ===========================================================================
 // Done
 // ===========================================================================
 console.log(`\nSeeded: 2 salons, 3 branches, ${Object.keys(staff).length} staff, ${GLAMOUR_SERVICES.length + DESERT_ROSE_SERVICES.length} services, 2 combos,`);
 console.log(`        ${glamourCustomers.length + desertCustomers.length} customers, ${LEADS.length} leads, ${appointments.length} appointments, ${invoices.length} invoices, ${attendance.length} attendance records`);
-console.log(`        6 pay setups, 1 pay change request waiting for approval, ${await models.CommissionEntry.countDocuments()} commission lines`);
+console.log(`        6 pay setups, 1 pay change request waiting for approval, 1 locked payroll month, ${await models.CommissionEntry.countDocuments()} commission lines`);
 console.log(`Today is centred on ${A.toFormat('h:mm a')} at Andheri (${A.zoneName}).`);
 console.log('\nEvery account uses the password:', DEMO_PASSWORD);
 console.table([

@@ -43,3 +43,20 @@ export const serviceRateSchema = z.object({
 
 // GET .../commission?month=2026-10
 export const monthSchema = z.object({ month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM') });
+
+const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM');
+
+export const monthParamSchema = z.object({ month });
+
+// A bonus or deduction for one person in one month, always with a reason
+export const adjustmentSchema = z.object({
+  staffId: objectId,
+  month,
+  kind: z.enum(['bonus', 'deduction']),
+  amount: paise.min(1, 'Enter an amount'),
+  reason: z.string().trim().min(3, 'Please give a reason').max(300),
+  correctsMonth: month.optional(), // set when it fixes a month that is already locked
+});
+
+// Locking can't be undone, so the screen must send an explicit yes
+export const lockSchema = z.object({ confirm: z.literal(true, 'Please confirm') });

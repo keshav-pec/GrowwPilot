@@ -59,3 +59,13 @@ export function formatPayDay(date) {
 export function firstOfMonth(date, monthsAhead = 0) {
   return DateTime.fromISO(date).plus({ months: monthsAhead }).startOf('month').toISODate();
 }
+
+// "2026-10" -> "October 2026"
+export function formatMonth(month) {
+  return DateTime.fromISO(`${month}-01`).toFormat('LLLL yyyy');
+}
+
+// "2026-10" -> "2026-11"
+export function nextMonth(month) {
+  return DateTime.fromISO(`${month}-01`).plus({ months: 1 }).toFormat('yyyy-MM');
+}

@@ -17,3 +17,6 @@ export { default as ActivityLog } from './ActivityLog.js';
 export { default as Notification } from './Notification.js';
 export { default as CommissionRule } from './CommissionRule.js';
 export { default as CommissionEntry } from './CommissionEntry.js';
+export { default as PayrollRun } from './PayrollRun.js';
+export { default as PayrollItem } from './PayrollItem.js';
+export { default as PayrollAdjustment } from './PayrollAdjustment.js';

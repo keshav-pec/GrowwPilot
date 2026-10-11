@@ -52,7 +52,7 @@ function usePayMutation(mutationFn) {
   return useMutation({
     mutationFn: (values) => mutationFn(values).then((res) => res.data),
     onSuccess: () => {
-      for (const key of ['pay-staff', 'pay-staff-detail', 'pay-commission', 'pay-requests', 'activity', 'notifications']) {
+      for (const key of ['pay-staff', 'pay-staff-detail', 'pay-commission', 'pay-requests', 'payroll-month', 'payroll-runs', 'activity', 'notifications']) {
         queryClient.invalidateQueries({ queryKey: [key] });
       }
     },
@@ -68,6 +68,36 @@ export const useSavePayPlan = () =>
 export const useCancelPayPlan = () => usePayMutation((planId) => api.delete(`/payroll/plans/${planId}`));
 
 export const useEndPayPlan = () => usePayMutation(({ planId, effectiveTo }) => api.post(`/payroll/plans/${planId}/end`, { effectiveTo }));
+
+// Owners: one month of payroll for the selected branch -> { run, items, adjustments, today, monthOver, lastDay }
+export function usePayrollMonth(month) {
+  const { activeBranchId } = useAuth();
+  return useQuery({
+    queryKey: ['payroll-month', activeBranchId, month],
+    queryFn: () => api.get(`/payroll/runs/${month}`).then((res) => res.data),
+    enabled: Boolean(month),
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+}
+
+// Months already opened for the selected branch: [{ month, status, totals }]
+export function usePayrollRuns() {
+  const { activeBranchId } = useAuth();
+  return useQuery({
+    queryKey: ['payroll-runs', activeBranchId],
+    queryFn: () => api.get('/payroll/runs').then((res) => res.data.runs),
+  });
+}
+
+export const useRecalculateMonth = () => usePayMutation((month) => api.post(`/payroll/runs/${month}/calculate`));
+
+export const useLockMonth = () => usePayMutation((month) => api.post(`/payroll/runs/${month}/lock`, { confirm: true }));
+
+// { staffId, month, kind: 'bonus' | 'deduction', amount (paise), reason, correctsMonth? }
+export const useAddAdjustment = () => usePayMutation((values) => api.post('/payroll/adjustments', values));
+
+export const useRemoveAdjustment = () => usePayMutation((id) => api.delete(`/payroll/adjustments/${id}`));
 
 // Owners: a special commission rate for one service (rateBps: 1500 = 15%), or remove it
 export const useSetServiceRate = () =>

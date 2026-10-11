@@ -3,8 +3,20 @@ import { requireAuth } from '../../middleware/auth.js';
 import { tenantContext } from '../../middleware/tenantContext.js';
 import { requireRole } from '../../middleware/requireRole.js';
 import { validate } from '../../middleware/validate.js';
-import { decisionSchema, endPlanSchema, listRequestsSchema, monthSchema, planSchema, requestSchema, serviceRateSchema } from './payroll.schemas.js';
+import {
+  adjustmentSchema,
+  decisionSchema,
+  endPlanSchema,
+  listRequestsSchema,
+  lockSchema,
+  monthParamSchema,
+  monthSchema,
+  planSchema,
+  requestSchema,
+  serviceRateSchema,
+} from './payroll.schemas.js';
 import * as controller from './payroll.controller.js';
+import * as monthly from './monthlyPayroll.controller.js';
 
 const router = Router();
 
@@ -33,5 +45,14 @@ router.post('/requests', requireRole('FRONT_DESK'), validate({ body: requestSche
 router.post('/requests/:id/approve', requireRole('OWNER'), validate({ body: decisionSchema }), controller.approveRequest);
 router.post('/requests/:id/reject', requireRole('OWNER'), validate({ body: decisionSchema }), controller.rejectRequest);
 router.post('/requests/:id/cancel', requireRole('FRONT_DESK'), controller.cancelRequest);
+
+// Monthly payroll for the selected branch: owners only (branch owners: their branches)
+const owner = requireRole('OWNER');
+router.get('/runs', owner, monthly.listRuns);
+router.get('/runs/:month', owner, validate({ params: monthParamSchema }), monthly.getRun);
+router.post('/runs/:month/calculate', owner, validate({ params: monthParamSchema }), monthly.calculateRun);
+router.post('/runs/:month/lock', owner, validate({ params: monthParamSchema, body: lockSchema }), monthly.lockRun);
+router.post('/adjustments', owner, validate({ body: adjustmentSchema }), monthly.addAdjustment);
+router.delete('/adjustments/:id', owner, monthly.removeAdjustment);
 
 export default router;
