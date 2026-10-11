@@ -1,12 +1,13 @@
 import mongoose from 'mongoose';
-import { Branch, PayChangeRequest, PayPlan, Staff } from '../../models/index.js';
+import { Branch, CommissionRule, PayChangeRequest, PayPlan, Service, Staff } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { todayInZone } from '../../utils/time.js';
 import { findStaff } from '../staff/staff.service.js';
 import { actorRole, logActivity } from '../activity/activity.service.js';
 import { branchApproverIds, businessOwnerIds, notify } from '../notifications/notifications.service.js';
-import { PAY_PARTS, checkNewStart, cleanPayParts, currentAndUpcoming, dayBefore, describePay, formatDay, planStatus } from './payPlan.rules.js';
+import { PAY_PARTS, checkNewStart, cleanPayParts, currentAndUpcoming, dayBefore, describePay, formatDay, formatPercent, planStatus } from './payPlan.rules.js';
+import { monthCommission, monthTotals, syncCommissions } from './commission.service.js';
 
 // Who can do what (PAYROLL_PLAN.md):
 // - business owner: every branch; branch owner: only their branches (findStaff checks the branch)
@@ -39,6 +40,15 @@ async function recordChange(ctx, { action, staff, summary, before, after }, sess
 
 function latestPlan(ctx, staffId, session) {
   return PayPlan.findOne(scoped(ctx, { staffId })).sort({ effectiveFrom: -1 }).session(session ?? null);
+}
+
+// A pay setup that starts today or earlier may cover bills already paid: work out their commission now.
+// Commission already written is never changed (a new rate only counts from the next bill).
+async function catchUpCommission(ctx, plan, staff) {
+  const today = await todayAt(staff.branchId);
+  if (plan.commissionBps && plan.effectiveFrom <= today) {
+    await syncCommissions(ctx.orgId, { staffId: staff._id, from: plan.effectiveFrom, to: today });
+  }
 }
 
 // Adds a plan to the end of the person's timeline, closing the previous one the day before
@@ -88,12 +98,16 @@ export async function listStaffPay(ctx) {
     PayChangeRequest.find(scoped(ctx, { staffId: { $in: staffIds }, status: 'pending' })).lean(),
   ]);
 
+  // Owners also see commission earned so far this month (the front desk only sees pay setups)
+  const commission = ctx.role === 'OWNER' ? await monthTotals(ctx, staffIds, today.slice(0, 7)) : null;
+
   const rows = staff.map((s) => {
     const mine = plans.filter((p) => String(p.staffId) === String(s._id));
     return {
       staff: s,
       ...currentAndUpcoming(mine, today),
       pendingRequest: pending.find((r) => String(r.staffId) === String(s._id)) ?? null,
+      ...(commission && { commissionThisMonth: commission[String(s._id)] ?? 0 }),
     };
   });
   return { today, rows };
@@ -105,12 +119,13 @@ export async function getStaffPay(ctx, staffId) {
   const today = await todayAt(staff.branchId);
   const isOwner = ctx.role === 'OWNER';
 
-  const [plans, requests] = await Promise.all([
+  const [plans, requests, serviceRates] = await Promise.all([
     PayPlan.find(scoped(ctx, { staffId: staff._id })).sort({ effectiveFrom: -1 }).populate('createdBy', 'name').lean(),
     PayChangeRequest.find(scoped(ctx, { staffId: staff._id, ...(isOwner ? {} : { status: 'pending' }) }))
       .sort({ createdAt: -1 })
       .limit(10)
       .lean(),
+    CommissionRule.find(scoped(ctx, { staffId: staff._id })).populate('serviceId', 'name').lean(),
   ]);
 
   return {
@@ -119,6 +134,7 @@ export async function getStaffPay(ctx, staffId) {
     ...currentAndUpcoming(plans, today),
     history: isOwner ? plans.map((p) => ({ ...p, status: planStatus(p, today) })) : undefined,
     requests,
+    serviceRates: serviceRates.sort((a, b) => (a.serviceId?.name ?? '').localeCompare(b.serviceId?.name ?? '')),
   };
 }
 
@@ -136,7 +152,7 @@ export function listRequests(ctx, { status }) {
 export async function createPlan(ctx, staffId, input) {
   const staff = await findStaff(ctx, staffId);
 
-  return mongoose.connection.transaction(async (session) => {
+  const plan = await mongoose.connection.transaction(async (session) => {
     const { plan, previous, before } = await insertPlan(ctx, staff, input, session);
     const summary = previous
       ? `Changed ${staff.name}'s pay to ${startsOn(plan)} (was ${describePay(previous)}).`
@@ -144,6 +160,8 @@ export async function createPlan(ctx, staffId, input) {
     await recordChange(ctx, { action: 'pay_plan.created', staff, summary: withNote(summary, input.note), before, after: payValues(plan) }, session);
     return plan;
   });
+  await catchUpCommission(ctx, plan, staff);
+  return plan;
 }
 
 // Edit a pay change that hasn't started yet
@@ -153,7 +171,7 @@ export async function updatePlan(ctx, id, input) {
     throw new AppError(409, 'PLAN_STARTED', 'This pay setup has already started, so it can’t be edited. Add a new pay change instead.');
   }
 
-  return mongoose.connection.transaction(async (session) => {
+  await mongoose.connection.transaction(async (session) => {
     const previous = await PayPlan.findOne(scoped(ctx, { staffId: staff._id, effectiveFrom: { $lt: plan.effectiveFrom } }))
       .sort({ effectiveFrom: -1 })
       .session(session);
@@ -171,8 +189,9 @@ export async function updatePlan(ctx, id, input) {
 
     const summary = `Edited ${staff.name}'s upcoming pay change: now ${startsOn(plan)} (was ${oldWording}).`;
     await recordChange(ctx, { action: 'pay_plan.edited', staff, summary: withNote(summary, input.note), before, after: payValues(plan) }, session);
-    return plan;
   });
+  await catchUpCommission(ctx, plan, staff);
+  return plan;
 }
 
 // Cancel a pay change that hasn't started yet. The previous setup simply carries on.
@@ -292,7 +311,7 @@ export async function approveRequest(ctx, id, { note }) {
   const request = await findPendingRequest(ctx, id);
   const staff = await findStaff(ctx, request.staffId);
 
-  return mongoose.connection.transaction(async (session) => {
+  const plan = await mongoose.connection.transaction(async (session) => {
     const { plan, previous, before } = await insertPlan(ctx, staff, { ...request.proposed, note: request.note }, session, { requestId: request._id });
     await closeRequest(ctx, request, { status: 'approved', decisionNote: note, planId: plan._id }, session);
 
@@ -301,6 +320,8 @@ export async function approveRequest(ctx, id, { note }) {
     await notify(ctx, [request.requestedBy], { message: `${ctx.userName} approved your pay change for ${staff.name}: ${startsOn(plan)}.`, link: REQUESTS_LINK }, session);
     return plan;
   });
+  await catchUpCommission(ctx, plan, staff);
+  return plan;
 }
 
 export async function rejectRequest(ctx, id, { note }) {
@@ -325,6 +346,63 @@ export async function cancelRequest(ctx, id) {
     await closeRequest(ctx, request, { status: 'cancelled' }, session);
     const summary = `Withdrew the request to change ${request.staffName}'s pay to ${startsOn(request.proposed)}.`;
     await logActivity(ctx, { action: 'pay_request.cancelled', branchId: request.branchId, staffId: request.staffId, summary }, session);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Commission: special rates per service, and what was earned
+// ---------------------------------------------------------------------------
+
+// Owners only: one month of commission lines for one person
+export async function getCommission(ctx, staffId, month) {
+  const staff = await findStaff(ctx, staffId);
+  return monthCommission(ctx, staff._id, month);
+}
+
+async function findService(ctx, serviceId) {
+  const service = await Service.findOne(scoped(ctx, { _id: serviceId })).select('name').lean();
+  if (!service) throw new AppError(404, 'NOT_FOUND', 'Service not found');
+  return service;
+}
+
+// The person's normal % today, in words, for the activity log
+async function normalRate(ctx, staff) {
+  const today = await todayAt(staff.branchId);
+  const plans = await PayPlan.find(scoped(ctx, { staffId: staff._id })).lean();
+  const { current } = currentAndUpcoming(plans, today);
+  return current?.commissionBps ? formatPercent(current.commissionBps) : 'no commission';
+}
+
+// Add or change a special rate, e.g. Rahul gets 15% on Hair Colour. It counts from the next paid bill.
+export async function setServiceRate(ctx, staffId, serviceId, { rateBps }) {
+  const staff = await findStaff(ctx, staffId);
+  const service = await findService(ctx, serviceId);
+  const normal = await normalRate(ctx, staff);
+
+  return mongoose.connection.transaction(async (session) => {
+    const existing = await CommissionRule.findOne(scoped(ctx, { staffId: staff._id, serviceId: service._id })).session(session);
+    const rule = existing ?? new CommissionRule({ orgId: ctx.orgId, staffId: staff._id, serviceId: service._id });
+    const before = existing ? { service: service.name, rateBps: existing.rateBps } : null;
+    rule.set({ rateBps, updatedBy: ctx.userId });
+    await rule.save({ session });
+
+    const summary = existing
+      ? `Changed ${staff.name}'s commission on ${service.name} from ${formatPercent(before.rateBps)} to ${formatPercent(rateBps)} (normal rate: ${normal}).`
+      : `Set ${staff.name}'s commission on ${service.name} to ${formatPercent(rateBps)} (normal rate: ${normal}).`;
+    await recordChange(ctx, { action: 'service_rate.set', staff, summary, before, after: { service: service.name, rateBps } }, session);
+    return rule;
+  });
+}
+
+export async function removeServiceRate(ctx, staffId, serviceId) {
+  const staff = await findStaff(ctx, staffId);
+  const rule = await CommissionRule.findOne(scoped(ctx, { staffId: staff._id, serviceId })).populate('serviceId', 'name');
+  if (!rule) throw new AppError(404, 'NOT_FOUND', 'Special rate not found');
+
+  await mongoose.connection.transaction(async (session) => {
+    await CommissionRule.deleteOne({ _id: rule._id }, { session });
+    const summary = `Removed ${staff.name}'s special commission on ${rule.serviceId.name} (was ${formatPercent(rule.rateBps)}). Their normal rate applies again.`;
+    await recordChange(ctx, { action: 'service_rate.removed', staff, summary, before: { service: rule.serviceId.name, rateBps: rule.rateBps }, after: null }, session);
   });
 }
 

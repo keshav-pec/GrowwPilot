@@ -48,14 +48,15 @@ Money is stored in whole paise, commission in basis points (10% = 1000).
 
 ---
 
-### Part 2: Commission
-- Commission is earned when a service is **completed and paid** (at checkout), on the amount actually charged, with any bill discount shared across the services.
-- Rule order: stylist + specific service → stylist's own % → salon-wide default %.
-- Each commission line remembers which rule and % were used, so later rate changes don't change past earnings.
-- Combos: the combo price is shared across its services by their normal prices.
-- An "earnings" panel per stylist (which service, which bill, how much).
-
----
+### Part 2: Commission ✅ done
+- Commission is earned when a service is **completed and paid** (at checkout), on the amount actually charged, with any bill discount shared across the services. The app has no GST, so nothing is taken out.
+- Only people whose pay setup includes commission earn it. Rate order: **special rate for that service** (e.g. 15% on Hair Colour; 0% = none) → the person's **normal %** from their pay setup.
+  - *Decision:* the PRD's third level, a salon-wide default %, is left out because everyone who earns commission already has their own % in their pay setup, so it would never be used.
+- Each commission line keeps the rate and where it came from, so later rate changes don't change past earnings. Lines can't be edited, and the same service on the same bill can't earn twice.
+- Combos: the combo price is shared across its services by their normal prices. Two stylists on one bill each earn on their own service.
+- Pay set up with a past start date catches up on bills already paid since that date.
+- Owners see **Commission this month** in the list and **Commission earned** per month (each line linked to its bill) when they open a person. Special rates are set there too (owners), and shown read-only to the front desk.
+- Not possible yet: splitting one service between two stylists (a booking has one stylist per service), refunds (the app has none).
 
 ### Part 3: Monthly payroll
 - One payroll per branch per month: base pay (from the pay setup and attendance), commission, per-service pay, bonuses and deductions.

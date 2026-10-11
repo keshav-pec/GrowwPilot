@@ -2,6 +2,7 @@ import { Users } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useStaffPayList } from '../../api/payroll';
 import { describePay, formatPayDay, modelLabel } from '../../lib/payroll';
+import { formatAmount } from '../../lib/money';
 import { Badge, EmptyState, Table } from '../../components/ui';
 
 // Everyone at the selected branch and how they're paid. Clicking a row opens their pay drawer.
@@ -37,6 +38,10 @@ export default function PaySetupTab({ onOpenStaff }) {
         ),
     },
     { key: 'since', header: 'Since', render: (r) => (r.current ? formatPayDay(r.current.effectiveFrom) : '—') },
+    // Owners only: the server doesn't send it to the front desk
+    ...(user.role === 'OWNER'
+      ? [{ key: 'commission', header: 'Commission this month', render: (r) => (r.commissionThisMonth ? formatAmount(r.commissionThisMonth) : '—') }]
+      : []),
     {
       key: 'next',
       header: 'Coming up',

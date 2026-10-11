@@ -3,6 +3,7 @@ import { Appointment, Branch, Counter, Invoice } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { formatMoney } from '../../utils/money.js';
+import { recordInvoiceCommissions } from '../payroll/commission.service.js';
 
 // ---------------------------------------------------------------------------
 // The money rules (plan 4.5). Pure function, so it's easy to test and explain.
@@ -43,7 +44,8 @@ function branchCode(name) {
   return name.replace(/[^a-z]/gi, '').slice(0, 3).toUpperCase() || 'BR';
 }
 
-// Checkout. One transaction saves the invoice, gives it the next number and marks the appointment paid.
+// Checkout. One transaction saves the invoice, gives it the next number, marks the appointment paid
+// and records the stylists' commission.
 export async function createInvoice(ctx, input) {
   const appointment = await Appointment.findOne(scoped(ctx, { _id: input.appointmentId })).lean();
   if (!appointment || !ctx.allowedBranchIds.includes(String(appointment.branchId))) {
@@ -54,7 +56,7 @@ export async function createInvoice(ctx, input) {
 
   const subtotal = appointment.totalPrice; // from the database, not from the request
   const { discount, total } = calculateCheckout(subtotal, input);
-  const branch = await Branch.findById(appointment.branchId).select('name').lean();
+  const branch = await Branch.findById(appointment.branchId).select('name timezone').lean();
 
   try {
     return await mongoose.connection.transaction(async (session) => {
@@ -93,6 +95,9 @@ export async function createInvoice(ctx, input) {
         { session }
       );
       if (marked.modifiedCount !== 1) throw new AppError(409, 'ALREADY_PAID', 'This appointment has already been checked out');
+
+      // Completed and paid: the stylists earn their commission now (saved with the bill, or not at all)
+      await recordInvoiceCommissions({ invoice, appointment, timezone: branch.timezone }, session);
 
       return invoice;
     });

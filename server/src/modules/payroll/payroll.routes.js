@@ -3,7 +3,7 @@ import { requireAuth } from '../../middleware/auth.js';
 import { tenantContext } from '../../middleware/tenantContext.js';
 import { requireRole } from '../../middleware/requireRole.js';
 import { validate } from '../../middleware/validate.js';
-import { decisionSchema, endPlanSchema, listRequestsSchema, planSchema, requestSchema } from './payroll.schemas.js';
+import { decisionSchema, endPlanSchema, listRequestsSchema, monthSchema, planSchema, requestSchema, serviceRateSchema } from './payroll.schemas.js';
 import * as controller from './payroll.controller.js';
 
 const router = Router();
@@ -21,6 +21,11 @@ router.post('/staff/:staffId/plans', requireRole('OWNER'), validate({ body: plan
 router.patch('/plans/:id', requireRole('OWNER'), validate({ body: planSchema }), controller.updatePlan);
 router.delete('/plans/:id', requireRole('OWNER'), controller.cancelPlan);
 router.post('/plans/:id/end', requireRole('OWNER'), validate({ body: endPlanSchema }), controller.endPlan);
+
+// Commission: what someone earned (owners only), and special rates per service (owners change them)
+router.get('/staff/:staffId/commission', requireRole('OWNER'), validate({ query: monthSchema }), controller.getCommission);
+router.put('/staff/:staffId/service-rates/:serviceId', requireRole('OWNER'), validate({ body: serviceRateSchema }), controller.setServiceRate);
+router.delete('/staff/:staffId/service-rates/:serviceId', requireRole('OWNER'), controller.removeServiceRate);
 
 // The front desk asks, an owner answers
 router.get('/requests', validate({ query: listRequestsSchema }), controller.listRequests);

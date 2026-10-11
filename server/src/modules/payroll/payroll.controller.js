@@ -46,3 +46,16 @@ export async function cancelRequest(req, res) {
   await payrollService.cancelRequest(req.ctx, req.params.id);
   res.json({ ok: true });
 }
+
+export async function getCommission(req, res) {
+  res.json(await payrollService.getCommission(req.ctx, req.params.staffId, req.valid.query.month));
+}
+
+export async function setServiceRate(req, res) {
+  res.json({ rule: await payrollService.setServiceRate(req.ctx, req.params.staffId, req.params.serviceId, req.valid.body) });
+}
+
+export async function removeServiceRate(req, res) {
+  await payrollService.removeServiceRate(req.ctx, req.params.staffId, req.params.serviceId);
+  res.json({ ok: true });
+}

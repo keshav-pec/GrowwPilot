@@ -15,3 +15,5 @@ export { default as PayPlan } from './PayPlan.js';
 export { default as PayChangeRequest } from './PayChangeRequest.js';
 export { default as ActivityLog } from './ActivityLog.js';
 export { default as Notification } from './Notification.js';
+export { default as CommissionRule } from './CommissionRule.js';
+export { default as CommissionEntry } from './CommissionEntry.js';

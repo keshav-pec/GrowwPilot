@@ -6,6 +6,8 @@ import { describePay, formatPayDay, modelLabel } from '../../lib/payroll';
 import { Badge, Button, ConfirmDialog, Drawer, Input, Spinner } from '../../components/ui';
 import PayPlanFormModal from './PayPlanFormModal';
 import PayRequestCard from './PayRequestCard';
+import ServiceRatesSection from './ServiceRatesSection';
+import CommissionSection from './CommissionSection';
 
 const PLAN_STATUS = {
   current: { label: 'Current', tone: 'brown' },
@@ -136,6 +138,10 @@ export default function StaffPayDrawer({ staffId, onClose }) {
                 </div>
               </Section>
             )}
+
+            {isOwner && <CommissionSection staffId={data.staff._id} today={data.today} />}
+
+            <ServiceRatesSection staff={data.staff} rates={data.serviceRates} normalBps={data.current?.commissionBps} isOwner={isOwner} />
 
             {pending && (
               <Section title="Request waiting">

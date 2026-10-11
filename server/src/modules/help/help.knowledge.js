@@ -368,6 +368,16 @@ export const KNOWLEDGE = [
     link: { label: 'Pay setup', to: '/app/payroll' },
   },
   {
+    id: 'commission',
+    title: 'How commission is worked out',
+    audiences: OWNERS,
+    keywords: ['*commission', 'commission earned', 'commission earn', 'commission worked', 'commission calculated', '*special', 'special rate', 'set rate', 'service rate', 'commission service'],
+    answer:
+      'Commission is earned when a service is **completed and paid**, on what the customer actually paid (a bill discount is shared across its services). The rate is the person’s **special rate for that service** if they have one, otherwise their normal % from their pay setup. Open **Payroll**, click the person to see **Commission earned** each month and to **Add a service rate**. A rate change only counts from the next bill.',
+    denied: 'Owners see the commission each person earned. You can see someone’s commission % and special service rates in **Staff pay**.',
+    link: { label: 'Payroll', to: '/app/payroll' },
+  },
+  {
     id: 'pay-requests',
     title: 'Approving pay change requests',
     audiences: OWNERS,

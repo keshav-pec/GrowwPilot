@@ -326,7 +326,8 @@ mark('Andheri', staff.Neha, 1, 'leave');
 await Attendance.insertMany(attendance);
 
 // ===========================================================================
-// 6. Payroll: pay setups (made through the real payroll rules, so the activity log and bell fill up too)
+// 6. Payroll: pay setups (made through the real payroll rules, so the activity log and bell fill up too).
+//    Pay that starts in the past also works out commission on the bills above.
 // ===========================================================================
 // What tenantContext would build for a logged-in user
 const asUser = (user) => ({
@@ -342,6 +343,7 @@ const monthStart = (monthsAgo) => A.minus({ months: monthsAgo }).startOf('month'
 const rupees = (amount) => toPaise(amount);
 
 await payroll.createPlan(asUser(anita), staff.Rahul._id, { model: 'FIXED', monthlyBase: rupees(20000), effectiveFrom: monthStart(3) });
+await payroll.setServiceRate(asUser(anita), staff.Rahul._id, gs['Hair Colour']._id, { rateBps: 1500 }); // colour pays more
 await payroll.createPlan(asUser(anita), staff.Rahul._id, { model: 'FIXED_COMMISSION', monthlyBase: rupees(22000), commissionBps: 1000, effectiveFrom: monthStart(1), note: 'Promoted to senior stylist' });
 await payroll.createPlan(asUser(anita), staff.Neha._id, { model: 'FIXED', monthlyBase: rupees(18000), effectiveFrom: monthStart(3) });
 await payroll.createPlan(asUser(anita), staff.Kabir._id, { model: 'COMMISSION', commissionBps: 3500, effectiveFrom: monthStart(2) });
@@ -362,7 +364,7 @@ await payroll.createRequest(asUser(kavya), {
 // ===========================================================================
 console.log(`\nSeeded: 2 salons, 3 branches, ${Object.keys(staff).length} staff, ${GLAMOUR_SERVICES.length + DESERT_ROSE_SERVICES.length} services, 2 combos,`);
 console.log(`        ${glamourCustomers.length + desertCustomers.length} customers, ${LEADS.length} leads, ${appointments.length} appointments, ${invoices.length} invoices, ${attendance.length} attendance records`);
-console.log('        6 pay setups, 1 pay change request waiting for approval');
+console.log(`        6 pay setups, 1 pay change request waiting for approval, ${await models.CommissionEntry.countDocuments()} commission lines`);
 console.log(`Today is centred on ${A.toFormat('h:mm a')} at Andheri (${A.zoneName}).`);
 console.log('\nEvery account uses the password:', DEMO_PASSWORD);
 console.table([

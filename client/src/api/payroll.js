@@ -20,6 +20,16 @@ export function useStaffPay(staffId) {
   });
 }
 
+// Owners: one person's commission in a month ("2026-10") -> { entries, count, totalSales, totalAmount }
+export function useStaffCommission(staffId, month) {
+  return useQuery({
+    queryKey: ['pay-commission', staffId, month],
+    queryFn: () => api.get(`/payroll/staff/${staffId}/commission`, { params: { month } }).then((res) => res.data),
+    enabled: Boolean(staffId && month),
+    placeholderData: keepPreviousData,
+  });
+}
+
 // status: 'pending' or 'all'. Covers every branch the user may use.
 export function usePayRequests(status) {
   return useQuery({
@@ -42,7 +52,7 @@ function usePayMutation(mutationFn) {
   return useMutation({
     mutationFn: (values) => mutationFn(values).then((res) => res.data),
     onSuccess: () => {
-      for (const key of ['pay-staff', 'pay-staff-detail', 'pay-requests', 'activity', 'notifications']) {
+      for (const key of ['pay-staff', 'pay-staff-detail', 'pay-commission', 'pay-requests', 'activity', 'notifications']) {
         queryClient.invalidateQueries({ queryKey: [key] });
       }
     },
@@ -58,6 +68,13 @@ export const useSavePayPlan = () =>
 export const useCancelPayPlan = () => usePayMutation((planId) => api.delete(`/payroll/plans/${planId}`));
 
 export const useEndPayPlan = () => usePayMutation(({ planId, effectiveTo }) => api.post(`/payroll/plans/${planId}/end`, { effectiveTo }));
+
+// Owners: a special commission rate for one service (rateBps: 1500 = 15%), or remove it
+export const useSetServiceRate = () =>
+  usePayMutation(({ staffId, serviceId, rateBps }) => api.put(`/payroll/staff/${staffId}/service-rates/${serviceId}`, { rateBps }));
+
+export const useRemoveServiceRate = () =>
+  usePayMutation(({ staffId, serviceId }) => api.delete(`/payroll/staff/${staffId}/service-rates/${serviceId}`));
 
 // Front desk
 export const useRequestPayChange = () => usePayMutation((values) => api.post('/payroll/requests', values));

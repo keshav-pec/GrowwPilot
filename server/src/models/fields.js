@@ -31,3 +31,15 @@ export function phone(options = {}) {
 
 // "HH:mm" in 24-hour time, e.g. "09:00" or "21:30"
 export const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// Makes a collection "add only": any attempt to change an existing row throws.
+// Used for records that must stay exactly as written (activity log, commission ledger).
+export function appendOnly(schema, what) {
+  function refuseChange() {
+    throw new Error(`${what} cannot be changed`);
+  }
+  schema.pre(['updateOne', 'updateMany', 'findOneAndUpdate', 'replaceOne', 'findOneAndReplace'], refuseChange);
+  schema.pre('save', function () {
+    if (!this.isNew) refuseChange();
+  });
+}

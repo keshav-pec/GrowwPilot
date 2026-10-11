@@ -35,3 +35,11 @@ export const endPlanSchema = z.object({ effectiveTo: day });
 export const decisionSchema = z.object({ note: z.string().trim().max(500).optional() });
 
 export const listRequestsSchema = z.object({ status: z.enum(['pending', 'all']).default('pending') });
+
+// A special commission rate for one service: basis points, 1500 = 15%, 0 = none
+export const serviceRateSchema = z.object({
+  rateBps: z.number().int('Use up to two decimals').min(0).max(10000, 'Commission can be at most 100%'),
+});
+
+// GET .../commission?month=2026-10
+export const monthSchema = z.object({ month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM') });

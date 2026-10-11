@@ -169,7 +169,7 @@ export default function PayPlanFormModal({ mode, staff, current, latest, plan, t
         {values.effectiveFrom && values.effectiveFrom < today && (
           <p className="flex gap-2 rounded-lg bg-yellow-soft px-3 py-2 text-sm text-ink sm:col-span-2">
             <AlertTriangle size={16} className="mt-0.5 shrink-0 text-orange" />
-            This date is in the past. Pay from {formatPayDay(values.effectiveFrom)} onwards will use this new setup.
+            This date is in the past. Pay from {formatPayDay(values.effectiveFrom)} onwards will use this new setup. Commission already worked out for those days stays as it was.
           </p>
         )}
 

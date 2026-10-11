@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { ref } from './fields.js';
+import { appendOnly, ref } from './fields.js';
 
 // Who did what, and when. Rows are only ever added: nothing in the app edits or removes them.
 const activityLogSchema = new mongoose.Schema(
@@ -20,13 +20,6 @@ const activityLogSchema = new mongoose.Schema(
 
 activityLogSchema.index({ orgId: 1, createdAt: -1 });
 
-// Refuse any attempt to change an existing row
-function refuseChange() {
-  throw new Error('Activity log entries cannot be changed');
-}
-activityLogSchema.pre(['updateOne', 'updateMany', 'findOneAndUpdate', 'replaceOne', 'findOneAndReplace'], refuseChange);
-activityLogSchema.pre('save', function () {
-  if (!this.isNew) refuseChange();
-});
+appendOnly(activityLogSchema, 'Activity log entries');
 
 export default mongoose.model('ActivityLog', activityLogSchema, 'activity_log');
