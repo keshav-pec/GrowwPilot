@@ -8,6 +8,7 @@ import PayPlanFormModal from './PayPlanFormModal';
 import PayRequestCard from './PayRequestCard';
 import ServiceRatesSection from './ServiceRatesSection';
 import CommissionSection from './CommissionSection';
+import AdvancesSection from './AdvancesSection';
 
 const PLAN_STATUS = {
   current: { label: 'Current', tone: 'brown' },
@@ -142,6 +143,8 @@ export default function StaffPayDrawer({ staffId, onClose }) {
             {isOwner && <CommissionSection staffId={data.staff._id} today={data.today} />}
 
             <ServiceRatesSection staff={data.staff} rates={data.serviceRates} normalBps={data.current?.commissionBps} isOwner={isOwner} />
+
+            {isOwner && <AdvancesSection staff={data.staff} today={data.today} />}
 
             {pending && (
               <Section title="Request waiting">

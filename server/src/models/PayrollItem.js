@@ -4,10 +4,10 @@ import { appendOnly, ref, money } from './fields.js';
 // One line of a payslip, e.g. { kind: 'salary', label: 'Monthly salary', detail: 'Full month', amount: 2000000 }
 const lineSchema = new mongoose.Schema(
   {
-    kind: { type: String, enum: ['salary', 'daily', 'hourly', 'per_service', 'commission', 'bonus', 'deduction'], required: true },
+    kind: { type: String, enum: ['salary', 'daily', 'hourly', 'per_service', 'commission', 'bonus', 'deduction', 'advance'], required: true },
     label: { type: String, required: true },
     detail: String,
-    amount: money({ required: true }), // always positive; deductions are taken away
+    amount: money({ required: true }), // always positive; deductions and advance repayments are taken away
   },
   { _id: false }
 );

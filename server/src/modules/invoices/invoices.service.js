@@ -4,6 +4,7 @@ import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { formatMoney } from '../../utils/money.js';
 import { recordInvoiceCommissions } from '../payroll/commission.service.js';
+import { markPayrollStale } from '../payroll/payrollStale.js';
 
 // ---------------------------------------------------------------------------
 // The money rules (plan 4.5). Pure function, so it's easy to test and explain.
@@ -59,7 +60,7 @@ export async function createInvoice(ctx, input) {
   const branch = await Branch.findById(appointment.branchId).select('name timezone').lean();
 
   try {
-    return await mongoose.connection.transaction(async (session) => {
+    const invoice = await mongoose.connection.transaction(async (session) => {
       // Next number for this branch (rolled back too if anything below fails)
       const counter = await Counter.findOneAndUpdate(
         { _id: `invoice:${branch._id}` },
@@ -101,6 +102,8 @@ export async function createInvoice(ctx, input) {
 
       return invoice;
     });
+    await markPayrollStale(ctx.orgId, appointment.branchId); // commission and per-service pay changed
+    return invoice;
   } catch (err) {
     // The unique index on invoice.appointmentId is the final safety net against paying twice
     if (err.code === 11000) throw new AppError(409, 'ALREADY_PAID', 'This appointment has already been checked out');

@@ -1,20 +1,69 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { AlertTriangle, Trash2 } from 'lucide-react';
-import { useRemoveAdjustment } from '../../api/payroll';
+import { AlertTriangle, FileDown, Trash2 } from 'lucide-react';
+import { payslipUrl, useCancelPayment, useRemoveAdjustment } from '../../api/payroll';
 import { formatAmount } from '../../lib/money';
-import { formatMonth, nextMonth } from '../../lib/payroll';
-import { Button, Drawer } from '../../components/ui';
+import { formatMonth, formatPayDay, isDeductionLine, nextMonth, salaryMethodLabel } from '../../lib/payroll';
+import { Badge, Button, Drawer, Modal, Textarea } from '../../components/ui';
 import AdjustmentModal from './AdjustmentModal';
+import RecordPaymentModal from './RecordPaymentModal';
 
-const DEDUCTION = 'deduction';
+// Cancel a payment entered by mistake. It stays on record, marked cancelled.
+function CancelPaymentModal({ payment, onClose }) {
+  const cancel = useCancelPayment();
+  const [reason, setReason] = useState('');
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Cancel this ${formatAmount(payment.amount)} payment?`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Keep it
+          </Button>
+          <Button
+            variant="danger"
+            loading={cancel.isPending}
+            disabled={reason.trim().length < 3}
+            onClick={() =>
+              cancel.mutate(
+                { id: payment._id, reason: reason.trim() },
+                {
+                  onSuccess: () => {
+                    toast.success('Payment cancelled');
+                    onClose();
+                  },
+                }
+              )
+            }
+          >
+            Cancel payment
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3 text-sm">
+        <p className="text-muted">Use this only if the payment was recorded by mistake. It stays in the history, marked cancelled.</p>
+        <Textarea label="Reason" rows={2} placeholder="e.g. Recorded twice" value={reason} onChange={(e) => setReason(e.target.value)} />
+        {cancel.isError && <p className="text-danger">{cancel.error.message}</p>}
+      </div>
+    </Modal>
+  );
+}
 
 // One person's pay for the month, line by line, with what to check and their bonuses / deductions
-export default function PayrollItemDrawer({ item, month, locked, adjustments, onOpenPaySetup, onClose }) {
+// Locked months also show what has been paid, with "Record payment".
+export default function PayrollItemDrawer({ item, month, locked, adjustments, payments, today, onOpenPaySetup, onClose }) {
   const removeAdjustment = useRemoveAdjustment();
   const [adding, setAdding] = useState(false);
-  const earnings = item.lines.filter((l) => l.kind !== DEDUCTION);
-  const deductions = item.lines.filter((l) => l.kind === DEDUCTION);
+  const [paying, setPaying] = useState(false);
+  const [cancelling, setCancelling] = useState(null);
+  const earnings = item.lines.filter((l) => !isDeductionLine(l));
+  const deductions = item.lines.filter(isDeductionLine);
+  const myPayments = payments.filter((p) => p.itemId === item._id);
+  const paid = myPayments.filter((p) => p.status === 'recorded').reduce((sum, p) => sum + p.amount, 0);
+  const owed = Math.max(Math.max(item.net, 0) - paid, 0);
   const mine = adjustments.filter((a) => a.staffId === item.staffId);
 
   function remove(adjustment) {
@@ -46,12 +95,18 @@ export default function PayrollItemDrawer({ item, month, locked, adjustments, on
               Pay setup
             </Button>
             <Button variant="secondary" onClick={() => setAdding(true)}>
-              {locked ? `Add a correction to ${formatMonth(nextMonth(month))}` : 'Add bonus or deduction'}
+              {locked ? 'Add correction' : 'Add bonus or deduction'}
             </Button>
+            {locked && owed > 0 && <Button onClick={() => setPaying(true)}>Record payment</Button>}
           </>
         }
       >
-        <p className="mb-4 text-sm text-muted">{item.payDescription}</p>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <p className="text-sm text-muted">{item.payDescription}</p>
+          <a href={payslipUrl(item._id)} className="flex shrink-0 items-center gap-1 text-sm text-gold-dark hover:underline">
+            <FileDown size={14} /> {locked ? 'Payslip' : 'Payslip preview'}
+          </a>
+        </div>
 
         {!locked && item.issues.length > 0 && (
           <ul className="mb-4 space-y-2">
@@ -100,6 +155,43 @@ export default function PayrollItemDrawer({ item, month, locked, adjustments, on
           </div>
         </div>
 
+        {locked && (
+          <section className="mb-4">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Payments</h3>
+              {owed === 0 ? <Badge tone="brown">Paid in full</Badge> : <Badge tone={paid ? 'gold' : 'orange'}>{formatAmount(owed)} still owed</Badge>}
+            </div>
+            {myPayments.length === 0 ? (
+              <p className="text-sm text-muted">Nothing paid yet.</p>
+            ) : (
+              <ul className="divide-y divide-border text-sm">
+                {myPayments.map((p) => (
+                  <li key={p._id} className={`flex items-start justify-between gap-2 py-2 ${p.status === 'cancelled' ? 'text-muted line-through' : ''}`}>
+                    <span>
+                      {formatPayDay(p.paidOn)} · {salaryMethodLabel(p.method)}
+                      {p.reference && ` · ${p.reference}`}
+                      <span className="block text-xs text-muted no-underline">
+                        Recorded by {p.recordedByName}
+                        {p.overpaid && ' · more than owed'}
+                        {p.note && ` · “${p.note}”`}
+                        {p.status === 'cancelled' && ` · cancelled by ${p.cancelledByName}: ${p.cancelReason}`}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-1 whitespace-nowrap">
+                      {formatAmount(p.amount)}
+                      {p.status === 'recorded' && (
+                        <button type="button" onClick={() => setCancelling(p)} className="rounded p-1 text-muted hover:bg-surface" aria-label="Cancel payment">
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+
         {item.notes.map((note) => (
           <p key={note} className="mb-2 text-sm text-muted">
             {note}
@@ -126,6 +218,8 @@ export default function PayrollItemDrawer({ item, month, locked, adjustments, on
         )}
       </Drawer>
 
+      {paying && <RecordPaymentModal item={item} owed={owed} today={today} onClose={() => setPaying(false)} />}
+      {cancelling && <CancelPaymentModal payment={cancelling} onClose={() => setCancelling(null)} />}
       {adding && (
         <AdjustmentModal
           staff={{ _id: item.staffId, name: item.staffName }}

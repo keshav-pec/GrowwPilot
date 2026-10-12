@@ -5,18 +5,24 @@ import { requireRole } from '../../middleware/requireRole.js';
 import { validate } from '../../middleware/validate.js';
 import {
   adjustmentSchema,
+  advanceSchema,
+  cancelPaymentSchema,
+  closeAdvanceSchema,
   decisionSchema,
   endPlanSchema,
   listRequestsSchema,
   lockSchema,
   monthParamSchema,
+  idempotencyHeaderSchema,
   monthSchema,
+  paymentSchema,
   planSchema,
   requestSchema,
   serviceRateSchema,
 } from './payroll.schemas.js';
 import * as controller from './payroll.controller.js';
 import * as monthly from './monthlyPayroll.controller.js';
+import * as pay from './payments.controller.js';
 
 const router = Router();
 
@@ -54,5 +60,14 @@ router.post('/runs/:month/calculate', owner, validate({ params: monthParamSchema
 router.post('/runs/:month/lock', owner, validate({ params: monthParamSchema, body: lockSchema }), monthly.lockRun);
 router.post('/adjustments', owner, validate({ body: adjustmentSchema }), monthly.addAdjustment);
 router.delete('/adjustments/:id', owner, monthly.removeAdjustment);
+
+// Salary payments (locked months only), payslips and advances
+const once = validate({ headers: idempotencyHeaderSchema });
+router.post('/items/:id/payments', owner, once, validate({ body: paymentSchema }), pay.recordPayment);
+router.post('/payments/:id/cancel', owner, validate({ body: cancelPaymentSchema }), pay.cancelPayment);
+router.get('/items/:id/payslip', owner, pay.payslip);
+router.get('/staff/:staffId/advances', owner, pay.listAdvances);
+router.post('/staff/:staffId/advances', owner, once, validate({ body: advanceSchema }), pay.giveAdvance);
+router.post('/advances/:id/close', owner, validate({ body: closeAdvanceSchema }), pay.closeAdvance);
 
 export default router;

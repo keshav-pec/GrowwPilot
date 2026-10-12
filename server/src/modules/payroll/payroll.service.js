@@ -8,6 +8,7 @@ import { actorRole, logActivity } from '../activity/activity.service.js';
 import { branchApproverIds, businessOwnerIds, notify } from '../notifications/notifications.service.js';
 import { PAY_PARTS, checkNewStart, cleanPayParts, currentAndUpcoming, dayBefore, describePay, formatDay, formatPercent, planStatus } from './payPlan.rules.js';
 import { monthCommission, monthTotals, syncCommissions } from './commission.service.js';
+import { markPayrollStale } from './payrollStale.js';
 
 // Who can do what (PAYROLL_PLAN.md):
 // - business owner: every branch; branch owner: only their branches (findStaff checks the branch)
@@ -35,6 +36,7 @@ const startsOn = (plan) => `${describePay(plan)} from ${formatDay(plan.effective
 // Log a change and tell the business owner(s) about it (unless they made it themselves)
 async function recordChange(ctx, { action, staff, summary, before, after }, session) {
   await logActivity(ctx, { action, branchId: staff.branchId, staffId: staff._id, summary, before, after }, session);
+  await markPayrollStale(ctx.orgId, staff.branchId);
   await notify(ctx, await businessOwnerIds(ctx), { message: `${ctx.userName} (${actorRole(ctx)}): ${summary}`, link: ACTIVITY_LINK }, session);
 }
 

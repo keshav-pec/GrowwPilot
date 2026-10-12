@@ -4,6 +4,7 @@ import { OPEN_APPOINTMENT_STATUSES } from '../../config/constants.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { dayRangeUTC, localToUTC, todayInZone } from '../../utils/time.js';
+import { markPayrollStale } from '../payroll/payrollStale.js';
 
 async function activeBranch(ctx) {
   return Branch.findOne(scoped(ctx, { _id: ctx.activeBranchId })).select('name timezone').lean();
@@ -51,6 +52,7 @@ export async function markAttendance(ctx, { staffId, date, status, checkIn, chec
 
   // One record per stylist per day (unique index on staffId + date)
   const attendance = await Attendance.findOneAndUpdate(scoped(ctx, { staffId, date }), { $set: update }, { upsert: true, new: true, runValidators: true });
+  await markPayrollStale(ctx.orgId, staff.branchId); // per-day and per-hour pay depend on attendance
 
   // Absent with bookings already made that day: tell the screen. These bookings also show up in
   // the owner's "Requires attention" list so someone reassigns them.

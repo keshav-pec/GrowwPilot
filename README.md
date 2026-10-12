@@ -43,12 +43,27 @@ GrowwPilot runs many salons on one platform. Each salon (an *organization*) has 
 | Who | Logs in? | Main screens |
 |---|---|---|
 | **Super Admin** (GrowwPilot team) | Yes | Salon list with search and status filter; onboarding (salon + first branch + owner login in one step); activate or deactivate a salon |
-| **Owner** | Yes | **Dashboard** (Salon Pulse, KPIs, Requires attention), **Analytics** (demand charts + sales PDF), branches, team (staff, front desk logins, branch owners), services and combos, plus everything the front desk sees |
-| **Front desk** | Yes | **Day board**, booking (multi-service or combo), appointment list, customers, leads (and convert to appointment), checkout with split payments, staff attendance. Works in **one branch only**. |
-| **Staff** (stylists) | No | A record: booked on appointments, attendance marked by the front desk |
+| **Owner** | Yes | **Dashboard** (Salon Pulse, KPIs, Requires attention), **Analytics** (demand charts + sales PDF), **Payroll** (pay setup, commission, monthly payroll, salary payments, payslips, advances, activity log), branches, team (staff, front desk logins, branch owners), services and combos, plus everything the front desk sees |
+| **Front desk** | Yes | **Day board**, booking (multi-service or combo), appointment list, customers, leads (and convert to appointment), checkout with split payments, staff attendance, **Staff pay** (see how each person is paid, request a change). Works in **one branch only**. |
+| **Staff** (stylists) | No | A record: booked on appointments, attendance marked by the front desk, paid through payroll |
 | **Customer** | No | A record: created by the front desk or by converting a lead |
 
-There are **two kinds of owner**: the **primary owner** sees and manages every branch, and a **branch owner** only sees the branches the primary owner gives them.
+There are **two kinds of owner**: the **primary owner** (shown as **Business owner** in the app) sees and manages every branch, and a **branch owner** only sees the branches the primary owner gives them.
+
+**Payroll** (salary, commission and payroll, built from the *Payroll PRD v1*; full plan and decisions in [`PAYROLL_PLAN.md`](PAYROLL_PLAN.md)). There is no separate "payroll admin" role; payroll uses the existing roles and branch access:
+
+| | Business owner | Branch owner | Front desk |
+|---|---|---|---|
+| Pay setup (how each person is paid) | Every branch | Their branches | See only, at their branch; **request** a change for an owner to approve |
+| Commission, monthly payroll, lock the month | Every branch | Their branches | No |
+| Salary payments, payslips, advances | Every branch | Their branches | No |
+| Activity log | Every branch | Their branches | No |
+
+- **7 ways to pay:** fixed monthly, monthly + commission, commission only, per day, per hour, per service, or a mix. A change starts on a date and never rewrites past pay.
+- **Commission** is earned when a service is completed **and paid**, on what the customer actually paid; a special rate per service beats the person's normal %.
+- **Monthly payroll** per branch: worked out from pay setups, attendance and commission, with a "things to check" list, bonuses and deductions with a reason, and **Lock month**. A locked month never changes; corrections go into a later month.
+- **Payments** (full or part; cash, UPI, bank) only against locked months, **payslip PDFs**, and **advances** taken back monthly.
+- **Every change is logged** in an activity log that can't be edited, and a **bell** notifies the business owner of changes made by others, branch owners of requests to approve, and the front desk of the answers.
 
 **Help assistant:** owners and front desk users also get a round chat button at the bottom right. Ask it *"how do I take a split payment?"* or *"what does Salon Pulse mean?"* and it answers with the steps **for your role**, links you to the right screen, and tells a front desk user who to ask for owner-only tasks. The **Need help?** link in the sidebar still emails GrowwPilot support.
 
@@ -76,7 +91,8 @@ server/src/
   middleware/    auth (who are you), tenantContext (which salon/branches), requireRole, validate (Zod), errorHandler
   modules/       one folder per feature: *.routes.js, *.controller.js, *.service.js, *.schemas.js
                  admin, auth, branches, staff, users, services, combos, customers, appointments
-                 (+ scheduling.service.js = the booking engine), leads, invoices, attendance, dashboard, analytics
+                 (+ scheduling.service.js = the booking engine), leads, invoices, attendance, dashboard, analytics,
+                 payroll (pay setups, commission, monthly payroll, payments, payslips, advances), activity, notifications
   models/        one Mongoose model per collection
   utils/         time (branch time <-> UTC), money (paise), phone, scoped, stateMachine, appointmentAlerts
   scripts/       seed.js, isolation-smoke-test.js
@@ -84,7 +100,7 @@ server/tests/    Vitest tests (in-memory MongoDB replica set)
 client/src/
   api/           axios client + React Query hooks per feature
   components/    ui/ kit (Button, Input, Modal, Drawer, Table...) + shared pieces
-  features/      admin, auth, dashboard, appointments, customers, leads, checkout, attendance, team, catalog, branches, analytics
+  features/      admin, auth, dashboard, appointments, customers, leads, checkout, attendance, team, catalog, branches, analytics, payroll
   layouts/       AdminLayout, AppLayout (role-based sidebar + branch switcher)
   routes/        router.jsx, ProtectedRoute.jsx
 ```
@@ -113,6 +129,13 @@ erDiagram
   LEAD |o--o| APPOINTMENT : "converted into"
   LEAD |o--o| CUSTOMER : "linked to"
   USER |o--o{ LEAD : "follows up"
+  STAFF ||--o{ PAY_PLAN : "paid by (dated)"
+  STAFF ||--o{ COMMISSION_ENTRY : earns
+  INVOICE ||--o{ COMMISSION_ENTRY : "commission from"
+  BRANCH ||--o{ PAYROLL_RUN : "one per month"
+  PAYROLL_RUN ||--o{ PAYROLL_ITEM : "one per person"
+  PAYROLL_ITEM ||--o{ PAYROLL_PAYMENT : "paid by"
+  STAFF ||--o{ EMPLOYEE_ADVANCE : receives
 
   ORGANIZATION { string name string slug "unique" string status }
   BRANCH { ObjectId orgId string timezone string openTime string closeTime int defaultServiceMinutes string status }
@@ -125,9 +148,15 @@ erDiagram
   INVOICE { ObjectId appointmentId "unique" string invoiceNumber int subtotal int discount int total object[] payments }
   LEAD { ObjectId orgId ObjectId branchId string source string status date nextFollowUpAt object[] notes }
   ATTENDANCE { ObjectId staffId string date "unique with staffId" string status date checkInAt }
+  PAY_PLAN { ObjectId staffId string model int monthlyBase "paise" int commissionBps string effectiveFrom string effectiveTo }
+  COMMISSION_ENTRY { ObjectId invoiceId ObjectId itemId "unique together" int saleAmount int rateBps int amount "never edited" }
+  PAYROLL_RUN { ObjectId branchId string month "unique with branchId" string status "draft or locked" string totalsHash }
+  PAYROLL_ITEM { ObjectId runId ObjectId staffId object[] lines int gross int deductions int net }
+  PAYROLL_PAYMENT { ObjectId itemId int amount string method string status "recorded or cancelled" string idempotencyKey }
+  EMPLOYEE_ADVANCE { ObjectId staffId int amount int monthlyRepayment string firstMonth }
 ```
 
-**Important indexes:** `customer (orgId, phone)` unique (no duplicate customers), `invoice.appointmentId` unique (no double checkout), `attendance (staffId, date)` unique, `appointment (orgId, branchId, startAt)` and `appointment (items.staffId, items.startAt)` for the day board and clash checks.
+**Important indexes:** `customer (orgId, phone)` unique (no duplicate customers), `invoice.appointmentId` unique (no double checkout), `attendance (staffId, date)` unique, `appointment (orgId, branchId, startAt)` and `appointment (items.staffId, items.startAt)` for the day board and clash checks. Payroll: `payPlan (staffId, effectiveFrom)`, `commissionEntry (invoiceId, itemId, type)`, `payrollRun (branchId, month)`, `payrollItem (runId, staffId)` and `payrollPayment (orgId, idempotencyKey)` are all unique, so nothing is counted or paid twice. Payroll also has pay change requests, special commission rates, bonuses/deductions, the activity log and notifications (not drawn).
 
 ---
 
@@ -150,7 +179,7 @@ npm install
 npm run dev
 ```
 
-**Demo data** (`npm run seed`): 2 salons, 3 branches (Mumbai and Dubai timezones), 8 staff, 10 services, 2 combos, 13 customers, 9 leads (every status and source, some overdue), about 100 appointments over 4 weeks (every status, multi-service and combo bookings, split payments, discounts) with 85 invoices, and 2 weeks of attendance. **Today's appointments are placed around the current time**, so the day board and dashboard always show something happening: a customer waiting, a possible no-show, one running late, a bill not collected, and tomorrow's booking with a stylist on leave. (Seed during opening hours for the best picture: after closing time, today's later bookings are already in the past and show up as possible no-shows.) The seed refuses to run when `NODE_ENV=production` unless you pass `-- --force`.
+**Demo data** (`npm run seed`): 2 salons, 3 branches (Mumbai and Dubai timezones), 8 staff, 10 services, 2 combos, 13 customers, 9 leads (every status and source, some overdue), about 100 appointments over 4 weeks (every status, multi-service and combo bookings, split payments, discounts) with 85 invoices, and 2 weeks of attendance. **Today's appointments are placed around the current time**, so the day board and dashboard always show something happening: a customer waiting, a possible no-show, one running late, a bill not collected, and tomorrow's booking with a stylist on leave. **Payroll:** every Glamour stylist has a pay setup (one of each kind), Rahul has a special 15% rate on Hair Colour, a front desk pay request waits for approval, Andheri's payroll from two months ago is locked and partly paid, last month has a bonus, and Neha has an advance. Desert Rose staff have no pay setup, to show that state. (Seed during opening hours for the best picture: after closing time, today's later bookings are already in the past and show up as possible no-shows.) The seed refuses to run when `NODE_ENV=production` unless you pass `-- --force`.
 
 ---
 
@@ -158,7 +187,7 @@ npm run dev
 
 ```bash
 cd server
-npm test                  # 94 Vitest tests, on a temporary in-memory MongoDB replica set (never your real data)
+npm test                  # 154 Vitest tests, on a temporary in-memory MongoDB replica set (never your real data)
 npm run smoke:isolation   # tenant isolation check against a running API with the demo seed (see section 12)
 ```
 
@@ -169,7 +198,8 @@ The tests cover the parts where a bug would cost money or trust:
 - **Lead conversion:** links to an existing customer by phone; a clash rolls back everything (no customer, no booking, lead unchanged).
 - **Checkout:** ₹1,530 = 1,000 + 500 + 30 works; ₹30 short fails; discount larger than the bill fails; paying twice (including two desks at the same moment) fails; invoice numbers never skip.
 - **Dashboard warnings:** no-show, waiting and running-late rules.
-- **Help assistant:** 26 typical questions land on the right topic; answers are limited to the asker's role (front desk vs owner, main owner vs branch owner); unknown questions get an honest "not sure" with suggestions.
+- **Payroll:** each way of paying; mid-month pay changes; absences not cutting salary; the PRD's commission example (₹2,500 service, ₹200 off, 10% = ₹230); combos and two stylists on one bill; a rate change never changing past commission; commission and payments never counted twice (including two identical requests at the same moment); locking refused while something must be fixed, and a locked month refusing every change; part payments, overpayment rules, cancelled payments, staff who have left; advances; and that branch owners, the front desk and another salon only reach what they're allowed to.
+- **Help assistant:** 34 typical questions land on the right topic; answers are limited to the asker's role (front desk vs owner, main owner vs branch owner); unknown questions get an honest "not sure" with suggestions.
 
 ---
 
@@ -214,6 +244,7 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 - **Deactivating a stylist who has future bookings** first shows those bookings and asks to confirm; they then appear in Requires attention so they get reassigned.
 - **Converting a lead** reuses the booking form and says upfront whether the customer already exists (*"Existing customer found: Priya S. The booking will be linked to her profile."*).
 - **The help assistant feels like a chat, but stays honest.** It shows typing dots, then the answer types itself out, like an AI chat. Every answer says which help article it came from and offers a button to open that screen. It answers for *your* role only: a front desk user asking how to add a stylist is told that owners do that, not given steps for a page they can't open. When it doesn't understand, it says so and suggests questions instead of guessing. It stays open with its history as you move between pages, and it doesn't replace the **Need help?** email link.
+- **Payroll is built for the owner, not an accountant.** The pay form asks "How do you pay this person?" in plain words and shows a worked example month. The monthly payroll opens on a single total and a short "things to check" list, each with a link to fix it; details live in a side panel per person. Mistakes are hard to make: locking needs a tick-box confirmation, payments can't exceed what's owed, and nothing is ever deleted (it's cancelled or corrected with a reason, and logged).
 - **Charts:** every chart shows one series in one colour, the heatmap uses a single hue from light to dark (checked with a palette validator), and every chart has a table of the same numbers, so nothing depends on hovering or on colour alone. Statuses always pair an icon with a text label.
 
 ---
@@ -232,7 +263,8 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 - **Auth:** JWT (holding only the user id) in an httpOnly, SameSite=Lax cookie (Secure in production); passwords hashed with bcrypt; the user and their salon are reloaded on every request, so deactivating a user or a salon logs them out on their next click. Failed logins are rate-limited.
 - **Validation twice:** Zod on the server for every request (the source of truth), and on the client for instant feedback.
 - **Security basics:** helmet headers, CORS limited to the client URL, a 100 kB body limit, env vars checked at start-up, error responses without stack traces in production, and no secrets in the repo.
-- **Help assistant = the simplest possible retrieval** (`server/src/modules/help/`). There's no AI model, no document upload and no chunking: the "documents" are 36 hand-written help topics in `help.knowledge.js`, each with keywords, the roles it's for, and an answer (optionally a different answer per role). For each question the server:
+- **Payroll money can always be explained.** Pay setups are dated and never edited once started. Commission lines and payroll items can't be updated (the models refuse it), and each commission line keeps the rate it used. Locking a month saves a fingerprint (SHA-256) of every amount. Payments carry an `Idempotency-Key`, so a double click is recorded once, and each payment bumps the month's paid total inside its transaction, so two payments at the same moment can't both slip under the amount owed (the same write-conflict trick as bookings). Every payroll change goes into an append-only activity log in the same transaction as the change.
+- **Help assistant = the simplest possible retrieval** (`server/src/modules/help/`). There's no AI model, no document upload and no chunking: the "documents" are 41 hand-written help topics in `help.knowledge.js`, each with keywords, the roles it's for, and an answer (optionally a different answer per role). For each question the server:
   1. **cleans the text:** lower case, no punctuation, drops filler words ("how do I…"), trims plurals and maps synonyms (stylist / barber / beautician → *staff*, appointment → *booking*);
   2. **scores every topic:** a keyword counts when all its words are in the question, worth 1 point per word (strong single words like *checkout* are worth 2); on a tie a specific topic ("cancel a booking") beats a general one ("booking");
   3. **answers for the asker:** the role comes from the session, never from the request. If the role is allowed it gets the steps (and a link); if not, it gets *who* can do it instead; below 2 points it says it isn't sure and suggests questions.
@@ -262,6 +294,7 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 - No buffer time between appointments and no stylist-specific working hours (the branch's opening hours apply to everyone).
 - The Render free plan sleeps when idle, so the first request after a while can take 30–60 s.
 - Analytics "utilisation" counts every day in the range as a working day (minus marked absences).
+- Payroll: stylists don't log in, so there's no "My earnings" screen (owners download payslips instead); no PF, ESI, TDS or professional tax (add them as deductions until a payroll expert has reviewed them); one service can't be split between two stylists; notifications are in the app only (no email); monthly pay periods only.
 
 ---
 
@@ -279,9 +312,10 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 | Body | add a stylist to their branch, offer a service at their branch | 400 `INVALID_BRANCH` ✅ |
 | Body | assign a lead to their user, make their stylist a customer's favourite | 400 `INVALID_ASSIGNEE` / `INVALID_STAFF` ✅ |
 | Query | analytics for their branch | 404 ✅ |
-| Header | `X-Branch-Id` = their branch (staff list, dashboard) | 403 `BRANCH_FORBIDDEN` ✅ |
+| URL | read or set their stylist's pay, give their stylist an advance, pay their payroll line, download their payslip | 404 ✅ |
+| Header | `X-Branch-Id` = their branch (staff list, dashboard, monthly payroll) | 403 `BRANCH_FORBIDDEN` ✅ |
 
-**All 20 attempts were blocked.** A front desk user sending another branch of their *own* salon in `X-Branch-Id` is also refused (403).
+**All 26 attempts were blocked.** A front desk user sending another branch of their *own* salon in `X-Branch-Id` is also refused (403).
 
 ---
 
@@ -298,4 +332,4 @@ This project was built with assistance from **Claude Code** (Anthropic's AI codi
 
 ## 14. Future scope
 
-Ordered roughly by value (from the plan's bonus phases): automated API/E2E test suite, walk-in quick add, an audit log (who changed what), drag-to-reschedule and a week view, a staff free/busy view, real-time sync with WebSockets, a "win back" list of customers who haven't returned, WhatsApp confirmations and reminders, before/after photos, emailing the sales PDF, an LLM-backed help assistant that can also answer questions about your own data (the current one matches keywords over a fixed help knowledge base), a staff salary module (fixed pay + commission from attendance and completed services), and no-show tracking with reminders.
+Ordered roughly by value (from the plan's bonus phases): automated API/E2E test suite, walk-in quick add, an audit log for the rest of the app (payroll already has one), drag-to-reschedule and a week view, a staff free/busy view, real-time sync with WebSockets, a "win back" list of customers who haven't returned, WhatsApp confirmations and reminders, before/after photos, emailing the sales PDF, an LLM-backed help assistant that can also answer questions about your own data (the current one matches keywords over a fixed help knowledge base), staff logins with their own earnings page, commission slabs and target bonuses, statutory deductions (PF, ESI, TDS) after legal review, and no-show tracking with reminders.

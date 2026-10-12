@@ -12,6 +12,7 @@ import { hashPassword } from '../utils/password.js';
 import * as models from '../models/index.js';
 import * as payroll from '../modules/payroll/payroll.service.js';
 import * as monthlyPayroll from '../modules/payroll/monthlyPayroll.service.js';
+import * as salaryPayments from '../modules/payroll/payments.service.js';
 import { DESERT_ROSE_CUSTOMERS, DESERT_ROSE_SERVICES, GLAMOUR_CUSTOMERS, GLAMOUR_SERVICES, LEADS } from './seed-data.js';
 
 const { Organization, Branch, User, Staff, Service, Combo, Customer, Appointment, Invoice, Lead, Attendance, Counter } = models;
@@ -362,6 +363,19 @@ await payroll.createRequest(asUser(kavya), {
 // Monthly payroll: two months ago is locked at Andheri; last month has a bonus and is still a draft
 const anitaAtAndheri = { ...asUser(anita), activeBranchId: String(branch.Andheri._id) };
 await monthlyPayroll.lockRun(anitaAtAndheri, A.minus({ months: 2 }).toFormat('yyyy-MM'));
+// That locked month: Rahul paid in full by bank transfer, Neha paid part in cash, so something is still owed
+const lockedMonth = A.minus({ months: 2 }).toFormat('yyyy-MM');
+const lockedItem = (stylist) => models.PayrollItem.findOne({ month: lockedMonth, staffId: stylist._id }).lean();
+const paidOn = A.minus({ months: 1 }).startOf('month').plus({ days: 2 }).toISODate();
+await salaryPayments.recordPayment(anitaAtAndheri, (await lockedItem(staff.Rahul))._id, { amount: rupees(20000), method: 'BANK', reference: 'NEFT 88231', paidOn }, 'seed-pay-rahul');
+await salaryPayments.recordPayment(anitaAtAndheri, (await lockedItem(staff.Neha))._id, { amount: rupees(10000), method: 'CASH', paidOn }, 'seed-pay-neha');
+// An advance for Neha, taken back from next month
+await salaryPayments.giveAdvance(
+  anitaAtAndheri,
+  staff.Neha._id,
+  { amount: rupees(6000), monthlyRepayment: rupees(2000), method: 'UPI', givenOn: A.toISODate(), firstMonth: A.plus({ months: 1 }).toFormat('yyyy-MM'), reason: 'Rent deposit' },
+  'seed-advance-neha'
+);
 await monthlyPayroll.addAdjustment(anitaAtAndheri, {
   staffId: String(staff.Neha._id),
   month: A.minus({ months: 1 }).toFormat('yyyy-MM'),
@@ -375,7 +389,7 @@ await monthlyPayroll.addAdjustment(anitaAtAndheri, {
 // ===========================================================================
 console.log(`\nSeeded: 2 salons, 3 branches, ${Object.keys(staff).length} staff, ${GLAMOUR_SERVICES.length + DESERT_ROSE_SERVICES.length} services, 2 combos,`);
 console.log(`        ${glamourCustomers.length + desertCustomers.length} customers, ${LEADS.length} leads, ${appointments.length} appointments, ${invoices.length} invoices, ${attendance.length} attendance records`);
-console.log(`        6 pay setups, 1 pay change request waiting for approval, 1 locked payroll month, ${await models.CommissionEntry.countDocuments()} commission lines`);
+console.log(`        6 pay setups, 1 pay change request waiting for approval, 1 locked payroll month with payments, 1 advance, ${await models.CommissionEntry.countDocuments()} commission lines`);
 console.log(`Today is centred on ${A.toFormat('h:mm a')} at Andheri (${A.zoneName}).`);
 console.log('\nEvery account uses the password:', DEMO_PASSWORD);
 console.table([

@@ -52,7 +52,7 @@ function usePayMutation(mutationFn) {
   return useMutation({
     mutationFn: (values) => mutationFn(values).then((res) => res.data),
     onSuccess: () => {
-      for (const key of ['pay-staff', 'pay-staff-detail', 'pay-commission', 'pay-requests', 'payroll-month', 'payroll-runs', 'activity', 'notifications']) {
+      for (const key of ['pay-staff', 'pay-staff-detail', 'pay-commission', 'pay-requests', 'payroll-month', 'payroll-runs', 'pay-advances', 'activity', 'notifications']) {
         queryClient.invalidateQueries({ queryKey: [key] });
       }
     },
@@ -98,6 +98,29 @@ export const useLockMonth = () => usePayMutation((month) => api.post(`/payroll/r
 export const useAddAdjustment = () => usePayMutation((values) => api.post('/payroll/adjustments', values));
 
 export const useRemoveAdjustment = () => usePayMutation((id) => api.delete(`/payroll/adjustments/${id}`));
+
+// Salary payments. `key` is made once per form, so a double click or retry records the payment only once.
+export const useRecordPayment = () =>
+  usePayMutation(({ itemId, key, ...values }) => api.post(`/payroll/items/${itemId}/payments`, values, { headers: { 'Idempotency-Key': key } }));
+
+export const useCancelPayment = () => usePayMutation(({ id, reason }) => api.post(`/payroll/payments/${id}/cancel`, { reason }));
+
+// The payslip PDF downloads with a plain link (the login cookie goes with it)
+export const payslipUrl = (itemId) => `/api/payroll/items/${itemId}/payslip`;
+
+// Owners: one person's advances, with how much has been taken back so far
+export function useAdvances(staffId) {
+  return useQuery({
+    queryKey: ['pay-advances', staffId],
+    queryFn: () => api.get(`/payroll/staff/${staffId}/advances`).then((res) => res.data.advances),
+    enabled: Boolean(staffId),
+  });
+}
+
+export const useGiveAdvance = () =>
+  usePayMutation(({ staffId, key, ...values }) => api.post(`/payroll/staff/${staffId}/advances`, values, { headers: { 'Idempotency-Key': key } }));
+
+export const useCloseAdvance = () => usePayMutation(({ id, ...values }) => api.post(`/payroll/advances/${id}/close`, values));
 
 // Owners: a special commission rate for one service (rateBps: 1500 = 15%), or remove it
 export const useSetServiceRate = () =>

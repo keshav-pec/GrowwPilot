@@ -60,3 +60,33 @@ export const adjustmentSchema = z.object({
 
 // Locking can't be undone, so the screen must send an explicit yes
 export const lockSchema = z.object({ confirm: z.literal(true, 'Please confirm') });
+
+const SALARY_METHODS = ['CASH', 'UPI', 'BANK'];
+
+// A salary payment against a locked month
+export const paymentSchema = z.object({
+  amount: paise.min(1, 'Enter an amount'),
+  method: z.enum(SALARY_METHODS),
+  reference: z.string().trim().max(100).optional(),
+  paidOn: day,
+  note: z.string().trim().max(300).optional(),
+  allowOverpay: z.boolean().optional(), // business owner only, with a note
+});
+
+export const cancelPaymentSchema = z.object({ reason: z.string().trim().min(3, 'Please give a reason').max(300) });
+
+// Money given now, taken back monthly from firstMonth
+export const advanceSchema = z.object({
+  amount: paise.min(1, 'Enter an amount'),
+  givenOn: day,
+  method: z.enum(SALARY_METHODS),
+  reference: z.string().trim().max(100).optional(),
+  reason: z.string().trim().min(3, 'Please give a reason').max(300),
+  monthlyRepayment: paise.min(1, 'Enter the monthly repayment'),
+  firstMonth: month,
+});
+
+export const closeAdvanceSchema = z.object({ fromMonth: month, reason: z.string().trim().min(3, 'Please give a reason').max(300) });
+
+// Financial actions carry a unique key per attempt, so a retry is recorded only once
+export const idempotencyHeaderSchema = z.object({ 'idempotency-key': z.string().min(8, 'Missing Idempotency-Key header').max(100) });

@@ -3,14 +3,14 @@ import { AppError } from '../utils/AppError.js';
 // Checks a request with Zod before it reaches the controller.
 // Usage: router.post('/', validate({ body: createCustomerSchema }), controller)
 //
-// The cleaned values are saved on req.valid = { body, query, params }.
+// The cleaned values are saved on req.valid = { body, query, params, headers }.
 // (Express 5 does not let us overwrite req.query, so we use req.valid instead.)
 export function validate(schemas) {
   return (req, res, next) => {
-    req.valid = {};
+    req.valid ??= {}; // several validate() steps on one route add to the same object
     const issues = [];
 
-    for (const part of ['body', 'query', 'params']) {
+    for (const part of ['body', 'query', 'params', 'headers']) {
       if (!schemas[part]) continue;
 
       const result = schemas[part].safeParse(req[part] ?? {});

@@ -15,9 +15,10 @@ async function login(email) {
   return res.headers.get('set-cookie').split(';')[0];
 }
 
-async function call(cookie, method, path, { body, branch } = {}) {
+async function call(cookie, method, path, { body, branch, idempotency } = {}) {
   const headers = { 'content-type': 'application/json', cookie };
   if (branch) headers['x-branch-id'] = branch;
+  if (idempotency) headers['idempotency-key'] = `smoke-${Math.random().toString(36).slice(2)}`;
   const res = await fetch(`${API}/api${path}`, { method, headers, body: body && JSON.stringify(body) });
   return { status: res.status, json: await res.json().catch(() => ({})) };
 }
@@ -32,6 +33,9 @@ const bLead = (await call(b, 'GET', '/leads')).json.leads[0];
 const bAppointments = (await call(b, 'GET', '/appointments')).json.appointments;
 const bPaid = bAppointments.find((a) => a.invoiceId);
 const bDesk = (await call(b, 'GET', '/users')).json.users.find((u) => u.role === 'FRONT_DESK');
+// Opening last month's payroll creates it, so B has payroll lines to aim at
+const lastMonth = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 15).toISOString().slice(0, 7);
+const bPayrollItem = (await call(b, 'GET', `/payroll/runs/${lastMonth}`)).json.items[0];
 
 // ----- 2. Salon A (Glamour Studio): its own ids, used alongside B's -----
 const a = await login('owner@glamour.com');
@@ -60,6 +64,12 @@ const attempts = [
   ['Body', "assign a lead to B's user", () => call(a, 'POST', '/leads', { body: { name: 'Spy', phone: '9800000000', source: 'Google', assignedToUserId: bDesk._id } }), 400],
   ['Body', "B's stylist as preferred", () => call(a, 'PATCH', `/customers/${aCustomer._id}`, { body: { preferredStaffId: bStaff._id } }), 400],
   ['Query', "analytics for B's branch", () => call(a, 'GET', `/analytics?from=2026-01-01&to=2026-01-31&branchId=${bBranch._id}`), 404],
+  ['URL', "read B's stylist's pay", () => call(a, 'GET', `/payroll/staff/${bStaff._id}`), 404],
+  ['URL', "set B's stylist's pay", () => call(a, 'POST', `/payroll/staff/${bStaff._id}/plans`, { body: { model: 'FIXED', monthlyBase: 100, effectiveFrom: tomorrow } }), 404],
+  ['URL', "give B's stylist an advance", () => call(a, 'POST', `/payroll/staff/${bStaff._id}/advances`, { body: { amount: 100, monthlyRepayment: 100, method: 'CASH', givenOn: tomorrow.slice(0, 8) + '01', firstMonth: tomorrow.slice(0, 7), reason: 'Spy' }, idempotency: true }), 404],
+  ['URL', "pay B's payroll line", () => call(a, 'POST', `/payroll/items/${bPayrollItem._id}/payments`, { body: { amount: 100, method: 'CASH', paidOn: tomorrow.slice(0, 8) + '01' }, idempotency: true }), 404],
+  ['URL', "download B's payslip", () => call(a, 'GET', `/payroll/items/${bPayrollItem._id}/payslip`), 404],
+  ['Header', "X-Branch-Id = B's branch (monthly payroll)", () => call(a, 'GET', `/payroll/runs/${lastMonth}`, { branch: bBranch._id }), 403],
   ['Header', "X-Branch-Id = B's branch (staff list)", () => call(a, 'GET', '/staff', { branch: bBranch._id }), 403],
   ['Header', "X-Branch-Id = B's branch (dashboard)", () => call(a, 'GET', '/dashboard', { branch: bBranch._id }), 403],
 ];

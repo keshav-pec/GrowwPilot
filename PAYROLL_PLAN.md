@@ -73,13 +73,17 @@ Money is stored in whole paise, commission in basis points (10% = 1000).
   - A month can be locked from its last day.
   - Early in a month (1st–7th), the screen opens on last month, since that's usually the one being paid.
 
-### Part 4: Payments, payslips, advances
-- Record full or part payments (cash / UPI / bank, reference, date). Can't pay more than what's owed.
-- Payslip PDF: earnings, deductions, net pay, payments made.
-- Advances: money given now, taken back from later months.
-- Staff who have left can still be paid what they're owed.
-
----
+### Part 4: Payments, payslips, advances ✅ done
+- **Payments** only against a **locked** month: full or part, cash / UPI / bank transfer, with reference, date and note. The list shows Paid / Part paid / Not paid; the totals show paid so far and still owed.
+- **Can't pay more than is owed**, unless the business owner ticks an override and gives a reason. Branch owners can't override.
+- A double click or retry records a payment once (each form sends a unique key). Two payments at the same moment can't both slip under the amount owed.
+- A payment entered by mistake is **cancelled with a reason**; it stays in the history, marked cancelled.
+- **Salary still owed from earlier locked months** shows as a reminder on later months.
+- **Payslip PDF** per person: earnings, deductions, net pay, payments made and still owed. Before locking it's a preview marked DRAFT.
+- **Advances** (open a person in Pay setup): amount, how it was given, reason, how much to take back each month and from which month. Repayments show up as deductions in each month's payroll automatically (e.g. ₹10,000 at ₹3,000/month = 3,000 + 3,000 + 3,000 + 1,000). Repayments can be stopped from a month on (e.g. paid back in cash). They can't start or stop in a month that's already locked.
+- **Staff who have left** stay in the payroll for any month they're owed pay, and can be paid.
+- Draft months work themselves out again as soon as something that changes pay happens (pay setup, special rate, attendance, a paid bill, an advance, a bonus).
+- Every payment, cancellation and advance is in the activity log; the business owner is notified of those made by a branch owner.
 
 ### Not in this module for now (and why)
 - **Staff "My earnings" screen**: stylists don't log in to GrowwPilot today. Owners can download and share payslips instead.

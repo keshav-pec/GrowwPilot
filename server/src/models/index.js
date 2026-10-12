@@ -20,3 +20,5 @@ export { default as CommissionEntry } from './CommissionEntry.js';
 export { default as PayrollRun } from './PayrollRun.js';
 export { default as PayrollItem } from './PayrollItem.js';
 export { default as PayrollAdjustment } from './PayrollAdjustment.js';
+export { default as PayrollPayment } from './PayrollPayment.js';
+export { default as EmployeeAdvance } from './EmployeeAdvance.js';

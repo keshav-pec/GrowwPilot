@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
-import { Appointment, Attendance, Branch, CommissionEntry, PayPlan, PayrollAdjustment, PayrollItem, PayrollRun, Staff } from '../../models/index.js';
+import { Appointment, Attendance, Branch, CommissionEntry, EmployeeAdvance, PayPlan, PayrollAdjustment, PayrollItem, PayrollPayment, PayrollRun, Staff } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { formatAmount } from '../../utils/money.js';
@@ -10,7 +10,7 @@ import { findStaff } from '../staff/staff.service.js';
 import { actorRole, logActivity } from '../activity/activity.service.js';
 import { businessOwnerIds, notify } from '../notifications/notifications.service.js';
 import { paidBillsBetween, syncCommissions } from './commission.service.js';
-import { calculateMonthlyPay, monthBounds } from './monthlyPay.rules.js';
+import { advanceRepayment, calculateMonthlyPay, monthBounds } from './monthlyPay.rules.js';
 
 // Monthly payroll for the branch picked in the branch switcher. Owners only (branch owners: their branches).
 // A draft month is worked out again when opened (if it's a few minutes old) or on "Recalculate".
@@ -28,7 +28,7 @@ async function activeBranch(ctx) {
 }
 
 // Log a payroll action and tell the business owner(s) (unless they did it themselves)
-async function recordPayrollAction(ctx, { action, branchId, staffId, summary, before, after }, session) {
+export async function recordPayrollAction(ctx, { action, branchId, staffId, summary, before, after }, session) {
   await logActivity(ctx, { action, branchId, staffId, summary, before, after }, session);
   await notify(ctx, await businessOwnerIds(ctx), { message: `${ctx.userName} (${actorRole(ctx)}): ${summary}`, link: MONTH_LINK(after?.month ?? before?.month) }, session);
 }
@@ -47,7 +47,7 @@ async function gatherMonth(ctx, branch, month) {
   const staffIds = staff.map((s) => s._id);
   const monthUTC = { $gte: dayRangeUTC(start, branch.timezone).start, $lt: dayRangeUTC(end, branch.timezone).end };
 
-  const [plans, attendance, commission, bills, unpaid, adjustments] = await Promise.all([
+  const [plans, attendance, commission, bills, unpaid, adjustments, advances] = await Promise.all([
     PayPlan.find(scoped(ctx, { staffId: { $in: staffIds }, effectiveFrom: { $lte: end }, $or: [{ effectiveTo: null }, { effectiveTo: { $gte: start } }] })).lean(),
     Attendance.find(scoped(ctx, { staffId: { $in: staffIds }, date: { $gte: start, $lte: end } })).lean(),
     CommissionEntry.find(scoped(ctx, { staffId: { $in: staffIds }, day: { $gte: start, $lte: end } })).select('staffId amount saleAmount').lean(),
@@ -55,6 +55,7 @@ async function gatherMonth(ctx, branch, month) {
     // Finished but not checked out: no commission or per-service pay until they're paid
     Appointment.find(scoped(ctx, { branchId: branch._id, status: 'COMPLETED', invoiceId: null, startAt: monthUTC })).select('items.staffId').lean(),
     PayrollAdjustment.find(scoped(ctx, { branchId: branch._id, month })).sort('createdAt').lean(),
+    EmployeeAdvance.find(scoped(ctx, { staffId: { $in: staffIds }, firstMonth: { $lte: month } })).lean(),
   ]);
 
   const mine = (rows, id) => rows.filter((r) => String(r.staffId) === String(id));
@@ -72,12 +73,13 @@ async function gatherMonth(ctx, branch, month) {
       paidServiceDays: bills.flatMap((b) => b.appointment.items.filter((i) => String(i.staffId) === String(s._id)).map(() => b.day)),
       unpaidServices: unpaid.flatMap((a) => a.items).filter((i) => String(i.staffId) === String(s._id)).length,
       adjustments: mine(adjustments, s._id),
+      advances: mine(advances, s._id).filter((a) => advanceRepayment(a, month)),
     };
   });
 
   // Everyone working here, plus anyone who left but still has pay for this month
   const included = people.filter(
-    (p) => p.staff.status === 'active' || p.plans.length > 0 || p.commission.count > 0 || p.adjustments.length > 0
+    (p) => p.staff.status === 'active' || p.plans.length > 0 || p.commission.count > 0 || p.adjustments.length > 0 || p.advances.length > 0
   );
   return { countUntil, people: included };
 }
@@ -97,6 +99,7 @@ export async function calculateRun(ctx, month) {
     gross: results.reduce((sum, r) => sum + r.pay.gross, 0),
     deductions: results.reduce((sum, r) => sum + r.pay.deductions, 0),
     net: results.reduce((sum, r) => sum + r.pay.net, 0),
+    payable: results.reduce((sum, r) => sum + Math.max(r.pay.net, 0), 0),
     commission: results.reduce((sum, r) => sum + r.person.commission.amount, 0),
     blocking: results.reduce((sum, r) => sum + r.pay.issues.filter((i) => i.blocking).length, 0),
     warnings: results.reduce((sum, r) => sum + r.pay.issues.filter((i) => !i.blocking).length, 0),
@@ -142,11 +145,20 @@ export async function getRun(ctx, month) {
 
   const { end } = monthBounds(month);
   const today = todayInZone(branch.timezone);
-  const [items, adjustments] = await Promise.all([
+  const [items, adjustments, payments, earlier] = await Promise.all([
     PayrollItem.find({ runId: run._id }).sort({ staffName: 1 }).lean(),
     PayrollAdjustment.find(scoped(ctx, { branchId: branch._id, month })).sort('createdAt').lean(),
+    PayrollPayment.find({ runId: run._id }).sort({ paidOn: 1, createdAt: 1 }).lean(),
+    PayrollRun.find(scoped(ctx, { branchId: branch._id, status: 'locked', month: { $lt: month } })).select('month totals.payable paidTotal').lean(),
   ]);
-  return { run, items, adjustments, today, monthOver: today >= end, lastDay: end };
+
+  // Salary still owed from earlier locked months, so it isn't forgotten
+  const owedEarlier = earlier
+    .map((r) => ({ month: r.month, owed: r.totals.payable - r.paidTotal }))
+    .filter((r) => r.owed > 0)
+    .sort((a, b) => a.month.localeCompare(b.month));
+
+  return { run, items, adjustments, payments, owedEarlier, today, monthOver: today >= end, lastDay: end };
 }
 
 // Months already opened for this branch, newest first (for the month picker)

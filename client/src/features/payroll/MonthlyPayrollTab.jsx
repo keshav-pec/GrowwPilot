@@ -29,6 +29,7 @@ function downloadCsv(items, month, branchName) {
     ['commission', 'Commission'],
     ['bonus', 'Bonuses'],
     ['deduction', 'Deductions'],
+    ['advance', 'Advance repayments'],
   ];
   const rupees = (paise) => (paise / 100).toFixed(2);
   const sum = (item, kind) => item.lines.filter((l) => l.kind === kind).reduce((s, l) => s + l.amount, 0);
@@ -133,11 +134,16 @@ export default function MonthlyPayrollTab({ month, onMonthChange, onOpenPaySetup
     );
   }
 
-  const { run, items, adjustments, monthOver, lastDay } = monthQuery.data;
+  const { run, items, adjustments, payments, owedEarlier, today, monthOver, lastDay } = monthQuery.data;
   const locked = run.status === 'locked';
   // Once locked, "things to check" are history: the amounts are final
   const withIssues = locked ? [] : items.filter((i) => i.issues.length > 0);
   const workedOut = DateTime.fromISO(run.calculatedAt);
+
+  // Locked months: how much of each person's pay has been handed over
+  const paidFor = (item) => payments.filter((p) => p.itemId === item._id && p.status === 'recorded').reduce((sum, p) => sum + p.amount, 0);
+  const owedFor = (item) => Math.max(Math.max(item.net, 0) - paidFor(item), 0);
+  const stillOwed = locked ? items.reduce((sum, i) => sum + owedFor(i), 0) : 0;
   const openItem = items.find((i) => i.staffId === openStaffId);
 
   const columns = [
@@ -146,11 +152,14 @@ export default function MonthlyPayrollTab({ month, onMonthChange, onOpenPaySetup
     { key: 'gross', header: 'Earnings', render: (i) => formatAmount(i.gross) },
     { key: 'deductions', header: 'Deductions', render: (i) => (i.deductions ? `− ${formatAmount(i.deductions)}` : '—') },
     { key: 'net', header: 'To pay', render: (i) => <span className="font-semibold">{formatAmount(i.net)}</span> },
+    ...(locked ? [{ key: 'paid', header: 'Paid', render: (i) => (paidFor(i) ? formatAmount(paidFor(i)) : '—') }] : []),
     {
       key: 'check',
       header: '',
       render: (i) =>
-        locked ? null : i.issues.some((x) => x.blocking) ? <Badge tone="orange">Must fix</Badge> : i.issues.length > 0 ? <Badge tone="yellow">Check</Badge> : <CheckCircle2 size={16} className="text-good" />,
+        locked ? (
+          i.net <= 0 ? null : owedFor(i) === 0 ? <Badge tone="brown">Paid</Badge> : paidFor(i) ? <Badge tone="gold">Part paid</Badge> : <Badge tone="orange">Not paid</Badge>
+        ) : i.issues.some((x) => x.blocking) ? <Badge tone="orange">Must fix</Badge> : i.issues.length > 0 ? <Badge tone="yellow">Check</Badge> : <CheckCircle2 size={16} className="text-good" />,
     },
   ];
 
@@ -193,10 +202,34 @@ export default function MonthlyPayrollTab({ month, onMonthChange, onOpenPaySetup
         )
       )}
 
+      {owedEarlier.length > 0 && (
+        <p className="mb-4 rounded-lg bg-orange/10 px-4 py-3 text-sm">
+          Salary still owed from earlier months:{' '}
+          {owedEarlier.map((o, index) => (
+            <span key={o.month}>
+              {index > 0 && ', '}
+              <button type="button" onClick={() => onMonthChange(o.month)} className="font-medium underline">
+                {formatMonth(o.month)}
+              </button>{' '}
+              {formatAmount(o.owed)}
+            </span>
+          ))}
+        </p>
+      )}
+
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Total to pay" value={formatAmount(run.totals.net)} hint={`${run.totals.count} ${run.totals.count === 1 ? 'person' : 'people'}`} />
-        <Stat label="Commission included" value={formatAmount(run.totals.commission)} />
-        <Stat label="Deductions" value={formatAmount(run.totals.deductions)} />
+        {locked ? (
+          <>
+            <Stat label="Paid so far" value={formatAmount(run.paidTotal)} />
+            <Stat label="Still owed" value={formatAmount(stillOwed)} hint={stillOwed === 0 ? 'Everyone is paid' : 'Open a person to record a payment'} />
+          </>
+        ) : (
+          <>
+            <Stat label="Commission included" value={formatAmount(run.totals.commission)} />
+            <Stat label="Deductions" value={formatAmount(run.totals.deductions)} />
+          </>
+        )}
         {locked ? (
           <Stat label="Locked by" value={run.lockedByName} hint={formatDateTime(run.lockedAt, activeBranch?.timezone)} />
         ) : (
@@ -236,7 +269,8 @@ export default function MonthlyPayrollTab({ month, onMonthChange, onOpenPaySetup
 
       <Table
         columns={columns}
-        rows={items.map((i) => ({ ...i, _id: i.staffId }))}
+        rows={items}
+        rowKey="staffId"
         onRowClick={(i) => setOpenStaffId(i.staffId)}
         empty={<EmptyState title="Nobody to pay this month" message="Set up how each person is paid in Pay setup, and they’ll appear here." />}
       />
@@ -247,6 +281,8 @@ export default function MonthlyPayrollTab({ month, onMonthChange, onOpenPaySetup
           month={month}
           locked={locked}
           adjustments={adjustments}
+          payments={payments}
+          today={today}
           onOpenPaySetup={() => {
             setOpenStaffId(null);
             onOpenPaySetup(openItem.staffId);

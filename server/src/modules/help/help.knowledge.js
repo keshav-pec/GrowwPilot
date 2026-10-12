@@ -388,6 +388,16 @@ export const KNOWLEDGE = [
     link: { label: 'Monthly payroll', to: '/app/payroll?tab=month' },
   },
   {
+    id: 'salary-payments',
+    title: 'Paying salaries, payslips and advances',
+    audiences: OWNERS,
+    keywords: ['*salary', 'pay salary', 'salary paid', 'salary payment', '*payslip', 'salary slip', '*advance', 'still owed', 'paid staff'],
+    answer:
+      'First **lock** the month in **Payroll → Monthly payroll**. Then click a person and **Record payment** (cash, UPI or bank transfer, all or part of it). Click **Payslip** for a PDF of their pay and the payments made. A payment entered by mistake can be cancelled with a reason. To give an **advance**, open the person in **Pay setup** and click **Give an advance**: it is taken back from their pay each month automatically.',
+    denied: 'Salaries, payslips and advances are handled by the owners.',
+    link: { label: 'Monthly payroll', to: '/app/payroll?tab=month' },
+  },
+  {
     id: 'pay-requests',
     title: 'Approving pay change requests',
     audiences: OWNERS,

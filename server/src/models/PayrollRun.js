@@ -18,6 +18,7 @@ const payrollRunSchema = new mongoose.Schema(
       gross: money({ default: 0 }),
       deductions: money({ default: 0 }),
       net: { type: Number, default: 0 }, // can be below zero, which blocks locking
+      payable: money({ default: 0 }), // what has to be paid out: everyone's pay above zero
       commission: money({ default: 0 }),
       blocking: { type: Number, default: 0 }, // "things to check" that stop the lock
       warnings: { type: Number, default: 0 },
@@ -26,6 +27,7 @@ const payrollRunSchema = new mongoose.Schema(
     lockedBy: ref('User'),
     lockedByName: String,
     totalsHash: String, // fingerprint of the locked amounts, to prove they never changed
+    paidTotal: money({ default: 0 }), // salary payments recorded against this month (not counting cancelled ones)
   },
   { timestamps: true }
 );

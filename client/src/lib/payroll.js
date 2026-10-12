@@ -69,3 +69,14 @@ export function formatMonth(month) {
 export function nextMonth(month) {
   return DateTime.fromISO(`${month}-01`).plus({ months: 1 }).toFormat('yyyy-MM');
 }
+
+// How salaries and advances are paid (the server has the same list)
+export const SALARY_METHODS = [
+  { value: 'CASH', label: 'Cash' },
+  { value: 'UPI', label: 'UPI' },
+  { value: 'BANK', label: 'Bank transfer' },
+];
+export const salaryMethodLabel = (method) => SALARY_METHODS.find((m) => m.value === method)?.label ?? method;
+
+// Lines that are taken off pay
+export const isDeductionLine = (line) => line.kind === 'deduction' || line.kind === 'advance';

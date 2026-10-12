@@ -1,7 +1,7 @@
 // How one person's pay for one month is worked out. Pure function (no database), so it's easy to test.
 //
 //   gross = salary + days worked + hours worked + services done + commission + bonuses
-//   net   = gross - deductions
+//   net   = gross - deductions - advance repayments
 //
 // Defaults (PAYROLL_PLAN.md, Part 3), to be confirmed by the owner:
 // - Monthly salary is split by calendar days when the pay setup covers only part of the month
@@ -28,6 +28,17 @@ function formatHours(minutes) {
   return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
 }
 
+// Which repayment of an advance falls in a month, or null. The schedule is fixed when it's given:
+// ₹10,000 at ₹3,000/month from Nov -> Nov ₹3,000 (1 of 4), Dec ₹3,000, Jan ₹3,000, Feb ₹1,000 (4 of 4)
+export function advanceRepayment(advance, month) {
+  if (month < advance.firstMonth) return null;
+  if (advance.closedFromMonth && month >= advance.closedFromMonth) return null;
+  const index = Math.round(DateTime.fromISO(`${month}-01`).diff(DateTime.fromISO(`${advance.firstMonth}-01`), 'months').months);
+  const count = Math.ceil(advance.amount / advance.monthlyRepayment);
+  if (index >= count) return null;
+  return { amount: Math.min(advance.monthlyRepayment, advance.amount - index * advance.monthlyRepayment), number: index + 1, count };
+}
+
 // The days each plan covers inside the month
 function segments(plans, month) {
   const { start, end } = monthBounds(month);
@@ -49,9 +60,10 @@ function segments(plans, month) {
 //   paidServiceDays  one day ("2026-10-04") per completed and paid service they did
 //   commission   { amount, count, sales } from the commission ledger
 //   adjustments  [{ kind: 'bonus' | 'deduction', amount, reason, correctsMonth? }]
+//   advances     money given earlier and taken back monthly: [{ amount, monthlyRepayment, firstMonth, closedFromMonth, reason }]
 //   unpaidServices   completed services in the month that haven't been paid yet
 //   isActive     still working here (someone who left with nothing set up isn't flagged)
-export function calculateMonthlyPay({ month, countUntil, plans, attendance, paidServiceDays, commission, adjustments, unpaidServices = 0, isActive = true }) {
+export function calculateMonthlyPay({ month, countUntil, plans, attendance, paidServiceDays, commission, adjustments, advances = [], unpaidServices = 0, isActive = true }) {
   const { start, end, days: monthDays } = monthBounds(month);
   const lines = [];
   const notes = [];
@@ -119,6 +131,13 @@ export function calculateMonthlyPay({ month, countUntil, plans, attendance, paid
     lines.push({ kind: a.kind, label: a.kind === 'bonus' ? 'Bonus' : 'Deduction', detail: `${a.reason}${fixes}`, amount: a.amount });
   }
 
+  for (const advance of advances) {
+    const repayment = advanceRepayment(advance, month);
+    if (repayment) {
+      lines.push({ kind: 'advance', label: 'Advance repayment', detail: `${repayment.number} of ${repayment.count} · ${advance.reason}`, amount: repayment.amount });
+    }
+  }
+
   // Attendance: days so far with nothing marked, while they had a pay setup
   const marked = new Set(attendance.map((a) => a.date));
   let unmarked = 0;
@@ -148,7 +167,7 @@ export function calculateMonthlyPay({ month, countUntil, plans, attendance, paid
 
   const earningKinds = ['salary', 'daily', 'hourly', 'per_service', 'commission', 'bonus'];
   const gross = lines.filter((l) => earningKinds.includes(l.kind)).reduce((sum, l) => sum + l.amount, 0);
-  const deductions = lines.filter((l) => l.kind === 'deduction').reduce((sum, l) => sum + l.amount, 0);
+  const deductions = lines.filter((l) => l.kind === 'deduction' || l.kind === 'advance').reduce((sum, l) => sum + l.amount, 0);
   const net = gross - deductions;
   if (net < 0) issues.push({ code: 'NEGATIVE_NET', message: 'Deductions are more than the pay for this month', blocking: true });
 
