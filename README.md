@@ -46,6 +46,7 @@ GrowwPilot runs many salons on one platform. Each salon (an *organization*) has 
 | **Owner** | Yes | **Dashboard** (Salon Pulse, KPIs, Requires attention), **Analytics** (demand charts + sales PDF), **Payroll** (pay setup, commission, monthly payroll, salary payments, payslips, advances, activity log), branches, team (staff, front desk logins, branch owners), services and combos, plus everything the front desk sees |
 | **Front desk** | Yes | **Day board**, booking (multi-service or combo), appointment list, customers, leads (and convert to appointment), checkout with split payments, staff attendance, **Staff pay** (see how each person is paid, request a change). Works in **one branch only**. |
 | **Staff** (stylists) | No | A record: booked on appointments, attendance marked by the front desk, paid through payroll |
+| **Front desk member** | Their front desk login, if linked | A team member of type *Front desk*: never booked, attendance marked like stylists, paid a salary, per day or per hour (no commission). Their pay is for owners only. |
 | **Customer** | No | A record: created by the front desk or by converting a lead |
 
 There are **two kinds of owner**: the **primary owner** (shown as **Business owner** in the app) sees and manages every branch, and a **branch owner** only sees the branches the primary owner gives them.
@@ -57,9 +58,11 @@ There are **two kinds of owner**: the **primary owner** (shown as **Business own
 | Pay setup (how each person is paid) | Every branch | Their branches | See only, at their branch; **request** a change for an owner to approve |
 | Commission, monthly payroll, lock the month | Every branch | Their branches | No |
 | Salary payments, payslips, advances | Every branch | Their branches | No |
+| Front desk members' pay (setup, payroll, payments, payslips, advances) | Every branch | Their branches | No, not even their own |
 | Activity log | Every branch | Their branches | No |
 
 - **7 ways to pay:** fixed monthly, monthly + commission, commission only, per day, per hour, per service, or a mix. A change starts on a date and never rewrites past pay.
+- **Two sections, Staff and Front desk.** Owners switch between them in Pay setup and Monthly payroll; the month is still worked out and locked for the whole branch at once, and the branch total shows both. Front desk members are paid a monthly salary, per day or per hour only.
 - **Commission** is earned when a service is completed **and paid**, on what the customer actually paid; a special rate per service beats the person's normal %.
 - **Monthly payroll** per branch: worked out from pay setups, attendance and commission, with a "things to check" list, bonuses and deductions with a reason, and **Lock month**. A locked month never changes; corrections go into a later month.
 - **Payments** (full or part; cash, UPI, bank) only against locked months, **payslip PDFs**, and **advances** taken back monthly.
@@ -179,7 +182,7 @@ npm install
 npm run dev
 ```
 
-**Demo data** (`npm run seed`): 2 salons, 3 branches (Mumbai and Dubai timezones), 8 staff, 10 services, 2 combos, 13 customers, 9 leads (every status and source, some overdue), about 100 appointments over 4 weeks (every status, multi-service and combo bookings, split payments, discounts) with 85 invoices, and 2 weeks of attendance. **Today's appointments are placed around the current time**, so the day board and dashboard always show something happening: a customer waiting, a possible no-show, one running late, a bill not collected, and tomorrow's booking with a stylist on leave. **Payroll:** every Glamour stylist has a pay setup (one of each kind), Rahul has a special 15% rate on Hair Colour, a front desk pay request waits for approval, Andheri's payroll from two months ago is locked and partly paid, last month has a bonus, and Neha has an advance. Desert Rose staff have no pay setup, to show that state. (Seed during opening hours for the best picture: after closing time, today's later bookings are already in the past and show up as possible no-shows.) The seed refuses to run when `NODE_ENV=production` unless you pass `-- --force`.
+**Demo data** (`npm run seed`): 2 salons, 3 branches (Mumbai and Dubai timezones), 8 staff, 10 services, 2 combos, 13 customers, 9 leads (every status and source, some overdue), about 100 appointments over 4 weeks (every status, multi-service and combo bookings, split payments, discounts) with 85 invoices, and 2 weeks of attendance. **Today's appointments are placed around the current time**, so the day board and dashboard always show something happening: a customer waiting, a possible no-show, one running late, a bill not collected, and tomorrow's booking with a stylist on leave. **Payroll:** every Glamour stylist has a pay setup (one of each kind), front desk members Kavya (Andheri, ₹15,000/month) and Ritu (Bandra, ₹600/day) are linked to their logins, Rahul has a special 15% rate on Hair Colour, a front desk pay request waits for approval, Andheri's payroll from two months ago is locked and partly paid, last month has a bonus, and Neha has an advance. Desert Rose staff have no pay setup, to show that state. (Seed during opening hours for the best picture: after closing time, today's later bookings are already in the past and show up as possible no-shows.) The seed refuses to run when `NODE_ENV=production` unless you pass `-- --force`.
 
 ---
 
@@ -198,8 +201,8 @@ The tests cover the parts where a bug would cost money or trust:
 - **Lead conversion:** links to an existing customer by phone; a clash rolls back everything (no customer, no booking, lead unchanged).
 - **Checkout:** ₹1,530 = 1,000 + 500 + 30 works; ₹30 short fails; discount larger than the bill fails; paying twice (including two desks at the same moment) fails; invoice numbers never skip.
 - **Dashboard warnings:** no-show, waiting and running-late rules.
-- **Payroll:** each way of paying; mid-month pay changes; absences not cutting salary; the PRD's commission example (₹2,500 service, ₹200 off, 10% = ₹230); combos and two stylists on one bill; a rate change never changing past commission; commission and payments never counted twice (including two identical requests at the same moment); locking refused while something must be fixed, and a locked month refusing every change; part payments, overpayment rules, cancelled payments, staff who have left; advances; and that branch owners, the front desk and another salon only reach what they're allowed to.
-- **Help assistant:** 34 typical questions land on the right topic; answers are limited to the asker's role (front desk vs owner, main owner vs branch owner); unknown questions get an honest "not sure" with suggestions.
+- **Payroll:** each way of paying; mid-month pay changes; absences not cutting salary; the PRD's commission example (₹2,500 service, ₹200 off, 10% = ₹230); combos and two stylists on one bill; a rate change never changing past commission; commission and payments never counted twice (including two identical requests at the same moment); locking refused while something must be fixed, and a locked month refusing every change; part payments, overpayment rules, cancelled payments, staff who have left; advances; and that branch owners, the front desk and another salon only reach what they're allowed to. **Front desk pay:** never booked, no commission, moving a stylist to the front desk only once their pay fits, the separate front desk totals, and an API test that logs in as each role and tries every front desk pay action (owners only; front desk logins can't reach any of it).
+- **Help assistant:** 35 typical questions land on the right topic; answers are limited to the asker's role (front desk vs owner, main owner vs branch owner); unknown questions get an honest "not sure" with suggestions.
 
 ---
 
@@ -294,7 +297,7 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 - No buffer time between appointments and no stylist-specific working hours (the branch's opening hours apply to everyone).
 - The Render free plan sleeps when idle, so the first request after a while can take 30–60 s.
 - Analytics "utilisation" counts every day in the range as a working day (minus marked absences).
-- Payroll: stylists don't log in, so there's no "My earnings" screen (owners download payslips instead); no PF, ESI, TDS or professional tax (add them as deductions until a payroll expert has reviewed them); one service can't be split between two stylists; notifications are in the app only (no email); monthly pay periods only.
+- Payroll: stylists don't log in, so there's no "My earnings" screen (owners download payslips instead); front desk members can't see their own payslip yet; no PF, ESI, TDS or professional tax (add them as deductions until a payroll expert has reviewed them); one service can't be split between two stylists; notifications are in the app only (no email); monthly pay periods only.
 
 ---
 

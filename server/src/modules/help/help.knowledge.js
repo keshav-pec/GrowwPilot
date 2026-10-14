@@ -303,6 +303,16 @@ export const KNOWLEDGE = [
     link: { label: 'Team', to: '/app/team' },
   },
   {
+    id: 'front-desk-pay',
+    title: 'Paying front desk staff',
+    audiences: OWNERS,
+    keywords: ['front desk salary', 'front desk pay', 'receptionist salary', 'pay receptionist', 'pay front desk', 'reception salary', 'front desk member'],
+    answer:
+      'First add them in **Team → Staff → Add staff** with the type **Front desk** (you can link their front desk login). They are never booked. Then open **Payroll → Pay setup → Front desk**, click them and choose a **monthly salary**, **per day** or **per hour** (no commission). They appear in the **Front desk** section of **Monthly payroll**, and are paid, get payslips and advances like everyone else.',
+    denied: 'Front desk pay is handled by the owners. Please ask your salon owner.',
+    link: { label: 'Pay setup', to: '/app/payroll?tab=setup&group=front-desk' },
+  },
+  {
     id: 'front-desk-login',
     title: 'Front desk logins',
     audiences: OWNERS,

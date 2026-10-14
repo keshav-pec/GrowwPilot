@@ -45,6 +45,7 @@ describe('Understanding the question', () => {
     ['how do I lock the month', 'monthly-payroll'],
     ['pay salary to Neha', 'salary-payments'],
     ['download payslip', 'salary-payments'],
+    ['how do I pay the front desk salary', 'front-desk-pay'],
     ['approve a pay request', 'pay-requests'],
     ['who changed the commission rate in the activity log', 'activity-log'],
     ['hello', 'greeting'],

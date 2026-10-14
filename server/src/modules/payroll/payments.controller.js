@@ -1,5 +1,5 @@
 import * as payments from './payments.service.js';
-import { findServiceStaff } from '../staff/staff.service.js';
+import { findStaff } from '../staff/staff.service.js';
 import { payslipFileName, writePayslipPdf } from './payslip.pdf.js';
 
 export async function recordPayment(req, res) {
@@ -18,7 +18,7 @@ export async function payslip(req, res) {
 }
 
 export async function listAdvances(req, res) {
-  const staff = await findServiceStaff(req.ctx, req.params.staffId);
+  const staff = await findStaff(req.ctx, req.params.staffId);
   res.json({ advances: await payments.listAdvances(req.ctx, staff) });
 }
 

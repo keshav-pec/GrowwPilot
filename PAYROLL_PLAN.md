@@ -107,8 +107,11 @@ Money is stored in whole paise, commission in basis points (10% = 1000).
 - Export has a "Section" column. Locked months can be paid and payslips downloaded for front desk members the same way as for staff.
 - Old payroll lines (before front desk existed) count as Staff.
 
-### Part 8: Front desk payments, payslips and advances; README, help and access tests
-- Owners only. Front desk logins can't see any front desk pay, not even their own payslip (for now).
+### Part 8: Front desk payments, payslips, advances; README, help and access tests ✅ done
+- Front desk members get **advances** like staff. Payments and payslips work from Part 7 (a front desk payslip only lists salary, bonus and deduction lines, so there's no commission on it).
+- **Owners only.** Front desk logins can't see any front desk pay, not even their own payslip (for now). A branch owner can't reach another branch's front desk pay.
+- An API test logs in as the business owner, a branch owner of another branch and a front desk login, and tries every front desk pay action (open, change, request, monthly payroll, payslip, payment, advance, bonus).
+- README and the help assistant ("how do I pay the front desk salary?") explain it.
 
 ### Not in this module for now (and why)
 - **Staff "My earnings" screen**: stylists don't log in to GrowwPilot today. Owners can download and share payslips instead.

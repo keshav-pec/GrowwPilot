@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { DateTime } from 'luxon';
 import { Appointment, CommissionRule, PayPlan, PayrollAdjustment, PayrollItem, PayrollRun, Staff, User } from '../src/models/index.js';
 import * as monthly from '../src/modules/payroll/monthlyPayroll.service.js';
-import { createStaff, findServiceStaff, updateStaff } from '../src/modules/staff/staff.service.js';
+import { createStaff, updateStaff } from '../src/modules/staff/staff.service.js';
 import { bookWithLock, getAvailability } from '../src/modules/appointments/scheduling.service.js';
 import { createCustomer } from '../src/modules/customers/customers.service.js';
 import * as payroll from '../src/modules/payroll/payroll.service.js';
@@ -165,11 +165,6 @@ describe('Front desk pay setup', () => {
     await expect(
       payroll.createRequest(deskCtx, { staffId: String(member._id), model: 'FIXED', monthlyBase: 2000000, effectiveFrom: nextMonth(), note: 'Raise' })
     ).rejects.toMatchObject({ status: 404 });
-  });
-
-  it('advances still leave front desk out (until Part 8)', async () => {
-    const member = await addDesk();
-    await expect(findServiceStaff(ctx, member._id)).rejects.toMatchObject({ status: 404 });
   });
 });
 

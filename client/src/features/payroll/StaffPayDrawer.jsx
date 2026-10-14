@@ -147,8 +147,7 @@ export default function StaffPayDrawer({ staffId, onClose }) {
 
             {!frontDesk && <ServiceRatesSection staff={data.staff} rates={data.serviceRates} normalBps={data.current?.commissionBps} isOwner={isOwner} />}
 
-            {/* Front desk advances come with front desk payments (Payroll Part 8) */}
-            {isOwner && !frontDesk && <AdvancesSection staff={data.staff} today={data.today} />}
+            {isOwner && <AdvancesSection staff={data.staff} today={data.today} />}
 
             {pending && (
               <Section title="Request waiting">

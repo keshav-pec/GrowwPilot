@@ -15,13 +15,6 @@ export async function findStaff(ctx, id) {
   return staff;
 }
 
-// Same, but stylists only. Monthly payroll and payments use this until they handle front desk pay (Parts 7 and 8).
-export async function findServiceStaff(ctx, id) {
-  const staff = await findStaff(ctx, id);
-  if (staff.kind === 'FRONT_DESK') throw new AppError(404, 'NOT_FOUND', 'Staff member not found');
-  return staff;
-}
-
 // For pay setup: front desk members' pay is for owners only (front desk logins can't see it, not even their own)
 export async function findPayStaff(ctx, id) {
   const staff = await findStaff(ctx, id);
