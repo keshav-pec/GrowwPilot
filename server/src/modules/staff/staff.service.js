@@ -1,4 +1,6 @@
-import { Staff, User } from '../../models/index.js';
+import { Branch, CommissionRule, PayPlan, Staff, User } from '../../models/index.js';
+import { todayInZone } from '../../utils/time.js';
+import { FRONT_DESK_PAY_MODELS } from '../payroll/payPlan.rules.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { assertAllowedBranches } from '../branches/branches.service.js';
@@ -13,10 +15,17 @@ export async function findStaff(ctx, id) {
   return staff;
 }
 
-// Same, but stylists only. Payroll uses this until front desk pay is added (Payroll Part 6).
+// Same, but stylists only. Monthly payroll and payments use this until they handle front desk pay (Parts 7 and 8).
 export async function findServiceStaff(ctx, id) {
   const staff = await findStaff(ctx, id);
   if (staff.kind === 'FRONT_DESK') throw new AppError(404, 'NOT_FOUND', 'Staff member not found');
+  return staff;
+}
+
+// For pay setup: front desk members' pay is for owners only (front desk logins can't see it, not even their own)
+export async function findPayStaff(ctx, id) {
+  const staff = await findStaff(ctx, id);
+  if (staff.kind === 'FRONT_DESK' && ctx.role !== 'OWNER') throw new AppError(404, 'NOT_FOUND', 'Staff member not found');
   return staff;
 }
 
@@ -63,6 +72,7 @@ export async function updateStaff(ctx, id, input) {
     if (bookings.length > 0) {
       throw new AppError(409, 'HAS_FUTURE_BOOKINGS', `${staff.name} has upcoming bookings. Reassign them before moving them to the front desk.`, bookings);
     }
+    await checkPayFitsFrontDesk(ctx, staff);
   }
   await checkLinkedLogin(ctx, next, staff._id);
 
@@ -77,6 +87,23 @@ export async function updateStaff(ctx, id, input) {
 
   staff.set({ ...input, userId: next.userId || null });
   return staff.save();
+}
+
+// Front desk members don't earn commission, so a stylist's commission pay must be changed or ended first.
+// Pay that has already ended stays as it was (past months were paid what they earned).
+async function checkPayFitsFrontDesk(ctx, staff) {
+  const branch = await Branch.findById(staff.branchId).select('timezone').lean();
+  const today = todayInZone(branch.timezone);
+  const [commissionPay, serviceRate] = await Promise.all([
+    PayPlan.exists(scoped(ctx, { staffId: staff._id, model: { $nin: FRONT_DESK_PAY_MODELS }, $or: [{ effectiveTo: null }, { effectiveTo: { $gte: today } }] })),
+    CommissionRule.exists(scoped(ctx, { staffId: staff._id })),
+  ]);
+  if (commissionPay) {
+    throw new AppError(409, 'PAY_NOT_FRONT_DESK', `${staff.name}'s pay includes commission or per-service pay. In Payroll, change it to a monthly salary, per day or per hour first.`);
+  }
+  if (serviceRate) {
+    throw new AppError(409, 'PAY_NOT_FRONT_DESK', `${staff.name} has special commission rates for some services. Remove them in Payroll first.`);
+  }
 }
 
 // Activate, deactivate or archive. If the stylist still has future bookings, the owner must confirm first.

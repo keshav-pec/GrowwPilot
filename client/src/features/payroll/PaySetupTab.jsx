@@ -20,6 +20,11 @@ export default function PaySetupTab({ onOpenStaff }) {
         <div>
           <span className="font-medium">{r.staff.name}</span>
           <span className="ml-2 text-xs text-muted">{r.staff.role}</span>
+          {r.staff.kind === 'FRONT_DESK' && (
+            <span className="ml-2">
+              <Badge tone="brown">Front desk</Badge>
+            </span>
+          )}
           {r.staff.status !== 'active' && <span className="ml-2 text-xs text-muted">(inactive)</span>}
         </div>
       ),

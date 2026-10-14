@@ -2,7 +2,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthContext';
 import { useCancelPayPlan, useEndPayPlan, useStaffPay } from '../../api/payroll';
-import { describePay, formatPayDay, modelLabel } from '../../lib/payroll';
+import { describePay, formatPayDay, isFrontDesk, modelLabel } from '../../lib/payroll';
 import { Badge, Button, ConfirmDialog, Drawer, Input, Spinner } from '../../components/ui';
 import PayPlanFormModal from './PayPlanFormModal';
 import PayRequestCard from './PayRequestCard';
@@ -78,6 +78,7 @@ export default function StaffPayDrawer({ staffId, onClose }) {
   // Only the newest setup can be edited, cancelled or ended (owners get the full history to tell)
   const latest = isOwner ? data?.history[0] : (data?.upcoming ?? data?.current);
   const canEnd = isOwner && data?.current && latest?._id === data.current._id;
+  const frontDesk = isFrontDesk(data?.staff); // no commission or special rates
 
   const footer = data && (
     <>
@@ -140,11 +141,14 @@ export default function StaffPayDrawer({ staffId, onClose }) {
               </Section>
             )}
 
-            {isOwner && <CommissionSection staffId={data.staff._id} today={data.today} />}
+            {frontDesk && <p className="mb-5 text-sm text-muted">Front desk: paid a monthly salary, per day or per hour (no commission).</p>}
 
-            <ServiceRatesSection staff={data.staff} rates={data.serviceRates} normalBps={data.current?.commissionBps} isOwner={isOwner} />
+            {isOwner && !frontDesk && <CommissionSection staffId={data.staff._id} today={data.today} />}
 
-            {isOwner && <AdvancesSection staff={data.staff} today={data.today} />}
+            {!frontDesk && <ServiceRatesSection staff={data.staff} rates={data.serviceRates} normalBps={data.current?.commissionBps} isOwner={isOwner} />}
+
+            {/* Front desk advances come with front desk payments (Payroll Part 8) */}
+            {isOwner && !frontDesk && <AdvancesSection staff={data.staff} today={data.today} />}
 
             {pending && (
               <Section title="Request waiting">

@@ -354,6 +354,9 @@ await payroll.createPlan(asUser(anita), staff.Neha._id, { model: 'FIXED', monthl
 await payroll.createPlan(asUser(anita), staff.Kabir._id, { model: 'COMMISSION', commissionBps: 3500, effectiveFrom: monthStart(2) });
 await payroll.createPlan(asUser(vikram), staff.Arjun._id, { model: 'HYBRID', dailyRate: rupees(700), commissionBps: 800, effectiveFrom: monthStart(2) });
 await payroll.createPlan(asUser(vikram), staff.Zoya._id, { model: 'ASSIGNMENT', assignmentRate: rupees(250), effectiveFrom: monthStart(1) });
+// Front desk members: salary or day rate, never commission
+await payroll.createPlan(asUser(anita), staff.Kavya._id, { model: 'FIXED', monthlyBase: rupees(15000), effectiveFrom: monthStart(3) });
+await payroll.createPlan(asUser(vikram), staff.Ritu._id, { model: 'DAILY', dailyRate: rupees(600), effectiveFrom: monthStart(2) });
 // A front desk request waiting for approval
 await payroll.createRequest(asUser(kavya), {
   staffId: String(staff.Neha._id),

@@ -12,6 +12,11 @@ export const PAY_MODELS = [
   { value: 'HYBRID', label: 'A mix', hint: 'Any two or more, e.g. a day rate plus commission.' },
 ];
 
+// Front desk members are never booked, so no commission or per-service pay (same as the server)
+const FRONT_DESK_PAY_MODELS = ['FIXED', 'DAILY', 'HOURLY'];
+export const isFrontDesk = (staff) => staff?.kind === 'FRONT_DESK';
+export const payModelsFor = (staff) => (isFrontDesk(staff) ? PAY_MODELS.filter((m) => FRONT_DESK_PAY_MODELS.includes(m.value)) : PAY_MODELS);
+
 export const PAY_PARTS = [
   { key: 'monthlyBase', label: 'Monthly salary (₹)' },
   { key: 'dailyRate', label: 'Pay per day (₹)' },

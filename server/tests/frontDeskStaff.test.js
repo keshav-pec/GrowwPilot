@@ -1,14 +1,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { DateTime } from 'luxon';
-import { Appointment, Staff, User } from '../src/models/index.js';
+import { Appointment, CommissionRule, PayPlan, Staff, User } from '../src/models/index.js';
 import { createStaff, findServiceStaff, updateStaff } from '../src/modules/staff/staff.service.js';
 import { bookWithLock, getAvailability } from '../src/modules/appointments/scheduling.service.js';
 import { createCustomer } from '../src/modules/customers/customers.service.js';
-import { listStaffPay } from '../src/modules/payroll/payroll.service.js';
+import * as payroll from '../src/modules/payroll/payroll.service.js';
 import { createFixtures, startDb, stopDb } from './testDb.js';
 
 let f;
 let ctx; // the business owner, working in Andheri
+let deskCtx; // Kavya, the Andheri front desk login
 let desks; // front desk logins: { andheri, bandra }
 const tomorrow = () => DateTime.now().setZone('Asia/Kolkata').plus({ days: 1 }).toISODate();
 
@@ -22,11 +23,23 @@ beforeAll(async () => {
   ]);
   desks = { andheri, bandra };
   ctx = { ...f.ctxGlamour, role: 'OWNER', isPrimaryOwner: true, userName: 'Anita' };
+  deskCtx = {
+    orgId: f.ctxGlamour.orgId,
+    userId: String(andheri._id),
+    userName: 'Kavya',
+    role: 'FRONT_DESK',
+    isPrimaryOwner: false,
+    allowedBranchIds: [String(f.andheri._id)],
+    activeBranchId: String(f.andheri._id),
+  };
 });
 afterAll(stopDb);
 beforeEach(async () => {
   await Appointment.deleteMany({});
   await Staff.deleteMany({ kind: 'FRONT_DESK' });
+  await Staff.deleteMany({ name: 'Sara' });
+  await PayPlan.deleteMany({});
+  await CommissionRule.deleteMany({});
 });
 
 const addDesk = (extra = {}) =>
@@ -102,12 +115,78 @@ describe('Front desk members are never booked', () => {
   });
 });
 
-describe('Payroll leaves front desk members out (until Part 6)', () => {
-  it('does not list them in pay setup and hides their pay page', async () => {
+const thisMonth = () => DateTime.now().setZone('Asia/Kolkata').startOf('month').toISODate();
+const nextMonth = () => DateTime.now().setZone('Asia/Kolkata').plus({ months: 1 }).startOf('month').toISODate();
+const addSara = () => createStaff(ctx, { name: 'Sara', role: 'Stylist', branchId: String(f.andheri._id) });
+
+describe('Front desk pay setup', () => {
+  it('owners can pay a front desk member a monthly salary, per day or per hour', async () => {
     const member = await addDesk();
-    const { rows } = await listStaffPay(ctx);
-    expect(rows.some((r) => String(r.staff._id) === String(member._id))).toBe(false);
-    expect(rows.some((r) => String(r.staff._id) === String(f.rahul._id))).toBe(true);
+    await expect(payroll.createPlan(ctx, member._id, { model: 'FIXED', monthlyBase: 1500000, effectiveFrom: thisMonth() })).resolves.toBeDefined();
+    await expect(payroll.createPlan(ctx, member._id, { model: 'DAILY', dailyRate: 60000, effectiveFrom: nextMonth() })).resolves.toBeDefined();
+  });
+
+  it('no commission or per-service pay for front desk', async () => {
+    const member = await addDesk();
+    for (const plan of [
+      { model: 'FIXED_COMMISSION', monthlyBase: 1500000, commissionBps: 500 },
+      { model: 'COMMISSION', commissionBps: 1000 },
+      { model: 'ASSIGNMENT', assignmentRate: 5000 },
+      { model: 'HYBRID', dailyRate: 50000, commissionBps: 500 },
+    ]) {
+      await expect(payroll.createPlan(ctx, member._id, { ...plan, effectiveFrom: thisMonth() })).rejects.toMatchObject({ code: 'FRONT_DESK_PAY' });
+    }
+    await expect(payroll.setServiceRate(ctx, member._id, f.haircut._id, { rateBps: 1500 })).rejects.toMatchObject({ code: 'FRONT_DESK_PAY' });
+  });
+
+  it("an upcoming front desk pay change can't be edited into commission", async () => {
+    const member = await addDesk();
+    const plan = await payroll.createPlan(ctx, member._id, { model: 'FIXED', monthlyBase: 1500000, effectiveFrom: nextMonth() });
+    await expect(
+      payroll.updatePlan(ctx, plan._id, { model: 'FIXED_COMMISSION', monthlyBase: 1500000, commissionBps: 500, effectiveFrom: nextMonth() })
+    ).rejects.toMatchObject({ code: 'FRONT_DESK_PAY' });
+  });
+
+  it('owners see front desk members in pay setup; front desk logins only see stylists', async () => {
+    const member = await addDesk();
+    const isListed = (rows) => rows.some((r) => String(r.staff._id) === String(member._id));
+    expect(isListed((await payroll.listStaffPay(ctx)).rows)).toBe(true);
+
+    const forDesk = (await payroll.listStaffPay(deskCtx)).rows;
+    expect(isListed(forDesk)).toBe(false);
+    expect(forDesk.some((r) => String(r.staff._id) === String(f.rahul._id))).toBe(true);
+  });
+
+  it("a front desk login can't open or ask to change front desk pay (not even their own)", async () => {
+    const member = await addDesk({ userId: String(desks.andheri._id) });
+    await expect(payroll.getStaffPay(deskCtx, member._id)).rejects.toMatchObject({ status: 404 });
+    await expect(
+      payroll.createRequest(deskCtx, { staffId: String(member._id), model: 'FIXED', monthlyBase: 2000000, effectiveFrom: nextMonth(), note: 'Raise' })
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('monthly payroll and payments still leave front desk out (until Parts 7 and 8)', async () => {
+    const member = await addDesk();
     await expect(findServiceStaff(ctx, member._id)).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('Moving a stylist to the front desk', () => {
+  it('is blocked while their pay includes commission', async () => {
+    const sara = await addSara();
+    await payroll.createPlan(ctx, sara._id, { model: 'FIXED_COMMISSION', monthlyBase: 1500000, commissionBps: 1000, effectiveFrom: thisMonth() });
+    await expect(updateStaff(ctx, sara._id, { kind: 'FRONT_DESK' })).rejects.toMatchObject({ code: 'PAY_NOT_FRONT_DESK' });
+  });
+
+  it('is blocked while they have special service rates', async () => {
+    const sara = await addSara();
+    await payroll.setServiceRate(ctx, sara._id, f.haircut._id, { rateBps: 1500 });
+    await expect(updateStaff(ctx, sara._id, { kind: 'FRONT_DESK' })).rejects.toMatchObject({ code: 'PAY_NOT_FRONT_DESK' });
+  });
+
+  it('works once they are on a monthly salary', async () => {
+    const sara = await addSara();
+    await payroll.createPlan(ctx, sara._id, { model: 'FIXED', monthlyBase: 1500000, effectiveFrom: thisMonth() });
+    await expect(updateStaff(ctx, sara._id, { kind: 'FRONT_DESK' })).resolves.toMatchObject({ kind: 'FRONT_DESK' });
   });
 });

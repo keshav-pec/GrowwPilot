@@ -171,7 +171,7 @@ export default function StaffFormModal({ staff, onClose }) {
             />
           )}
           {saveStaff.isError && <p className="text-sm text-danger sm:col-span-2">{saveStaff.error.message}</p>}
-          {staff && staff.kind !== 'FRONT_DESK' && (
+          {staff && (
             <Link to={`/app/payroll?staff=${staff._id}`} className="text-sm text-gold-dark hover:underline sm:col-span-2">
               See or change {staff.name}’s pay in Payroll →
             </Link>

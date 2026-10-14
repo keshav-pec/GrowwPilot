@@ -16,6 +16,15 @@ export const PARTS_BY_MODEL = {
   HYBRID: PAY_PARTS,
 };
 
+// Front desk members are never booked, so they can't earn commission or per-service pay
+export const FRONT_DESK_PAY_MODELS = ['FIXED', 'DAILY', 'HOURLY'];
+
+export function checkPayModelFor(staff, model) {
+  if (staff.kind === 'FRONT_DESK' && !FRONT_DESK_PAY_MODELS.includes(model)) {
+    throw new AppError(400, 'FRONT_DESK_PAY', 'Front desk members are paid a monthly salary, per day or per hour (no commission)');
+  }
+}
+
 const PART_LABEL = {
   monthlyBase: 'Monthly salary',
   dailyRate: 'Day rate',

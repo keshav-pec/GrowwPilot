@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
 import { useRequestPayChange, useSavePayPlan } from '../../api/payroll';
 import { formatAmount, isValidRupees, toPaise } from '../../lib/money';
-import { PARTS_BY_MODEL, PAY_MODELS, PAY_PARTS, describePay, firstOfMonth, formatPayDay, formatPercent } from '../../lib/payroll';
+import { PARTS_BY_MODEL, PAY_MODELS, PAY_PARTS, describePay, firstOfMonth, formatPayDay, formatPercent, payModelsFor } from '../../lib/payroll';
 import { Button, Input, Modal, Select, Textarea } from '../../components/ui';
 
 const amount = z.string().trim().refine((v) => v === '' || isValidRupees(v), 'Enter an amount like 20000 or 499.50');
@@ -49,11 +49,11 @@ function toPayload(values) {
   return payload;
 }
 
-// Saved plan -> form text
-function toFormValues(plan) {
+// Saved plan -> form text (a way of paying this person can't have falls back to monthly salary)
+function toFormValues(plan, models) {
   const text = (paise) => (paise ? String(paise / 100) : '');
   return {
-    model: plan?.model ?? 'FIXED',
+    model: models.some((m) => m.value === plan?.model) ? plan.model : 'FIXED',
     monthlyBase: text(plan?.monthlyBase),
     dailyRate: text(plan?.dailyRate),
     hourlyRate: text(plan?.hourlyRate),
@@ -102,6 +102,7 @@ export default function PayPlanFormModal({ mode, staff, current, latest, plan, t
   const savePlan = useSavePayPlan();
   const requestChange = useRequestPayChange();
   const mutation = isRequest ? requestChange : savePlan;
+  const models = payModelsFor(staff); // front desk: salary, per day or per hour
 
   // First setup: from the 1st of this month. A change: from the 1st of the month after the newest setup starts.
   const defaultStart = plan?.effectiveFrom ?? (latest ? firstOfMonth(latest.effectiveFrom > today ? latest.effectiveFrom : today, 1) : firstOfMonth(today));
@@ -113,7 +114,7 @@ export default function PayPlanFormModal({ mode, staff, current, latest, plan, t
     formState: { errors },
   } = useForm({
     resolver: zodResolver(buildSchema(isRequest)),
-    defaultValues: { ...toFormValues(plan ?? latest), effectiveFrom: defaultStart, note: '' },
+    defaultValues: { ...toFormValues(plan ?? latest, models), effectiveFrom: defaultStart, note: '' },
   });
 
   const values = watch();
@@ -157,7 +158,7 @@ export default function PayPlanFormModal({ mode, staff, current, latest, plan, t
         )}
 
         <div className="sm:col-span-2">
-          <Select label="How are they paid?" options={PAY_MODELS} error={errors.model?.message} hint={model?.hint} {...register('model')} />
+          <Select label="How are they paid?" options={models} error={errors.model?.message} hint={model?.hint} {...register('model')} />
         </div>
 
         {PAY_PARTS.filter((part) => used.includes(part.key)).map((part) => (

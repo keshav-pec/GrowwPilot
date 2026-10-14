@@ -93,7 +93,13 @@ Money is stored in whole paise, commission in basis points (10% = 1000).
 - Attendance lists front desk members too (marked by the front desk, a branch owner or the business owner).
 - Payroll leaves front desk members out until Part 6.
 
-### Part 6: Simple pay setup for front desk (monthly salary, per day, per hour; no commission)
+### Part 6: Simple pay setup for front desk ✅ done
+- Front desk members are paid a **monthly salary**, **per day** or **per hour**. The server refuses commission, per-service pay, a mix, and special service rates for them.
+- Owners see front desk members in Pay setup (marked "Front desk"); their pay drawer has no commission or special-rate sections.
+- **Owners only**: front desk logins don't see front desk members in Pay setup, can't open their pay and can't request changes for them (not even their own).
+- A stylist can only be moved to the front desk once their pay has no commission or per-service pay and no special service rates. Pay that already ended stays as it was.
+- Monthly payroll, payments and advances still leave front desk members out until Parts 7 and 8.
+
 ### Part 7: Separate Staff and Front desk tabs in Pay setup and Monthly payroll
 ### Part 8: Front desk payments, payslips and advances; README, help and access tests
 - Owners only. Front desk logins can't see any front desk pay, not even their own payslip (for now).
