@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { CalendarPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useAppointments, useSetAppointmentStatus } from '../../api/appointments';
-import { useStaff } from '../../api/staff';
+import { useServiceStaff } from '../../api/staff';
 import { useAttendance } from '../../api/attendance';
 import { NEXT_STEP, STATUS_LABEL, getAlert } from '../../lib/appointments';
 import { addDays, formatDay, formatTime, todayIn } from '../../lib/time';
@@ -33,7 +33,7 @@ export default function DayBoardPage() {
   const isToday = date === todayIn(zone);
 
   const appointmentsQuery = useAppointments({ date });
-  const staffQuery = useStaff();
+  const staffQuery = useServiceStaff();
   const attendanceRows = useAttendance(date).data?.rows ?? [];
   const awayStatus = (staffId) => {
     const status = attendanceRows.find((r) => r.staff._id === staffId)?.attendance?.status;

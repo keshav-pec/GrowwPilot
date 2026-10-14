@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { useSaveCustomer } from '../../api/customers';
-import { useStaff } from '../../api/staff';
+import { useServiceStaff } from '../../api/staff';
 import { isValidPhone } from '../../lib/phone';
 import { Button, Input, Modal, Select, Textarea } from '../../components/ui';
 
@@ -21,7 +21,7 @@ const schema = z.object({
 // Add a customer (customer = null) or edit one. onSaved gets the saved customer.
 export default function CustomerFormModal({ customer, onClose, onSaved }) {
   const saveCustomer = useSaveCustomer();
-  const staff = (useStaff().data ?? []).filter((s) => s.status === 'active');
+  const staff = (useServiceStaff().data ?? []).filter((s) => s.status === 'active');
   const [existing, setExisting] = useState(null); // the customer who already has this phone
 
   // The current preferred stylist may work at another branch, so make sure they're in the list

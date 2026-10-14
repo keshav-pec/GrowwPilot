@@ -85,6 +85,19 @@ Money is stored in whole paise, commission in basis points (10% = 1000).
 - Draft months work themselves out again as soon as something that changes pay happens (pay setup, special rate, attendance, a paid bill, an advance, a bonus).
 - Every payment, cancellation and advance is in the activity log; the business owner is notified of those made by a branch owner.
 
+### Part 5: Front desk members in the team list ✅ done
+- Each team member is either **Service staff** (stylists, beauticians: can be booked) or **Front desk** (paid, never booked). Everyone saved before this is service staff.
+- A front desk member can be linked to their front desk login (same branch, one login per person).
+- Front desk members never show in booking, the day board, stylist filters, preferred stylist or "chairs filled". The server refuses to book them.
+- A stylist with upcoming bookings can't be moved to the front desk until those bookings are reassigned.
+- Attendance lists front desk members too (marked by the front desk, a branch owner or the business owner).
+- Payroll leaves front desk members out until Part 6.
+
+### Part 6: Simple pay setup for front desk (monthly salary, per day, per hour; no commission)
+### Part 7: Separate Staff and Front desk tabs in Pay setup and Monthly payroll
+### Part 8: Front desk payments, payslips and advances; README, help and access tests
+- Owners only. Front desk logins can't see any front desk pay, not even their own payslip (for now).
+
 ### Not in this module for now (and why)
 - **Staff "My earnings" screen**: stylists don't log in to GrowwPilot today. Owners can download and share payslips instead.
 - **Product commission, refunds, gift cards, memberships, packages, deposits**: the app doesn't sell products or have these yet.

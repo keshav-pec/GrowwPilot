@@ -3,7 +3,8 @@ import { Branch, CommissionRule, PayChangeRequest, PayPlan, Service, Staff } fro
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { todayInZone } from '../../utils/time.js';
-import { findStaff } from '../staff/staff.service.js';
+import { findServiceStaff } from '../staff/staff.service.js';
+import { SERVICE_STAFF } from '../../config/constants.js';
 import { actorRole, logActivity } from '../activity/activity.service.js';
 import { branchApproverIds, businessOwnerIds, notify } from '../notifications/notifications.service.js';
 import { PAY_PARTS, checkNewStart, cleanPayParts, currentAndUpcoming, dayBefore, describePay, formatDay, formatPercent, planStatus } from './payPlan.rules.js';
@@ -11,7 +12,7 @@ import { monthCommission, monthTotals, syncCommissions } from './commission.serv
 import { markPayrollStale } from './payrollStale.js';
 
 // Who can do what (PAYROLL_PLAN.md):
-// - business owner: every branch; branch owner: only their branches (findStaff checks the branch)
+// - business owner: every branch; branch owner: only their branches (findServiceStaff checks the branch)
 // - front desk: sees pay setups at their branch and can only REQUEST a change; an owner approves it
 // - every change goes in the activity log, and the business owner is notified of changes made by others
 
@@ -77,7 +78,7 @@ async function insertPlan(ctx, staff, input, session, extra = {}) {
 async function findEditablePlan(ctx, id) {
   const plan = await PayPlan.findOne(scoped(ctx, { _id: id }));
   if (!plan) throw new AppError(404, 'NOT_FOUND', 'Pay setup not found');
-  const staff = await findStaff(ctx, plan.staffId);
+  const staff = await findServiceStaff(ctx, plan.staffId);
   const later = await PayPlan.exists(scoped(ctx, { staffId: plan.staffId, effectiveFrom: { $gt: plan.effectiveFrom } }));
   if (later) throw new AppError(409, 'NOT_LATEST', 'Only the latest pay setup can be changed. Change or cancel the newer one first.');
   return { plan, staff, today: await todayAt(staff.branchId) };
@@ -90,7 +91,7 @@ async function findEditablePlan(ctx, id) {
 // The "Pay setup" list: every stylist at the selected branch, how they're paid today, and what's coming
 export async function listStaffPay(ctx) {
   const today = await todayAt(ctx.activeBranchId);
-  const staff = await Staff.find(scoped(ctx, { branchId: ctx.activeBranchId, status: { $ne: 'archived' } }))
+  const staff = await Staff.find(scoped(ctx, { branchId: ctx.activeBranchId, status: { $ne: 'archived' }, ...SERVICE_STAFF }))
     .select('name role status')
     .sort({ status: 1, name: 1 })
     .lean();
@@ -117,7 +118,7 @@ export async function listStaffPay(ctx) {
 
 // One person's pay. The front desk only gets the pay setup (current + upcoming + open request), not the history.
 export async function getStaffPay(ctx, staffId) {
-  const staff = await findStaff(ctx, staffId);
+  const staff = await findServiceStaff(ctx, staffId);
   const today = await todayAt(staff.branchId);
   const isOwner = ctx.role === 'OWNER';
 
@@ -152,7 +153,7 @@ export function listRequests(ctx, { status }) {
 // ---------------------------------------------------------------------------
 
 export async function createPlan(ctx, staffId, input) {
-  const staff = await findStaff(ctx, staffId);
+  const staff = await findServiceStaff(ctx, staffId);
 
   const plan = await mongoose.connection.transaction(async (session) => {
     const { plan, previous, before } = await insertPlan(ctx, staff, input, session);
@@ -246,7 +247,7 @@ export async function endPlan(ctx, id, { effectiveTo }) {
 // ---------------------------------------------------------------------------
 
 export async function createRequest(ctx, input) {
-  const staff = await findStaff(ctx, input.staffId);
+  const staff = await findServiceStaff(ctx, input.staffId);
   const proposed = { ...cleanPayParts(input), effectiveFrom: input.effectiveFrom };
 
   // Check the date now for quick feedback; it's checked again when an owner approves
@@ -311,7 +312,7 @@ async function closeRequest(ctx, request, update, session) {
 
 export async function approveRequest(ctx, id, { note }) {
   const request = await findPendingRequest(ctx, id);
-  const staff = await findStaff(ctx, request.staffId);
+  const staff = await findServiceStaff(ctx, request.staffId);
 
   const plan = await mongoose.connection.transaction(async (session) => {
     const { plan, previous, before } = await insertPlan(ctx, staff, { ...request.proposed, note: request.note }, session, { requestId: request._id });
@@ -328,7 +329,7 @@ export async function approveRequest(ctx, id, { note }) {
 
 export async function rejectRequest(ctx, id, { note }) {
   const request = await findPendingRequest(ctx, id);
-  const staff = await findStaff(ctx, request.staffId);
+  const staff = await findServiceStaff(ctx, request.staffId);
 
   await mongoose.connection.transaction(async (session) => {
     await closeRequest(ctx, request, { status: 'rejected', decisionNote: note }, session);
@@ -357,7 +358,7 @@ export async function cancelRequest(ctx, id) {
 
 // Owners only: one month of commission lines for one person
 export async function getCommission(ctx, staffId, month) {
-  const staff = await findStaff(ctx, staffId);
+  const staff = await findServiceStaff(ctx, staffId);
   return monthCommission(ctx, staff._id, month);
 }
 
@@ -377,7 +378,7 @@ async function normalRate(ctx, staff) {
 
 // Add or change a special rate, e.g. Rahul gets 15% on Hair Colour. It counts from the next paid bill.
 export async function setServiceRate(ctx, staffId, serviceId, { rateBps }) {
-  const staff = await findStaff(ctx, staffId);
+  const staff = await findServiceStaff(ctx, staffId);
   const service = await findService(ctx, serviceId);
   const normal = await normalRate(ctx, staff);
 
@@ -397,7 +398,7 @@ export async function setServiceRate(ctx, staffId, serviceId, { rateBps }) {
 }
 
 export async function removeServiceRate(ctx, staffId, serviceId) {
-  const staff = await findStaff(ctx, staffId);
+  const staff = await findServiceStaff(ctx, staffId);
   const rule = await CommissionRule.findOne(scoped(ctx, { staffId: staff._id, serviceId })).populate('serviceId', 'name');
   if (!rule) throw new AppError(404, 'NOT_FOUND', 'Special rate not found');
 

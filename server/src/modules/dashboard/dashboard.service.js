@@ -3,7 +3,7 @@
 import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
 import { Appointment, Attendance, Branch, Invoice, Lead, Staff } from '../../models/index.js';
-import { OPEN_APPOINTMENT_STATUSES } from '../../config/constants.js';
+import { OPEN_APPOINTMENT_STATUSES, SERVICE_STAFF } from '../../config/constants.js';
 import { scoped } from '../../utils/scoped.js';
 import { formatMoney } from '../../utils/money.js';
 import { dayRangeUTC, formatTime } from '../../utils/time.js';
@@ -156,7 +156,7 @@ async function getPulse(ctx, branch, now, today, todayAppointments, attention) {
 
   // Signal 2: chairs filled = booked stylist-minutes / available stylist-minutes today
   const [workingStaff, awayToday] = await Promise.all([
-    Staff.find(scoped(ctx, { branchId: branch._id, status: 'active' })).select('_id').lean(),
+    Staff.find(scoped(ctx, { branchId: branch._id, status: 'active', ...SERVICE_STAFF })).select('_id').lean(),
     Attendance.find(scoped(ctx, { branchId: branch._id, date: nowLocal.toISODate(), status: { $in: AWAY } })).select('staffId').lean(),
   ]);
   const inToday = workingStaff.filter((s) => !awayToday.some((a) => String(a.staffId) === String(s._id))).length;

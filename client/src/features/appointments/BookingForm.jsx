@@ -7,7 +7,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useSaveAppointment } from '../../api/appointments';
 import { useConvertLead } from '../../api/leads';
 import { useCombos, useServices } from '../../api/catalog';
-import { useStaff } from '../../api/staff';
+import { useServiceStaff } from '../../api/staff';
 import { useAttendance } from '../../api/attendance';
 import { formatMoney } from '../../lib/money';
 import { formatDay } from '../../lib/time';
@@ -30,7 +30,7 @@ export default function BookingForm({ initial, appointmentId, leadInfo }) {
 
   const services = useServices().data ?? [];
   const combos = useCombos().data ?? [];
-  const activeStaff = (useStaff().data ?? []).filter((s) => s.status === 'active');
+  const activeStaff = (useServiceStaff().data ?? []).filter((s) => s.status === 'active');
   const saveAppointment = useSaveAppointment();
   const convertLead = useConvertLead();
   const lead = leadInfo?.lead;

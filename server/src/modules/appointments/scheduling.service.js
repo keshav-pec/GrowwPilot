@@ -3,7 +3,7 @@
 import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
 import { Appointment, Attendance, Branch, Combo, Customer, Service, Staff } from '../../models/index.js';
-import { OPEN_APPOINTMENT_STATUSES } from '../../config/constants.js';
+import { OPEN_APPOINTMENT_STATUSES, SERVICE_STAFF } from '../../config/constants.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { formatTime, localToUTC, toBranchTime } from '../../utils/time.js';
@@ -48,7 +48,9 @@ async function loadBookingRefs(ctx, payload) {
   const staffIds = payload.items.map((item) => item.staffId);
   const staff = await Staff.find(scoped(ctx, { _id: { $in: staffIds } })).lean();
   for (const id of staffIds) {
-    if (!staff.some((s) => sameId(s._id, id))) throw new AppError(400, 'INVALID_STAFF', 'One of the stylists was not found');
+    const member = staff.find((s) => sameId(s._id, id));
+    if (!member) throw new AppError(400, 'INVALID_STAFF', 'One of the stylists was not found');
+    if (member.kind === 'FRONT_DESK') throw new AppError(400, 'INVALID_STAFF', `${member.name} works at the front desk and can't be booked`);
   }
 
   // Combo (optional): the items must be exactly the combo's services
@@ -272,7 +274,7 @@ export async function bookWithLock(ctx, payload) {
 // ---------------------------------------------------------------------------
 export async function getAvailability(ctx, { date, staffId, duration, excludeAppointmentId }) {
   const branch = await Branch.findOne(scoped(ctx, { _id: ctx.activeBranchId })).lean();
-  const staff = await Staff.findOne(scoped(ctx, { _id: staffId, branchId: ctx.activeBranchId })).lean();
+  const staff = await Staff.findOne(scoped(ctx, { _id: staffId, branchId: ctx.activeBranchId, ...SERVICE_STAFF })).lean();
   if (!branch || !staff) throw new AppError(404, 'NOT_FOUND', 'Stylist not found at this branch');
 
   const zone = branch.timezone;

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CalendarPlus, CalendarX, Search } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useAppointments } from '../../api/appointments';
-import { useStaff } from '../../api/staff';
+import { useServiceStaff } from '../../api/staff';
 import { STATUS_LABEL, staffNames } from '../../lib/appointments';
 import { useDebounce } from '../../lib/useDebounce';
 import { formatMoney } from '../../lib/money';
@@ -50,7 +50,7 @@ export default function AppointmentsPage() {
     staffId: staffId || undefined,
     search: debouncedSearch || undefined,
   });
-  const staffQuery = useStaff();
+  const staffQuery = useServiceStaff();
   const [selectedId, setSelectedId] = useState(null);
   const selected = appointmentsQuery.data?.find((a) => a._id === selectedId);
 

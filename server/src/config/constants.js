@@ -2,6 +2,11 @@
 
 export const ROLES = ['SUPER_ADMIN', 'OWNER', 'FRONT_DESK'];
 
+// Team members: SERVICE = stylists and beauticians (can be booked), FRONT_DESK = reception (paid, never booked)
+export const STAFF_KINDS = ['SERVICE', 'FRONT_DESK'];
+// Query part for "stylists only". Uses $ne so team members saved before `kind` existed still count.
+export const SERVICE_STAFF = { kind: { $ne: 'FRONT_DESK' } };
+
 export const APPOINTMENT_STATUSES = ['BOOKED', 'ARRIVED', 'IN_SERVICE', 'COMPLETED', 'CANCELLED'];
 export const APPOINTMENT_SOURCES = ['phone', 'walk-in', 'lead'];
 

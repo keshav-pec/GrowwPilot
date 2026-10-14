@@ -8,5 +8,12 @@ export function useStaff() {
   return useResourceList(['staff', activeBranchId], '/staff', 'staff');
 }
 
+// Stylists only (front desk members are never booked or picked as a stylist)
+export const isServiceStaff = (s) => s.kind !== 'FRONT_DESK';
+export function useServiceStaff() {
+  const { activeBranchId } = useAuth();
+  return useResourceList(['staff', activeBranchId], '/staff', 'staff', { select: (list) => list.filter(isServiceStaff) });
+}
+
 export const useSaveStaff = () => useSaveResource('/staff', [['staff']]);
 export const useSetStaffStatus = () => useSetResourceStatus('/staff', [['staff']]);

@@ -5,7 +5,7 @@ import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { formatAmount } from '../../utils/money.js';
 import { todayInZone } from '../../utils/time.js';
-import { findStaff } from '../staff/staff.service.js';
+import { findServiceStaff } from '../staff/staff.service.js';
 import { recordPayrollAction } from './monthlyPayroll.service.js';
 import { markPayrollStale } from './payrollStale.js';
 import { advanceRepayment } from './monthlyPay.rules.js';
@@ -150,7 +150,7 @@ export async function giveAdvance(ctx, staffId, input, idempotencyKey) {
   const repeat = await EmployeeAdvance.findOne(scoped(ctx, { idempotencyKey })).lean();
   if (repeat) return repeat;
 
-  const staff = await findStaff(ctx, staffId);
+  const staff = await findServiceStaff(ctx, staffId);
   if (input.monthlyRepayment > input.amount) throw new AppError(400, 'VALIDATION_ERROR', 'The monthly repayment can’t be more than the advance');
   if (input.firstMonth < input.givenOn.slice(0, 7)) throw new AppError(400, 'VALIDATION_ERROR', 'Repayments can’t start before the advance is given');
   if ([...(await lockedMonths(ctx, staff.branchId))].some((m) => m >= input.firstMonth)) {
@@ -179,7 +179,7 @@ export async function giveAdvance(ctx, staffId, input, idempotencyKey) {
 export async function closeAdvance(ctx, advanceId, { fromMonth, reason }) {
   const advance = await EmployeeAdvance.findOne(scoped(ctx, { _id: advanceId }));
   if (!advance || !ctx.allowedBranchIds.includes(String(advance.branchId))) throw new AppError(404, 'NOT_FOUND', 'Advance not found');
-  const staff = await findStaff(ctx, advance.staffId);
+  const staff = await findServiceStaff(ctx, advance.staffId);
   if (advance.closedFromMonth) throw new AppError(409, 'ALREADY_CLOSED', 'This advance is already closed');
   // Locked months already took their repayment, so it can only stop after the last locked month
   if ([...(await lockedMonths(ctx, advance.branchId))].some((m) => m >= fromMonth)) {

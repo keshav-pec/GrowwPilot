@@ -70,6 +70,9 @@ const staff = byName(
     { orgId: desertRose._id, branchId: branch['Dubai Marina']._id, name: 'Omar', role: 'Barber' },
     { orgId: desertRose._id, branchId: branch['Dubai Marina']._id, name: 'Layla', role: 'Stylist' },
     { orgId: desertRose._id, branchId: branch['Dubai Marina']._id, name: 'Hana', role: 'Beautician' },
+    // Front desk members: paid like everyone else, never booked, linked to their login
+    { orgId: glamour._id, branchId: branch.Andheri._id, name: 'Kavya', kind: 'FRONT_DESK', role: 'Receptionist', userId: deskOf.Andheri._id },
+    { orgId: glamour._id, branchId: branch.Bandra._id, name: 'Ritu', kind: 'FRONT_DESK', role: 'Receptionist', userId: deskOf.Bandra._id },
   ])
 );
 
@@ -321,7 +324,7 @@ for (let d = 1; d <= 14; d++) {
   mark('Andheri', staff.Neha, -d, d === 11 ? 'leave' : 'present');
   mark('Andheri', staff.Kabir, -d, d === 3 ? 'absent' : d === 10 ? 'leave' : 'present');
 }
-for (const s of [staff.Rahul, staff.Neha, staff.Kabir]) mark('Andheri', s, 0, 'present');
+for (const s of [staff.Rahul, staff.Neha, staff.Kabir, staff.Kavya]) mark('Andheri', s, 0, 'present');
 mark('Bandra', staff.Arjun, 0, 'present'); // Zoya not marked yet today
 for (const s of [staff.Omar, staff.Layla, staff.Hana]) mark('Dubai Marina', s, 0, 'present');
 mark('Andheri', staff.Neha, 1, 'leave');

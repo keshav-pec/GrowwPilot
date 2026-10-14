@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { Appointment, Branch, Customer, Invoice, Staff } from '../../models/index.js';
-import { OPEN_APPOINTMENT_STATUSES } from '../../config/constants.js';
+import { OPEN_APPOINTMENT_STATUSES, SERVICE_STAFF } from '../../config/constants.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { escapeRegex } from '../../utils/regex.js';
@@ -72,7 +72,7 @@ async function findCustomer(ctx, id) {
 // The preferred stylist must be a (non-archived) stylist of this salon
 async function assertPreferredStaff(ctx, staffId) {
   if (!staffId) return;
-  const exists = await Staff.exists(scoped(ctx, { _id: staffId, status: { $ne: 'archived' } }));
+  const exists = await Staff.exists(scoped(ctx, { _id: staffId, status: { $ne: 'archived' }, ...SERVICE_STAFF }));
   if (!exists) throw new AppError(400, 'INVALID_STAFF', 'That stylist was not found');
 }
 

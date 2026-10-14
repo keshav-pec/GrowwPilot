@@ -5,10 +5,12 @@ import { api } from './client';
 // and change its status. These three hooks do that for any URL.
 
 // GET /staff -> res.data.staff
-export function useResourceList(queryKey, url, field) {
+// `options` go straight to useQuery (e.g. `select` to show only part of the list)
+export function useResourceList(queryKey, url, field, options = {}) {
   return useQuery({
     queryKey,
     queryFn: () => api.get(url).then((res) => res.data[field]),
+    ...options,
   });
 }
 
