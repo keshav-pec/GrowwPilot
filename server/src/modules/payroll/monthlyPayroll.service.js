@@ -6,8 +6,7 @@ import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { formatAmount } from '../../utils/money.js';
 import { dayRangeUTC, todayInZone } from '../../utils/time.js';
-import { findServiceStaff } from '../staff/staff.service.js';
-import { SERVICE_STAFF } from '../../config/constants.js';
+import { findStaff } from '../staff/staff.service.js';
 import { actorRole, logActivity } from '../activity/activity.service.js';
 import { businessOwnerIds, notify } from '../notifications/notifications.service.js';
 import { paidBillsBetween, syncCommissions } from './commission.service.js';
@@ -44,7 +43,8 @@ async function gatherMonth(ctx, branch, month) {
   // Bills paid before a pay setup existed get their commission now (never changes lines already written)
   await syncCommissions(ctx.orgId, { from: start, to: countUntil });
 
-  const staff = await Staff.find(scoped(ctx, { branchId: branch._id, ...SERVICE_STAFF })).select('name role status').sort('name').lean();
+  // Service staff and front desk members (front desk never has commission or per-service pay)
+  const staff = await Staff.find(scoped(ctx, { branchId: branch._id })).select('name role status kind').sort('name').lean();
   const staffIds = staff.map((s) => s._id);
   const monthUTC = { $gte: dayRangeUTC(start, branch.timezone).start, $lt: dayRangeUTC(end, branch.timezone).end };
 
@@ -95,12 +95,16 @@ export async function calculateRun(ctx, month) {
     pay: calculateMonthlyPay({ month, countUntil, ...p, isActive: p.staff.status === 'active' }),
   }));
 
+  const addUp = (rows) => ({
+    count: rows.length,
+    gross: rows.reduce((sum, r) => sum + r.pay.gross, 0),
+    deductions: rows.reduce((sum, r) => sum + r.pay.deductions, 0),
+    net: rows.reduce((sum, r) => sum + r.pay.net, 0),
+    payable: rows.reduce((sum, r) => sum + Math.max(r.pay.net, 0), 0),
+  });
   const totals = {
-    count: results.length,
-    gross: results.reduce((sum, r) => sum + r.pay.gross, 0),
-    deductions: results.reduce((sum, r) => sum + r.pay.deductions, 0),
-    net: results.reduce((sum, r) => sum + r.pay.net, 0),
-    payable: results.reduce((sum, r) => sum + Math.max(r.pay.net, 0), 0),
+    ...addUp(results),
+    frontDesk: addUp(results.filter((r) => r.person.staff.kind === 'FRONT_DESK')),
     commission: results.reduce((sum, r) => sum + r.person.commission.amount, 0),
     blocking: results.reduce((sum, r) => sum + r.pay.issues.filter((i) => i.blocking).length, 0),
     warnings: results.reduce((sum, r) => sum + r.pay.issues.filter((i) => !i.blocking).length, 0),
@@ -125,6 +129,7 @@ export async function calculateRun(ctx, month) {
         staffId: person.staff._id,
         staffName: person.staff.name,
         staffRole: person.staff.role,
+        staffKind: person.staff.kind ?? 'SERVICE',
         ...pay,
       })),
       { session, ordered: true }
@@ -228,7 +233,7 @@ async function refreshIfOpened(ctx, run, month) {
 }
 
 export async function addAdjustment(ctx, input) {
-  const staff = await findServiceStaff(ctx, input.staffId);
+  const staff = await findStaff(ctx, input.staffId);
   if (String(staff.branchId) !== ctx.activeBranchId) throw new AppError(400, 'WRONG_BRANCH', `${staff.name} works at another branch.`);
   if (input.correctsMonth && input.correctsMonth >= input.month) {
     throw new AppError(400, 'VALIDATION_ERROR', 'A correction must be for an earlier month');
@@ -254,7 +259,7 @@ export async function addAdjustment(ctx, input) {
 export async function removeAdjustment(ctx, id) {
   const adjustment = await PayrollAdjustment.findOne(scoped(ctx, { _id: id })).lean();
   if (!adjustment || !ctx.allowedBranchIds.includes(String(adjustment.branchId))) throw new AppError(404, 'NOT_FOUND', 'Bonus or deduction not found');
-  const staff = await findServiceStaff(ctx, adjustment.staffId);
+  const staff = await findStaff(ctx, adjustment.staffId);
   const run = await assertMonthOpen(ctx, adjustment.branchId, adjustment.month);
 
   await mongoose.connection.transaction(async (session) => {

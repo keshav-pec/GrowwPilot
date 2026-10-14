@@ -22,6 +22,14 @@ const payrollRunSchema = new mongoose.Schema(
       commission: money({ default: 0 }),
       blocking: { type: Number, default: 0 }, // "things to check" that stop the lock
       warnings: { type: Number, default: 0 },
+      // The front desk part of the totals above (the rest is service staff)
+      frontDesk: {
+        count: { type: Number, default: 0 },
+        gross: money({ default: 0 }),
+        deductions: money({ default: 0 }),
+        net: { type: Number, default: 0 },
+        payable: money({ default: 0 }),
+      },
     },
     lockedAt: Date,
     lockedBy: ref('User'),

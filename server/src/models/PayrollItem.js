@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { appendOnly, ref, money } from './fields.js';
+import { STAFF_KINDS } from '../config/constants.js';
 
 // One line of a payslip, e.g. { kind: 'salary', label: 'Monthly salary', detail: 'Full month', amount: 2000000 }
 const lineSchema = new mongoose.Schema(
@@ -33,6 +34,7 @@ const payrollItemSchema = new mongoose.Schema(
     staffId: ref('Staff', { required: true }),
     staffName: { type: String, required: true },
     staffRole: String,
+    staffKind: { type: String, enum: STAFF_KINDS, default: 'SERVICE' }, // which section of the payroll they show in
     payDescription: String, // how they were paid this month, in words
     lines: [lineSchema],
     notes: [String], // facts that don't change the pay, e.g. "2 days absent (not taken off automatically)"

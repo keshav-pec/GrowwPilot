@@ -100,7 +100,13 @@ Money is stored in whole paise, commission in basis points (10% = 1000).
 - A stylist can only be moved to the front desk once their pay has no commission or per-service pay and no special service rates. Pay that already ended stays as it was.
 - Monthly payroll, payments and advances still leave front desk members out until Parts 7 and 8.
 
-### Part 7: Separate Staff and Front desk tabs in Pay setup and Monthly payroll
+### Part 7: Separate Staff and Front desk sections ✅ done
+- Owners switch between **Staff** and **Front desk** in Pay setup and Monthly payroll (front desk logins only see Staff, as before).
+- Monthly payroll now includes front desk members: salary, per day or per hour, bonuses and deductions, things to check. Each section shows its own to-pay, deductions and things to check; the branch total shows both.
+- The month is still worked out and **locked for the whole branch at once**. If the other section has something that must be fixed, a note says so.
+- Export has a "Section" column. Locked months can be paid and payslips downloaded for front desk members the same way as for staff.
+- Old payroll lines (before front desk existed) count as Staff.
+
 ### Part 8: Front desk payments, payslips and advances; README, help and access tests
 - Owners only. Front desk logins can't see any front desk pay, not even their own payslip (for now).
 

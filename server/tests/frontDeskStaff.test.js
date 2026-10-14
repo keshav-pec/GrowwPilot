@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { DateTime } from 'luxon';
-import { Appointment, CommissionRule, PayPlan, Staff, User } from '../src/models/index.js';
+import { Appointment, CommissionRule, PayPlan, PayrollAdjustment, PayrollItem, PayrollRun, Staff, User } from '../src/models/index.js';
+import * as monthly from '../src/modules/payroll/monthlyPayroll.service.js';
 import { createStaff, findServiceStaff, updateStaff } from '../src/modules/staff/staff.service.js';
 import { bookWithLock, getAvailability } from '../src/modules/appointments/scheduling.service.js';
 import { createCustomer } from '../src/modules/customers/customers.service.js';
@@ -40,6 +41,7 @@ beforeEach(async () => {
   await Staff.deleteMany({ name: 'Sara' });
   await PayPlan.deleteMany({});
   await CommissionRule.deleteMany({});
+  await Promise.all([PayrollRun, PayrollItem, PayrollAdjustment].map((m) => m.deleteMany({})));
 });
 
 const addDesk = (extra = {}) =>
@@ -165,7 +167,7 @@ describe('Front desk pay setup', () => {
     ).rejects.toMatchObject({ status: 404 });
   });
 
-  it('monthly payroll and payments still leave front desk out (until Parts 7 and 8)', async () => {
+  it('advances still leave front desk out (until Part 8)', async () => {
     const member = await addDesk();
     await expect(findServiceStaff(ctx, member._id)).rejects.toMatchObject({ status: 404 });
   });
@@ -188,5 +190,46 @@ describe('Moving a stylist to the front desk', () => {
     const sara = await addSara();
     await payroll.createPlan(ctx, sara._id, { model: 'FIXED', monthlyBase: 1500000, effectiveFrom: thisMonth() });
     await expect(updateStaff(ctx, sara._id, { kind: 'FRONT_DESK' })).resolves.toMatchObject({ kind: 'FRONT_DESK' });
+  });
+});
+
+describe('Monthly payroll with a front desk section', () => {
+  const lastMonth = () => DateTime.now().setZone('Asia/Kolkata').minus({ months: 1 }).toFormat('yyyy-MM');
+
+  async function deskOnSalary() {
+    const member = await addDesk();
+    await payroll.createPlan(ctx, member._id, { model: 'FIXED', monthlyBase: 1500000, effectiveFrom: `${lastMonth()}-01` });
+    await payroll.createPlan(ctx, f.rahul._id, { model: 'FIXED', monthlyBase: 2000000, effectiveFrom: `${lastMonth()}-01` });
+    return member;
+  }
+
+  it('front desk members are paid in the month, marked as front desk, with no commission', async () => {
+    const member = await deskOnSalary();
+    const run = await monthly.calculateRun(ctx, lastMonth());
+    const item = await PayrollItem.findOne({ runId: run._id, staffId: member._id }).lean();
+
+    expect(item.staffKind).toBe('FRONT_DESK');
+    expect(item.net).toBe(1500000);
+    expect(item.lines.map((l) => l.kind)).toEqual(['salary']);
+
+    const rahul = await PayrollItem.findOne({ runId: run._id, staffId: f.rahul._id }).lean();
+    expect(rahul.staffKind).toBe('SERVICE');
+  });
+
+  it('keeps front desk totals apart, and the branch total includes both', async () => {
+    await deskOnSalary();
+    const run = await monthly.calculateRun(ctx, lastMonth());
+    expect(run.totals.frontDesk.count).toBe(1);
+    expect(run.totals.frontDesk.net).toBe(1500000);
+    expect(run.totals.net).toBe(1500000 + 2000000);
+  });
+
+  it('owners can add a bonus for a front desk member', async () => {
+    const member = await deskOnSalary();
+    await monthly.calculateRun(ctx, lastMonth());
+    await monthly.addAdjustment(ctx, { staffId: String(member._id), month: lastMonth(), kind: 'bonus', amount: 50000, reason: 'Diwali bonus' });
+    const { items, run } = await monthly.getRun(ctx, lastMonth());
+    expect(items.find((i) => String(i.staffId) === String(member._id)).net).toBe(1550000);
+    expect(run.totals.frontDesk.net).toBe(1550000);
   });
 });

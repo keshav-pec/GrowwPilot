@@ -395,7 +395,7 @@ await monthlyPayroll.addAdjustment(anitaAtAndheri, {
 // ===========================================================================
 console.log(`\nSeeded: 2 salons, 3 branches, ${Object.keys(staff).length} staff, ${GLAMOUR_SERVICES.length + DESERT_ROSE_SERVICES.length} services, 2 combos,`);
 console.log(`        ${glamourCustomers.length + desertCustomers.length} customers, ${LEADS.length} leads, ${appointments.length} appointments, ${invoices.length} invoices, ${attendance.length} attendance records`);
-console.log(`        6 pay setups, 1 pay change request waiting for approval, 1 locked payroll month with payments, 1 advance, ${await models.CommissionEntry.countDocuments()} commission lines`);
+console.log(`        8 pay setups (2 front desk), 1 pay change request waiting for approval, 1 locked payroll month with payments, 1 advance, ${await models.CommissionEntry.countDocuments()} commission lines`);
 console.log(`Today is centred on ${A.toFormat('h:mm a')} at Andheri (${A.zoneName}).`);
 console.log('\nEvery account uses the password:', DEMO_PASSWORD);
 console.table([

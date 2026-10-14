@@ -8,6 +8,7 @@ import PayRequestsTab from './PayRequestsTab';
 import ActivityTab from './ActivityTab';
 import MonthlyPayrollTab from './MonthlyPayrollTab';
 import StaffPayDrawer from './StaffPayDrawer';
+import { GROUPS } from './GroupSwitch';
 
 // Owners: "Payroll". Front desk: "Staff pay" (pay setup and requests only, see PAYROLL_PLAN.md)
 export default function PayrollPage() {
@@ -26,6 +27,8 @@ export default function PayrollPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = tabs.some((t) => t.value === searchParams.get('tab')) ? searchParams.get('tab') : tabs[0].value;
   const staffId = searchParams.get('staff');
+  // Owners see two sections, Staff and Front desk (?group=front-desk). The front desk only sees staff.
+  const group = isOwner && GROUPS.some((g) => g.value === searchParams.get('group')) ? searchParams.get('group') : 'staff';
 
   // Early in a month, owners are usually paying last month's salaries, so show that one first
   const now = DateTime.now().setZone(activeBranch?.timezone);
@@ -51,9 +54,15 @@ export default function PayrollPage() {
       <Tabs tabs={tabs} value={tab} onChange={(value) => update({ tab: value })} />
 
       {tab === 'month' && (
-        <MonthlyPayrollTab month={month} onMonthChange={(value) => update({ month: value })} onOpenPaySetup={(id) => update({ tab: 'setup', staff: id })} />
+        <MonthlyPayrollTab
+          month={month}
+          onMonthChange={(value) => update({ month: value })}
+          group={group}
+          onGroupChange={(value) => update({ group: value })}
+          onOpenPaySetup={(id) => update({ tab: 'setup', staff: id })}
+        />
       )}
-      {tab === 'setup' && <PaySetupTab onOpenStaff={(id) => update({ staff: id })} />}
+      {tab === 'setup' && <PaySetupTab group={group} onGroupChange={(value) => update({ group: value })} onOpenStaff={(id) => update({ staff: id })} />}
       {tab === 'requests' && <PayRequestsTab />}
       {tab === 'activity' && <ActivityTab />}
 
