@@ -15,7 +15,26 @@ const columns = [
   { key: 'status', header: 'Status', render: (u) => <StatusBadge status={u.status} /> },
 ];
 
-// People who log in: front desk accounts (for the selected branch) or branch owners
+// What each tab says
+const TEXT = {
+  FRONT_DESK: {
+    add: 'Add front desk',
+    emptyTitle: 'No front desk logins for this branch',
+    emptyMessage: 'Add a login for the receptionist who works at this branch.',
+  },
+  INVENTORY: {
+    add: 'Add inventory login',
+    emptyTitle: 'No inventory logins for this branch',
+    emptyMessage: 'Add a login for the person who looks after stock at this branch. They will only see Inventory.',
+  },
+  OWNER: {
+    add: 'Add branch owner',
+    emptyTitle: 'No branch owners yet',
+    emptyMessage: 'A branch owner can manage staff and front desk accounts for the branches you choose.',
+  },
+};
+
+// People who log in: front desk or inventory logins (for the selected branch), or branch owners
 export default function LoginsTab({ role }) {
   const { activeBranchId } = useAuth();
   const usersQuery = useUsers();
@@ -30,7 +49,7 @@ export default function LoginsTab({ role }) {
     <>
       <div className="mb-4 flex justify-end">
         <Button onClick={() => setEditing('new')}>
-          <Plus size={16} /> {role === 'OWNER' ? 'Add branch owner' : 'Add front desk'}
+          <Plus size={16} /> {TEXT[role].add}
         </Button>
       </div>
 
@@ -43,15 +62,7 @@ export default function LoginsTab({ role }) {
           loading={usersQuery.isPending}
           onRowClick={(u) => setEditing(u)}
           empty={
-            <EmptyState
-              icon={KeyRound}
-              title={role === 'OWNER' ? 'No branch owners yet' : 'No front desk logins for this branch'}
-              message={
-                role === 'OWNER'
-                  ? 'A branch owner can manage staff and front desk accounts for the branches you choose.'
-                  : 'Add a login for the receptionist who works at this branch.'
-              }
-            />
+            <EmptyState icon={KeyRound} title={TEXT[role].emptyTitle} message={TEXT[role].emptyMessage} />
           }
         />
       )}

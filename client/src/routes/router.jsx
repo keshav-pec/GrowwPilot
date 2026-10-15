@@ -24,6 +24,7 @@ import InvoicePage from '../features/checkout/InvoicePage';
 import AttendancePage from '../features/attendance/AttendancePage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import PayrollPage from '../features/payroll/PayrollPage';
+import InventoryPage from '../features/inventory/InventoryPage';
 import NotFoundPage from './NotFoundPage';
 import { Spinner } from '../components/ui';
 
@@ -58,9 +59,9 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Salon area (owner and front desk)
+  // Salon area (owner, front desk and inventory logins)
   {
-    element: <ProtectedRoute roles={['OWNER', 'FRONT_DESK']} />,
+    element: <ProtectedRoute roles={['OWNER', 'FRONT_DESK', 'INVENTORY']} />,
     children: [
       {
         path: '/app',
@@ -68,19 +69,30 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <HomeRedirect /> },
 
+          // Inventory add-on: owners, front desk and inventory logins (who see only this page)
+          {
+            element: <ProtectedRoute roles={['OWNER', 'FRONT_DESK', 'INVENTORY']} addon="inventory" />,
+            children: [{ path: 'inventory', element: <InventoryPage /> }],
+          },
+
           // Owner and front desk
-          { path: 'today', element: <DayBoardPage /> },
-          { path: 'appointments', element: <AppointmentsPage /> },
-          { path: 'appointments/new', element: <BookingPage /> },
-          { path: 'appointments/:id/edit', element: <BookingPage /> },
-          { path: 'customers', element: <CustomersPage /> },
-          { path: 'customers/:id', element: <CustomerProfilePage /> },
-          { path: 'leads', element: <LeadsPage /> },
-          { path: 'leads/:id/convert', element: <LeadConvertPage /> },
-          { path: 'checkout/:appointmentId', element: <CheckoutPage /> },
-          { path: 'invoices/:id', element: <InvoicePage /> },
-          { path: 'attendance', element: <AttendancePage /> },
-          { path: 'payroll', element: <PayrollPage /> }, // front desk: pay setup + requests only
+          {
+            element: <ProtectedRoute roles={['OWNER', 'FRONT_DESK']} />,
+            children: [
+              { path: 'today', element: <DayBoardPage /> },
+              { path: 'appointments', element: <AppointmentsPage /> },
+              { path: 'appointments/new', element: <BookingPage /> },
+              { path: 'appointments/:id/edit', element: <BookingPage /> },
+              { path: 'customers', element: <CustomersPage /> },
+              { path: 'customers/:id', element: <CustomerProfilePage /> },
+              { path: 'leads', element: <LeadsPage /> },
+              { path: 'leads/:id/convert', element: <LeadConvertPage /> },
+              { path: 'checkout/:appointmentId', element: <CheckoutPage /> },
+              { path: 'invoices/:id', element: <InvoicePage /> },
+              { path: 'attendance', element: <AttendancePage /> },
+              { path: 'payroll', element: <PayrollPage /> }, // front desk: pay setup + requests only
+            ],
+          },
 
           // Owner only
           {

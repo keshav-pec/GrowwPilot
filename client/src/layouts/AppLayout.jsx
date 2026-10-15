@@ -5,6 +5,7 @@ import {
   ChartColumn,
   ClipboardCheck,
   LayoutDashboard,
+  Package,
   Scissors,
   Target,
   UserCog,
@@ -16,8 +17,9 @@ import BranchSwitcher from './BranchSwitcher';
 import ChatAssistant from '../components/ChatAssistant';
 import NotificationBell from '../components/NotificationBell';
 import { useAuth } from '../auth/AuthContext';
+import { hasAddon } from '../lib/constants';
 
-// Sidebar menu. `roles` says who sees each item.
+// Sidebar menu. `roles` says who sees each item; `addon` hides it unless the salon has that add-on.
 const APP_NAV = [
   { to: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['OWNER'] },
   { to: '/app/today', label: 'Day board', icon: CalendarClock, roles: ['OWNER', 'FRONT_DESK'] },
@@ -25,6 +27,7 @@ const APP_NAV = [
   { to: '/app/customers', label: 'Customers', icon: Users, roles: ['OWNER', 'FRONT_DESK'] },
   { to: '/app/leads', label: 'Leads', icon: Target, roles: ['OWNER', 'FRONT_DESK'] },
   { to: '/app/attendance', label: 'Attendance', icon: ClipboardCheck, roles: ['OWNER', 'FRONT_DESK'] },
+  { to: '/app/inventory', label: 'Inventory', icon: Package, roles: ['OWNER', 'FRONT_DESK', 'INVENTORY'], addon: 'inventory' },
   { to: '/app/analytics', label: 'Analytics', icon: ChartColumn, roles: ['OWNER'] },
   { to: '/app/team', label: 'Team', icon: UserCog, roles: ['OWNER'] },
   { to: '/app/branches', label: 'Branches', icon: Building2, roles: ['OWNER'] },
@@ -36,7 +39,7 @@ const APP_NAV = [
 
 export default function AppLayout() {
   const { user } = useAuth();
-  const navItems = APP_NAV.filter((item) => item.roles.includes(user.role));
+  const navItems = APP_NAV.filter((item) => item.roles.includes(user.role) && (!item.addon || hasAddon(user, item.addon)));
 
   return (
     <>
@@ -50,7 +53,7 @@ export default function AppLayout() {
         }
       />
       {/* Help assistant for owners and front desk (it stays open while you move between pages) */}
-      <ChatAssistant />
+      {user.role !== 'INVENTORY' && <ChatAssistant />}
     </>
   );
 }

@@ -10,7 +10,7 @@ import { listNotifications, markRead } from './notifications.service.js';
 const router = Router();
 
 // Everyone in a salon has a bell; each user only ever sees their own messages
-router.use(requireAuth, tenantContext, requireRole('OWNER', 'FRONT_DESK'));
+router.use(requireAuth, tenantContext, requireRole('OWNER', 'FRONT_DESK', 'INVENTORY'));
 
 router.get('/', async (req, res) => {
   res.json(await listNotifications(req.ctx));

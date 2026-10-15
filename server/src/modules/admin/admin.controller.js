@@ -15,3 +15,8 @@ export async function createOrg(req, res) {
 export async function setOrgStatus(req, res) {
   res.json({ org: await adminService.setOrgStatus(req.params.id, req.valid.body.status) });
 }
+
+export async function setOrgAddon(req, res) {
+  const { id, addon } = req.valid.params;
+  res.json({ org: await adminService.setOrgAddon(req.user, id, addon, req.valid.body.enabled) });
+}

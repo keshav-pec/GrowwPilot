@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { ref } from './fields.js';
 import { ROLES } from '../config/constants.js';
 
-// Someone who can log in: Super Admin, Owner or Front Desk.
+// Someone who can log in: Super Admin, Owner, Front Desk or Inventory.
 const userSchema = new mongoose.Schema(
   {
     // Every user belongs to a salon, except the Super Admin
@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema(
     // select: false = never returned by queries unless we ask for it with .select('+passwordHash')
     passwordHash: { type: String, required: true, select: false },
     allBranches: { type: Boolean, default: false }, // true for the primary owner
-    branchIds: [ref('Branch')], // branches this user may work in (front desk: exactly one)
+    branchIds: [ref('Branch')], // branches this user may work in (front desk and inventory: exactly one)
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   },
   { timestamps: true }

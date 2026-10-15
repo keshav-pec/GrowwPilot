@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { env } from '../../config/env.js';
 import { Branch, Organization, User } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
+import { enabledAddons } from '../../config/addons.js';
 
 export const COOKIE_NAME = 'gp_token';
 const SESSION_DAYS = 7;
@@ -30,15 +31,19 @@ export function verifyToken(token) {
 }
 
 // Throws if the user, or their salon, has been deactivated. Returns the user's organization.
+// Inventory logins also need the Inventory add-on: switching it off logs them out on their next request.
 export async function assertCanLogIn(user) {
   if (user.status !== 'active') {
     throw new AppError(401, 'ACCOUNT_INACTIVE', 'Your account has been deactivated');
   }
   if (user.role === 'SUPER_ADMIN') return null;
 
-  const org = await Organization.findById(user.orgId).select('name status').lean();
+  const org = await Organization.findById(user.orgId).select('name status addons').lean();
   if (!org || org.status !== 'active') {
     throw new AppError(401, 'ORG_INACTIVE', 'This salon has been deactivated. Please contact GrowwPilot support.');
+  }
+  if (user.role === 'INVENTORY' && !enabledAddons(org).includes('inventory')) {
+    throw new AppError(401, 'ADDON_DISABLED', 'Inventory is switched off for this salon. Please ask your salon owner.');
   }
   return org;
 }
@@ -58,7 +63,7 @@ export async function login({ email, password }) {
 
 // The active branches this user may work in:
 // - primary owner (allBranches): every branch of the salon
-// - branch owner / front desk: only the branches listed on their account
+// - branch owner / front desk / inventory: only the branches listed on their account
 export async function getAllowedBranches(user) {
   if (user.role === 'SUPER_ADMIN') return [];
 
@@ -77,7 +82,7 @@ export function toSessionUser(user, org, branches) {
     email: user.email,
     role: user.role,
     allBranches: user.allBranches,
-    org: org ? { _id: org._id, name: org.name } : null,
+    org: org ? { _id: org._id, name: org.name, addons: enabledAddons(org) } : null, // addons: e.g. ['inventory']
     branches,
   };
 }

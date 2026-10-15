@@ -114,3 +114,15 @@ export async function setOrgStatus(id, status) {
   if (!org) throw new AppError(404, 'NOT_FOUND', 'Salon not found');
   return org;
 }
+
+// Switch a paid add-on on or off for a salon. Switching it off only hides it: all its data is kept.
+// (Inventory logins are logged out on their next request, see assertCanLogIn.)
+export async function setOrgAddon(superAdmin, id, addon, enabled) {
+  const now = new Date();
+  const changes = enabled
+    ? { [`addons.${addon}.enabled`]: true, [`addons.${addon}.enabledAt`]: now, [`addons.${addon}.enabledBy`]: superAdmin._id }
+    : { [`addons.${addon}.enabled`]: false, [`addons.${addon}.disabledAt`]: now };
+  const org = await Organization.findByIdAndUpdate(id, { $set: changes }, { returnDocument: 'after' }).lean();
+  if (!org) throw new AppError(404, 'NOT_FOUND', 'Salon not found');
+  return org;
+}

@@ -14,6 +14,8 @@ function handleAuthError(error) {
     queryClient.setQueryData(['me'], null);
     toast.error(error.message);
   }
+  // An add-on was switched off while the page was open: reload who I am, so its menu item disappears
+  if (error.code === 'ADDON_DISABLED') queryClient.invalidateQueries({ queryKey: ['me'] });
 }
 
 // React Query keeps server data cached and refetches it when the tab regains focus

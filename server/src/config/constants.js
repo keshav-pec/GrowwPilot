@@ -1,6 +1,7 @@
 // All the fixed lists of values used across the app, in one place.
 
-export const ROLES = ['SUPER_ADMIN', 'OWNER', 'FRONT_DESK'];
+// INVENTORY = a stock-keeping login for one branch (Inventory add-on only)
+export const ROLES = ['SUPER_ADMIN', 'OWNER', 'FRONT_DESK', 'INVENTORY'];
 
 // Team members: SERVICE = stylists and beauticians (can be booked), FRONT_DESK = reception (paid, never booked)
 export const STAFF_KINDS = ['SERVICE', 'FRONT_DESK'];

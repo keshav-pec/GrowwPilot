@@ -22,3 +22,6 @@ export { default as PayrollItem } from './PayrollItem.js';
 export { default as PayrollAdjustment } from './PayrollAdjustment.js';
 export { default as PayrollPayment } from './PayrollPayment.js';
 export { default as EmployeeAdvance } from './EmployeeAdvance.js';
+
+// Inventory add-on (INVENTORY_PLAN.md)
+export { default as InventorySettings } from './inventory/InventorySettings.js';

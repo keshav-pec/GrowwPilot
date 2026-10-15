@@ -3,9 +3,10 @@ import { scoped } from '../../utils/scoped.js';
 
 const PAGE_SIZE = 25;
 
-// "Business owner" (sees every branch), "Branch owner" or "Front desk"
+// "Business owner" (sees every branch), "Branch owner", "Front desk" or "Inventory"
 export function actorRole(ctx) {
   if (ctx.role === 'FRONT_DESK') return 'Front desk';
+  if (ctx.role === 'INVENTORY') return 'Inventory';
   return ctx.isPrimaryOwner ? 'Business owner' : 'Branch owner';
 }
 

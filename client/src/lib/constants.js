@@ -2,6 +2,7 @@ export const ROLES = {
   SUPER_ADMIN: 'SUPER_ADMIN',
   OWNER: 'OWNER',
   FRONT_DESK: 'FRONT_DESK',
+  INVENTORY: 'INVENTORY',
 };
 
 // Where each role lands after login
@@ -9,12 +10,14 @@ export const ROLE_HOME = {
   SUPER_ADMIN: '/admin/salons',
   OWNER: '/app/dashboard',
   FRONT_DESK: '/app/today',
+  INVENTORY: '/app/inventory',
 };
 
 export const ROLE_LABEL = {
   SUPER_ADMIN: 'Super Admin',
   OWNER: 'Owner',
   FRONT_DESK: 'Front Desk',
+  INVENTORY: 'Inventory',
 };
 
 // localStorage key for the branch picked in the branch switcher
@@ -35,3 +38,8 @@ export const TIMEZONES = [
   { value: 'Europe/London', label: 'UK (Europe/London)' },
   { value: 'America/New_York', label: 'US East (America/New_York)' },
 ];
+
+// Does the user's salon have this paid add-on switched on? e.g. hasAddon(user, 'inventory')
+export function hasAddon(user, name) {
+  return Boolean(user?.org?.addons?.includes(name));
+}

@@ -1,5 +1,6 @@
 import { AppError } from '../utils/AppError.js';
 import { getAllowedBranches } from '../modules/auth/auth.service.js';
+import { enabledAddons } from '../config/addons.js';
 
 // Builds req.ctx: WHO is asking and WHICH salon and branches they may touch.
 // orgId always comes from the logged-in user, never from the URL or request body.
@@ -15,7 +16,7 @@ export async function tenantContext(req, res, next) {
   }
 
   // The branch picked in the branch switcher. It must be one the user is allowed to use.
-  // Front desk users only have one allowed branch, so they are always locked to it.
+  // Front desk and inventory logins only have one allowed branch, so they are always locked to it.
   const requested = req.get('X-Branch-Id');
   if (requested && !allowedBranchIds.includes(requested)) {
     throw new AppError(403, 'BRANCH_FORBIDDEN', 'You do not have access to this branch');
@@ -29,6 +30,7 @@ export async function tenantContext(req, res, next) {
     isPrimaryOwner: user.role === 'OWNER' && user.allBranches,
     allowedBranchIds,
     activeBranchId: requested || allowedBranchIds[0] || null,
+    addons: enabledAddons(req.org), // e.g. ['inventory']
   };
   next();
 }

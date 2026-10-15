@@ -32,3 +32,12 @@ export function useSetOrgStatus(id) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin'] }),
   });
 }
+
+// Switch a paid add-on on or off: mutate({ addon: 'inventory', enabled: true })
+export function useSetOrgAddon(id) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ addon, enabled }) => api.patch(`/admin/orgs/${id}/addons/${addon}`, { enabled }).then((res) => res.data.org),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin'] }),
+  });
+}

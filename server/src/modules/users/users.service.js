@@ -3,14 +3,15 @@ import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { generateTempPassword, hashPassword } from '../../utils/password.js';
 import { assertAllowedBranches } from '../branches/branches.service.js';
+import { ONE_BRANCH_ROLES } from './users.schemas.js';
 
 // Who can manage whom:
-// - primary owner: every front desk account and every branch owner
-// - branch owner: only front desk accounts in their own branches
+// - primary owner: every front desk and inventory login, and every branch owner
+// - branch owner: only front desk and inventory logins in their own branches
 function canManage(ctx, target) {
   if (String(target._id) === ctx.userId) return false; // not yourself
   if (target.role === 'OWNER') return ctx.isPrimaryOwner && !target.allBranches; // never the primary owner
-  if (target.role === 'FRONT_DESK') return ctx.isPrimaryOwner || ctx.allowedBranchIds.includes(String(target.branchIds[0]));
+  if (ONE_BRANCH_ROLES.includes(target.role)) return ctx.isPrimaryOwner || ctx.allowedBranchIds.includes(String(target.branchIds[0]));
   return false;
 }
 
@@ -21,16 +22,16 @@ async function findManageableUser(ctx, id) {
 }
 
 function checkBranchesForRole(ctx, role, branchIds) {
-  if (role === 'FRONT_DESK' && branchIds.length !== 1) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'A front desk account works in exactly one branch');
+  if (ONE_BRANCH_ROLES.includes(role) && branchIds.length !== 1) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'This login works in exactly one branch');
   }
   assertAllowedBranches(ctx, branchIds);
 }
 
 export async function listUsers(ctx) {
   const filter = ctx.isPrimaryOwner
-    ? scoped(ctx, { role: { $in: ['FRONT_DESK', 'OWNER'] }, allBranches: { $ne: true } })
-    : scoped(ctx, { role: 'FRONT_DESK', branchIds: { $in: ctx.allowedBranchIds } });
+    ? scoped(ctx, { role: { $in: [...ONE_BRANCH_ROLES, 'OWNER'] }, allBranches: { $ne: true } })
+    : scoped(ctx, { role: { $in: ONE_BRANCH_ROLES }, branchIds: { $in: ctx.allowedBranchIds } });
 
   return User.find(filter).populate('branchIds', 'name').sort({ role: 1, name: 1 }).lean();
 }
@@ -39,6 +40,9 @@ export async function listUsers(ctx) {
 export async function createUser(ctx, input) {
   if (input.role === 'OWNER' && !ctx.isPrimaryOwner) {
     throw new AppError(403, 'FORBIDDEN', 'Only the main owner can add other owners');
+  }
+  if (input.role === 'INVENTORY' && !ctx.addons.includes('inventory')) {
+    throw new AppError(403, 'ADDON_DISABLED', 'Inventory is not switched on for your salon');
   }
   checkBranchesForRole(ctx, input.role, input.branchIds);
 

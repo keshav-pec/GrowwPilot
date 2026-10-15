@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PLANS } from '../../config/constants.js';
+import { ADDONS } from '../../config/addons.js';
 import { email, optionalPhone, timezone } from '../../utils/schemas.js';
 
 export const listOrgsSchema = z.object({
@@ -24,4 +25,14 @@ export const createOrgSchema = z.object({
 
 export const setStatusSchema = z.object({
   status: z.enum(['active', 'inactive']),
+});
+
+// PATCH /admin/orgs/:id/addons/:addon  { enabled: true }
+export const addonParamsSchema = z.object({
+  id: z.string(),
+  addon: z.enum(ADDONS),
+});
+
+export const setAddonSchema = z.object({
+  enabled: z.boolean(),
 });

@@ -14,15 +14,17 @@ const baseSchema = z.object({
   phone: z.string().refine((v) => v.trim() === '' || isValidPhone(v), 'Enter a valid 10-digit mobile number'),
 });
 
-// Front desk: one branch. Branch owner: one or more branches.
+// Front desk and inventory: one branch. Branch owner: one or more branches.
+const oneBranchSchema = baseSchema.extend({ branchId: z.string().min(1, 'Choose a branch') });
 const schemas = {
-  FRONT_DESK: baseSchema.extend({ branchId: z.string().min(1, 'Choose a branch') }),
+  FRONT_DESK: oneBranchSchema,
+  INVENTORY: oneBranchSchema,
   OWNER: baseSchema.extend({ branchIds: z.array(z.string()).min(1, 'Choose at least one branch') }),
 };
 
-const LABEL = { FRONT_DESK: 'front desk account', OWNER: 'branch owner' };
+const LABEL = { FRONT_DESK: 'front desk account', INVENTORY: 'inventory login', OWNER: 'branch owner' };
 
-// Add or edit a login (front desk or branch owner). New logins get a temporary password.
+// Add or edit a login (front desk, inventory or branch owner). New logins get a temporary password.
 export default function UserFormModal({ role, account, onClose, onCredentials }) {
   const { user, activeBranchId } = useAuth();
   const saveUser = useSaveUser();
@@ -46,7 +48,7 @@ export default function UserFormModal({ role, account, onClose, onCredentials })
   });
 
   function onSubmit({ name, email, phone, branchId, branchIds }) {
-    const branches = role === 'FRONT_DESK' ? [branchId] : branchIds;
+    const branches = role === 'OWNER' ? branchIds : [branchId];
     const values = account
       ? { _id: account._id, name, phone, branchIds: branches } // email is the login: not editable
       : { role, name, email, phone, branchIds: branches };
@@ -126,7 +128,7 @@ export default function UserFormModal({ role, account, onClose, onCredentials })
         />
         <Input label="Phone (optional)" error={errors.phone?.message} {...register('phone')} />
 
-        {role === 'FRONT_DESK' ? (
+        {role !== 'OWNER' ? (
           <Select
             label="Branch"
             options={user.branches.map((b) => ({ value: b._id, label: b.name }))}

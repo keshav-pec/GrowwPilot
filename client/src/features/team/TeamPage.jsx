@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import { hasAddon } from '../../lib/constants';
 import { PageHeader, Tabs } from '../../components/ui';
 import StaffTab from './StaffTab';
 import LoginsTab from './LoginsTab';
@@ -8,10 +9,11 @@ export default function TeamPage() {
   const { user, activeBranchId } = useAuth();
   const branchName = user.branches.find((b) => b._id === activeBranchId)?.name;
 
-  // Only the main owner manages other owners
+  // Only the main owner manages other owners. Inventory logins only exist with the Inventory add-on.
   const tabs = [
     { value: 'staff', label: 'Staff' },
     { value: 'front-desk', label: 'Front desk logins' },
+    ...(hasAddon(user, 'inventory') ? [{ value: 'inventory', label: 'Inventory logins' }] : []),
     ...(user.allBranches ? [{ value: 'owners', label: 'Branch owners' }] : []),
   ];
 
@@ -29,6 +31,7 @@ export default function TeamPage() {
 
       {tab === 'staff' && <StaffTab />}
       {tab === 'front-desk' && <LoginsTab role="FRONT_DESK" />}
+      {tab === 'inventory' && <LoginsTab role="INVENTORY" />}
       {tab === 'owners' && <LoginsTab role="OWNER" />}
     </>
   );
