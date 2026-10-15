@@ -2,11 +2,17 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../../auth/AuthContext';
 import { useSetSkuStatus, useSku, useSkuMovements, useUseSkuHere } from '../../../api/inventory/skus';
-import { MOVEMENT_LABEL, SKU_TYPE_LABEL, WAY_OF_USE_LABEL, costPerStockUnit, formatQty, isMeasured, newRequestKey } from '../../../lib/inventory';
+import { useHandouts } from '../../../api/inventory/allocations';
+import { useCorrectFinish } from '../../../api/inventory/movements';
+import { SKU_TYPE_LABEL, WAY_OF_USE_LABEL, costPerStockUnit, formatQty, isMeasured, movementLabel, newRequestKey } from '../../../lib/inventory';
 import { formatAmount } from '../../../lib/money';
 import { formatDateTime } from '../../../lib/time';
-import { Badge, Button, ConfirmDialog, Drawer, Pagination, Spinner } from '../../../components/ui';
+import { Badge, Button, ConfirmDialog, Drawer, Input, Modal, Pagination, Spinner } from '../../../components/ui';
 import ProductFormModal from './ProductFormModal';
+import HandoutsList from '../overview/HandoutsList';
+import IssueModal from '../actions/IssueModal';
+import WriteOffModal from '../actions/WriteOffModal';
+import ReportProblemModal from '../actions/ReportProblemModal';
 
 function Section({ title, children }) {
   return (
@@ -27,8 +33,11 @@ function Stat({ label, value }) {
 }
 
 // Product page (INV-04): stock per place at this branch, hand-outs, details and the full movement history
-export default function ProductDrawer({ skuId, categories, canSeeCosts, onClose }) {
+export default function ProductDrawer({ skuId, categories, can, onClose }) {
   const skuQuery = useSku(skuId);
+  const handoutsQuery = useHandouts(skuId);
+  const canSeeCosts = can['inventory.viewCosts'];
+  const [action, setAction] = useState(null); // 'issue' | 'writeOff' | 'report'
   const setStatus = useSetSkuStatus();
   const useHere = useUseSkuHere();
   const [editing, setEditing] = useState(null); // null | 'all' | 'reorder'
@@ -131,26 +140,29 @@ export default function ProductDrawer({ skuId, categories, canSeeCosts, onClose 
                 </ul>
               </Section>
 
+              {sku.status === 'active' && (
+                <div className="mb-5 flex flex-wrap gap-2">
+                  {can['inventory.issue'] && data.totals.available > 0 && (
+                    <Button size="sm" onClick={() => setAction('issue')}>
+                      Issue
+                    </Button>
+                  )}
+                  {can['inventory.writeOff'] ? (
+                    <Button size="sm" variant="secondary" onClick={() => setAction('writeOff')}>
+                      Use or write off
+                    </Button>
+                  ) : (
+                    can['inventory.reportProblem'] && (
+                      <Button size="sm" variant="secondary" onClick={() => setAction('report')}>
+                        Report a problem
+                      </Button>
+                    )
+                  )}
+                </div>
+              )}
+
               <Section title="Handed out">
-                {data.handouts.length === 0 ? (
-                  <p className="text-sm text-muted">Nothing handed out right now.</p>
-                ) : (
-                  <ul className="divide-y divide-border rounded-lg border border-border text-sm">
-                    {data.handouts.map((h) => (
-                      <li key={h._id} className="flex justify-between px-3 py-2">
-                        <span>
-                          {h.recipient.name}
-                          {h.needsHandover && (
-                            <span className="ml-2">
-                              <Badge tone="danger">Needs handover</Badge>
-                            </span>
-                          )}
-                        </span>
-                        <span className="font-medium">{formatQty(h.remainingQty, sku)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                {handoutsQuery.isPending ? <Spinner size={20} /> : <HandoutsList handouts={handoutsQuery.data ?? []} can={can} showProduct={false} />}
               </Section>
             </>
           )}
@@ -173,11 +185,14 @@ export default function ProductDrawer({ skuId, categories, canSeeCosts, onClose 
           </Section>
 
           <Section title="Movement history">
-            <MovementHistory sku={sku} showCosts={canSeeCosts} />
+            <MovementHistory sku={sku} showCosts={canSeeCosts} canCorrect={can['inventory.correctFinish']} />
           </Section>
         </>
       )}
 
+      {action === 'issue' && <IssueModal sku={sku} onClose={() => setAction(null)} />}
+      {action === 'writeOff' && <WriteOffModal sku={sku} onClose={() => setAction(null)} />}
+      {action === 'report' && <ReportProblemModal sku={sku} onClose={() => setAction(null)} />}
       {editing && (
         <ProductFormModal product={data} categories={categories} canSeeCosts={canSeeCosts} reorderOnly={editing === 'reorder'} onClose={() => setEditing(null)} />
       )}
@@ -202,9 +217,10 @@ export default function ProductDrawer({ skuId, categories, canSeeCosts, onClose 
 }
 
 // Every change to this product's stock at the branch (INV-13), newest first. Nothing here can be edited.
-function MovementHistory({ sku, showCosts }) {
+function MovementHistory({ sku, showCosts, canCorrect }) {
   const { activeBranch } = useAuth();
   const [page, setPage] = useState(1);
+  const [correcting, setCorrecting] = useState(null); // a FINISH movement to undo
   const historyQuery = useSkuMovements(sku._id, page);
 
   if (historyQuery.isPending) return <Spinner size={20} />;
@@ -219,7 +235,7 @@ function MovementHistory({ sku, showCosts }) {
           <li key={m._id} className="px-3 py-2">
             <div className="flex justify-between gap-2">
               <span className="font-medium">
-                {MOVEMENT_LABEL[m.type]} · {m.location.name}
+                {movementLabel(m)} · {m.location.name}
               </span>
               <span className={`whitespace-nowrap font-semibold ${m.qty > 0 ? 'text-good' : 'text-danger'}`}>
                 {m.qty > 0 ? '+' : ''}
@@ -232,10 +248,59 @@ function MovementHistory({ sku, showCosts }) {
               {showCosts && m.unitCost != null && ` · ${formatAmount(costPerStockUnit(m.unitCost, sku))} per ${sku.stockUnit}`}
             </p>
             {m.note && <p className="mt-0.5 text-xs text-ink">{m.note}</p>}
+            {canCorrect && m.type === 'FINISH' && (
+              <button type="button" className="mt-1 text-xs text-brown underline" onClick={() => setCorrecting(m)}>
+                Finished by mistake? Undo
+              </button>
+            )}
           </li>
         ))}
       </ul>
       <Pagination page={page} pages={pages} onChange={setPage} />
+      {correcting && <CorrectFinishModal movement={correcting} sku={sku} onClose={() => setCorrecting(null)} />}
     </>
+  );
+}
+
+// Owners: a finish made by mistake is undone with a correction that points at it. Nothing is deleted.
+function CorrectFinishModal({ movement, sku, onClose }) {
+  const correct = useCorrectFinish();
+  const [key] = useState(newRequestKey);
+  const [note, setNote] = useState('');
+
+  function save() {
+    correct.mutate(
+      { key, transactionId: movement.transactionId, note },
+      {
+        onSuccess: () => {
+          toast.success(`${formatQty(-movement.qty, sku)} is back with ${movement.heldBy?.name ?? 'the hand-out'}`);
+          onClose();
+        },
+      }
+    );
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Undo a finish"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={save} loading={correct.isPending} disabled={note.trim().length < 3}>
+            Undo finish
+          </Button>
+        </>
+      }
+    >
+      <p className="mb-3 text-sm text-muted">
+        {formatQty(-movement.qty, sku)} goes back into the hand-out it came from. The original entry stays in the history, with this correction next to it.
+      </p>
+      <Input id="correct-note" label="What went wrong" autoFocus placeholder="e.g. Marked the wrong bottle" value={note} onChange={(e) => setNote(e.target.value)} />
+      {correct.isError && <p className="mt-2 text-sm text-danger">{correct.error.message}</p>}
+    </Modal>
   );
 }

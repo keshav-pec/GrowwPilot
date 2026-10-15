@@ -5,6 +5,7 @@ import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { assertAllowedBranches } from '../branches/branches.service.js';
 import { findFutureBookings } from '../appointments/appointments.service.js';
+import { flagHandoverForStaff } from '../inventory/allocations/allocations.service.js';
 
 // Loads one staff member, but only if they are in this salon AND in a branch this user may use
 export async function findStaff(ctx, id) {
@@ -116,5 +117,8 @@ export async function setStaffStatus(ctx, id, { status, confirm }) {
   }
 
   staff.status = status;
-  return staff.save();
+  await staff.save();
+  // Products they still have from Inventory need handing over to someone else
+  if (status !== 'active') await flagHandoverForStaff(ctx, staff);
+  return staff;
 }

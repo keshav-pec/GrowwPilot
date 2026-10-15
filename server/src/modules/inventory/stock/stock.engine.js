@@ -3,6 +3,7 @@ import { InventoryBalance, InventoryLedgerEntry, InventoryLocation, InventorySku
 import { AppError } from '../../../utils/AppError.js';
 import { scoped } from '../../../utils/scoped.js';
 import { actorRole } from '../../activity/activity.service.js';
+import { refreshLowStock } from './lowStock.js';
 
 // ---------------------------------------------------------------------------
 // The stock engine: the ONLY code that writes stock movements and balances.
@@ -23,12 +24,14 @@ const unique = (values) => [...new Set(values.map(String))];
 
 // postMovement(ctx, {
 //   branchId, type, reason?, note?, heldBy?, reference?, correctsId?, requestKey?, occurredAt?,
+//   actor? ({ id, name, role }: who reported it, when that isn't the person saving it), approvedBy? ({ id, name }),
 //   lines: [{ skuId, locationId, qty: +10 | -1, bucket, unitCost? (paise per counting unit) }],
 // }, session)
 // -> { transaction, entries }
 export async function postMovement(ctx, movement, session) {
   if (!session) throw new Error('postMovement must run inside a transaction');
-  const { branchId, type, reason, note, heldBy, reference, correctsId, requestKey, lines } = movement;
+  const { branchId, type, reason, note, heldBy, reference, correctsId, requestKey, approvedBy, lines } = movement;
+  const actor = movement.actor ?? { id: ctx.userId, name: ctx.userName, role: actorRole(ctx) };
 
   if (!lines?.length) throw new AppError(400, 'VALIDATION_ERROR', 'A stock movement needs at least one line');
   for (const line of lines) {
@@ -101,12 +104,13 @@ export async function postMovement(ctx, movement, session) {
         type,
         reason,
         note,
-        actorId: ctx.userId,
-        actorName: ctx.userName,
-        actorRole: actorRole(ctx),
+        actorId: actor.id,
+        actorName: actor.name,
+        actorRole: actor.role,
         heldBy,
         reference,
         correctsId,
+        approvedBy,
         requestKey,
         occurredAt,
         postedAt,
@@ -129,6 +133,10 @@ export async function postMovement(ctx, movement, session) {
     })),
     { session, ordered: true }
   );
+
+  // Stock in the stores changed: raise (or clear) low-stock alerts
+  const storeChanged = unique(costedLines.filter((l) => locations.find((loc) => String(loc._id) === String(l.locationId)).kind === 'STORE').map((l) => l.skuId));
+  await refreshLowStock(ctx, branchId, storeChanged, session);
 
   return { transaction, entries };
 }

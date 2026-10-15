@@ -9,6 +9,10 @@ import skuRoutes from './skus/skus.routes.js';
 import locationRoutes from './locations/locations.routes.js';
 import importRoutes from './imports/imports.routes.js';
 import setupRoutes from './setup/setup.routes.js';
+import allocationRoutes from './allocations/allocations.routes.js';
+import movementRoutes from './movements/movements.routes.js';
+import requestRoutes from './approvals/approvals.routes.js';
+import { getOverview } from './overview/overview.service.js';
 
 const router = Router();
 
@@ -27,5 +31,13 @@ router.use('/skus', skuRoutes);
 router.use('/locations', locationRoutes);
 router.use('/imports', importRoutes);
 router.use('/setup', setupRoutes);
+router.use('/allocations', allocationRoutes);
+router.use('/movements', movementRoutes);
+router.use('/requests', requestRoutes);
+
+// GET /api/inventory/overview — the Overview tab for the selected branch
+router.get('/overview', async (req, res) => {
+  res.json(await getOverview(req.ctx));
+});
 
 export default router;

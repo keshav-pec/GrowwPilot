@@ -4,8 +4,8 @@ import { RECIPIENT_KINDS } from '../../config/inventory.js';
 import { wholeNumber } from './wholeNumber.js';
 
 // A hand-out: stock issued from the store to the floor, a station or a stylist ("In use").
-// Used from Phase 4 (issue, finish & replace, return, move). Phase 2 only reads it, e.g. to block
-// changing a product's way of use while hand-outs are open.
+// Its stock sits in the branch's In use place; remainingQty is how much of it is still there.
+// Its history (issued, finished, returned, moved...) is in InventoryAllocationEvent.
 const inventoryAllocationSchema = new mongoose.Schema(
   {
     orgId: ref('Organization', { required: true }),
@@ -20,7 +20,8 @@ const inventoryAllocationSchema = new mongoose.Schema(
     remainingQty: wholeNumber({ required: true }),
     status: { type: String, enum: ['OPEN', 'CLOSED'], default: 'OPEN' },
     needsHandover: { type: Boolean, default: false }, // the stylist who had it left (Phase 4)
-    replacesId: ref('InventoryAllocation', { default: null }),
+    replacesId: ref('InventoryAllocation', { default: null }), // issued to replace a finished one
+    closedAt: { type: Date, default: null },
     version: { type: Number, default: 0 },
   },
   { timestamps: true, collection: 'inventory_allocations' }

@@ -36,10 +36,30 @@ export const MOVEMENT_LABEL = {
   FINISH: 'Finished',
   SERVICE_USE: 'Used in a service',
   WRITE_OFF: 'Written off',
+  ADJUSTMENT: 'Count corrected',
   COUNT_CORRECTION: 'Stock count',
   CORRECTION: 'Correction',
   RETURN_TO_SUPPLIER: 'Returned to supplier',
 };
+
+// Why stock was used or written off by hand
+export const WRITE_OFF_REASONS = [
+  { value: 'DIRECT_USE', label: 'Used' },
+  { value: 'DAMAGE', label: 'Damaged' },
+  { value: 'EXPIRY', label: 'Expired' },
+  { value: 'LOSS', label: 'Lost' },
+  { value: 'SPILLAGE', label: 'Spilled' },
+  { value: 'STOCK_COUNT_CORRECTION', label: 'Count was wrong' },
+];
+export const REASON_LABEL = { ...Object.fromEntries(WRITE_OFF_REASONS.map((r) => [r.value, r.label])), OTHER: 'Something else' };
+// What the front desk can report
+export const REPORT_REASONS = [...WRITE_OFF_REASONS.filter((r) => r.value !== 'DIRECT_USE'), { value: 'OTHER', label: 'Something else' }];
+
+// "Written off: Damaged", "Finished"...
+export function movementLabel(m) {
+  if (m.type === 'WRITE_OFF') return m.reason === 'DIRECT_USE' ? 'Used by hand' : `Written off: ${REASON_LABEL[m.reason]}`;
+  return MOVEMENT_LABEL[m.type];
+}
 
 export const isMeasured = (sku) => sku?.wayOfUse === 'SERVICE_MEASURED';
 
@@ -74,3 +94,27 @@ export const costPerStockUnit = (avgCost, sku) => (avgCost == null ? null : Math
 // A random id made once per form, sent as the Idempotency-Key header: a double click or a retry
 // then changes stock only once
 export const newRequestKey = () => crypto.randomUUID();
+
+// Recipients travel as { kind, id } and show up in pickers as "FLOOR", "STATION:<id>" or "STAFF:<id>"
+export const recipientValue = (r) => (r.kind === 'FLOOR' ? 'FLOOR' : `${r.kind}:${r.id ?? r._id}`);
+export function recipientFromValue(value) {
+  const [kind, id] = value.split(':');
+  return kind === 'FLOOR' ? { kind } : { kind, id };
+}
+
+// The store and recipient used last at this branch, so the next issue is quicker (kept in this browser only)
+const lastKey = (branchId) => `gp_inventory_last:${branchId}`;
+export function rememberedChoice(branchId) {
+  try {
+    return JSON.parse(localStorage.getItem(lastKey(branchId))) ?? {};
+  } catch {
+    return {};
+  }
+}
+export function rememberChoice(branchId, choice) {
+  try {
+    localStorage.setItem(lastKey(branchId), JSON.stringify({ ...rememberedChoice(branchId), ...choice }));
+  } catch {
+    // private window: nothing is remembered
+  }
+}

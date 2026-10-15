@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ClipboardList, LayoutGrid, Settings } from 'lucide-react';
+import { ClipboardList, Settings } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useInventoryAccess } from '../../api/inventory/access';
 import { useSetup } from '../../api/inventory/setup';
@@ -10,6 +10,7 @@ import ProductDrawer from './products/ProductDrawer';
 import LocationsCard from './settings/LocationsCard';
 import SetupGuide from './setup/SetupGuide';
 import SetupChecklist from './setup/SetupChecklist';
+import OverviewTab from './overview/OverviewTab';
 
 // The tabs. Overview and Purchasing are filled in by later phases (INVENTORY_PLAN.md).
 const TABS = [
@@ -100,11 +101,7 @@ export default function InventoryPage() {
           {tab === 'overview' && (
             <>
               {setupOpen && <SetupChecklist setup={setup} onContinue={() => update({ tab: 'setup' })} />}
-              <EmptyState
-                icon={LayoutGrid}
-                title="Your stock at a glance"
-                message="What is in store, what is in use and what needs ordering will show here. For now, see each product in the Products tab."
-              />
+              <OverviewTab can={can} onOpenProduct={(id) => update({ product: id })} />
             </>
           )}
           {tab === 'products' && <ProductsTab can={can} onOpenProduct={(id) => update({ product: id })} />}
@@ -120,7 +117,7 @@ export default function InventoryPage() {
         </>
       )}
 
-      {productId && <ProductDrawer skuId={productId} canSeeCosts={can['inventory.viewCosts']} onClose={() => update({ product: null })} />}
+      {productId && <ProductDrawer skuId={productId} can={can} onClose={() => update({ product: null })} />}
     </>
   );
 }

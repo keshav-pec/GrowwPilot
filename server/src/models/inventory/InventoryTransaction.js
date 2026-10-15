@@ -25,6 +25,7 @@ const inventoryTransactionSchema = new mongoose.Schema(
 
     reference: { kind: String, id: mongoose.Schema.Types.ObjectId }, // e.g. { kind: 'appointment', id }
     correctsId: ref('InventoryTransaction', { default: null }),
+    approvedBy: { id: ref('User'), name: String }, // set when an owner approved it (e.g. a write-off above the limit)
     requestKey: String, // the Idempotency-Key of the request that made it
     occurredAt: { type: Date, required: true }, // when it happened
     postedAt: { type: Date, required: true }, // when it was saved
@@ -33,6 +34,8 @@ const inventoryTransactionSchema = new mongoose.Schema(
 );
 
 inventoryTransactionSchema.index({ orgId: 1, branchId: 1, postedAt: -1 });
+// A movement can be corrected only once
+inventoryTransactionSchema.index({ correctsId: 1 }, { unique: true, partialFilterExpression: { correctsId: { $type: 'objectId' } } });
 appendOnly(inventoryTransactionSchema, 'A stock movement');
 
 export default mongoose.model('InventoryTransaction', inventoryTransactionSchema);

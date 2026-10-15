@@ -3,11 +3,13 @@ import toast from 'react-hot-toast';
 import { ArrowRightLeft, BellRing, Check, PackagePlus, Repeat2 } from 'lucide-react';
 import { useMarkSetupStep } from '../../../api/inventory/setup';
 import { newRequestKey } from '../../../lib/inventory';
-import { Badge, Button } from '../../../components/ui';
+import { Button } from '../../../components/ui';
 import LocationsCard from '../settings/LocationsCard';
 import UploadCard from '../import/UploadCard';
 import ImportPreview from '../import/ImportPreview';
 import ProductFormModal from '../products/ProductFormModal';
+import IssueModal from '../actions/IssueModal';
+import FinishModal from '../actions/FinishModal';
 
 const STEPS = ['Where you keep stock', 'Add your products', 'Check before saving', 'Done'];
 
@@ -19,6 +21,7 @@ export default function SetupGuide({ setup, can, onLeave, onFinished, onOpenProd
   const [checked, setChecked] = useState(null); // an uploaded file: { batch, rows, fileName }
   const [imported, setImported] = useState(null); // { created, withStock }
   const [adding, setAdding] = useState(false);
+  const [tryAction, setTryAction] = useState(null); // 'issue' | 'finish'
 
   function confirmLocations() {
     markStep.mutate({ key: newRequestKey(), step: 'locations' }, { onSuccess: () => setStep(2), onError: (err) => toast.error(err.message) });
@@ -163,8 +166,30 @@ export default function SetupGuide({ setup, can, onLeave, onFinished, onOpenProd
           )}
           <p className="mb-3 text-sm font-medium text-ink">Three things you’ll do most:</p>
           <div className="grid gap-3 md:grid-cols-3">
-            <Tip icon={ArrowRightLeft} title="Issue a product" text="Hand a bottle from the store to a stylist or station. It moves to In use." soon />
-            <Tip icon={Repeat2} title="Mark a bottle finished" text="When it’s empty, mark it finished and hand out a new one in the same step." soon />
+            <Tip
+              icon={ArrowRightLeft}
+              title="Issue a product"
+              text="Hand a bottle from the store to a stylist or station. It moves to In use."
+              action={
+                can['inventory.issue'] && (
+                  <Button size="sm" variant="secondary" onClick={() => setTryAction('issue')}>
+                    Issue a product
+                  </Button>
+                )
+              }
+            />
+            <Tip
+              icon={Repeat2}
+              title="Mark a bottle finished"
+              text="When it’s empty, mark it finished and hand out a new one in the same step."
+              action={
+                can['inventory.finish'] && (
+                  <Button size="sm" variant="secondary" onClick={() => setTryAction('finish')}>
+                    Mark finished
+                  </Button>
+                )
+              }
+            />
             <Tip
               icon={BellRing}
               title="Set reorder levels"
@@ -185,17 +210,18 @@ export default function SetupGuide({ setup, can, onLeave, onFinished, onOpenProd
       )}
 
       {adding && <ProductFormModal canSeeCosts={can['inventory.viewCosts']} onClose={() => setAdding(false)} />}
+      {tryAction === 'issue' && <IssueModal onClose={() => setTryAction(null)} />}
+      {tryAction === 'finish' && <FinishModal canReplace={can['inventory.issue']} onClose={() => setTryAction(null)} />}
     </div>
   );
 }
 
-function Tip({ icon: Icon, title, text, action, soon }) {
+function Tip({ icon: Icon, title, text, action }) {
   return (
     <div className="rounded-xl border border-border p-4">
       <div className="mb-2 flex items-center gap-2">
         <Icon size={18} className="text-brown" />
         <h3 className="text-sm font-semibold text-brown">{title}</h3>
-        {soon && <Badge>Coming next</Badge>}
       </div>
       <p className="mb-3 text-sm text-muted">{text}</p>
       {action}

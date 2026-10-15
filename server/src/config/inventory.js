@@ -27,7 +27,8 @@ export const MOVEMENT_TYPES = [
   'TRANSFER', // a hand-out moved to someone else (nothing used)
   'FINISH', // a bottle in use was finished
   'SERVICE_USE', // used up by a completed service
-  'WRITE_OFF', // use, damage, expiry, loss, spillage
+  'WRITE_OFF', // used by hand, damaged, expired, lost, spilled
+  'ADJUSTMENT', // a count was wrong (found more or less than the books say)
   'COUNT_CORRECTION', // difference found in a stock count
   'CORRECTION', // fixes an earlier movement (points at it)
   'RETURN_TO_SUPPLIER',
@@ -41,3 +42,8 @@ export const RECIPIENT_KINDS = ['FLOOR', 'STATION', 'STAFF'];
 
 // Measured products are counted in their base unit (ml, g, piece); all others in their stock unit (bottle, kit...)
 export const isMeasured = (sku) => sku.wayOfUse === 'SERVICE_MEASURED';
+
+// Why stock was used or written off by hand. A lost bottle is LOSS, never FINISH.
+export const WRITE_OFF_REASONS = ['DIRECT_USE', 'DAMAGE', 'EXPIRY', 'LOSS', 'SPILLAGE', 'STOCK_COUNT_CORRECTION'];
+// Reports keep waste apart from normal use: direct use is consumption, the rest is waste or a correction
+export const REASON_BUCKET = { DIRECT_USE: 'CONSUMED', STOCK_COUNT_CORRECTION: 'ADJUSTED', DAMAGE: 'WASTED', EXPIRY: 'WASTED', LOSS: 'WASTED', SPILLAGE: 'WASTED' };
