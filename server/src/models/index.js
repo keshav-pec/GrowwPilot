@@ -33,3 +33,4 @@ export { default as InventoryTransaction } from './inventory/InventoryTransactio
 export { default as InventoryLedgerEntry } from './inventory/InventoryLedgerEntry.js';
 export { default as InventoryAllocation } from './inventory/InventoryAllocation.js';
 export { default as IdempotencyRecord } from './IdempotencyRecord.js';
+export { default as InventoryImport } from './inventory/InventoryImport.js';

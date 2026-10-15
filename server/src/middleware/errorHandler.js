@@ -24,6 +24,10 @@ export function errorHandler(err, req, res, next) {
     status = 400;
     code = 'BAD_JSON';
     message = 'Request body is not valid JSON';
+  } else if (err.type === 'entity.too.large') {
+    status = 413;
+    code = 'TOO_LARGE';
+    message = 'This request is too large';
   } else if (err.name === 'CastError') {
     // A badly formed id, e.g. /customers/abc. Treat it like "not found".
     status = 404;

@@ -36,7 +36,10 @@ app.set('trust proxy', env.TRUST_PROXY);
 // --- Global middleware ---
 app.use(helmet()); // sets safe HTTP headers
 app.use(cors({ origin: env.CLIENT_ORIGIN, credentials: true })); // only our frontend may call the API, with cookies
-app.use(express.json({ limit: '100kb' })); // reads JSON request bodies
+// Reads JSON request bodies (at most 100 kb). The spreadsheet import reads its own bigger body,
+// after the login check (see inventory/imports/imports.routes.js).
+const readJson = express.json({ limit: '100kb' });
+app.use((req, res, next) => (req.path.startsWith('/api/inventory/imports') ? next() : readJson(req, res, next)));
 app.use(cookieParser()); // reads cookies (we'll store the login token in one)
 if (env.NODE_ENV === 'development') app.use(morgan('dev')); // logs each request in the terminal
 

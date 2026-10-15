@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Package, Plus, Search } from 'lucide-react';
+import { Package, Plus, Search, Upload } from 'lucide-react';
 import { fetchSkus, useSkus, useUseSkuHere } from '../../../api/inventory/skus';
 import { WAYS_OF_USE, WAY_OF_USE_LABEL, formatQty, newRequestKey } from '../../../lib/inventory';
 import { formatAmount } from '../../../lib/money';
 import { useDebounce } from '../../../lib/useDebounce';
 import { Badge, Button, EmptyState, Pagination, Select, Table } from '../../../components/ui';
 import ProductFormModal from './ProductFormModal';
+import ImportModal from '../import/ImportModal';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -24,6 +25,7 @@ export default function ProductsTab({ can, onOpenProduct }) {
   const [otherProducts, setOtherProducts] = useState(false); // the salon's products not used at this branch yet
   const [page, setPage] = useState(1);
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const useHere = useUseSkuHere();
 
   const debouncedSearch = useDebounce(search.trim());
@@ -136,9 +138,14 @@ export default function ProductsTab({ can, onOpenProduct }) {
           />
         </label>
         {canEdit && (
-          <Button onClick={() => setAdding(true)}>
-            <Plus size={16} /> Add product
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setImporting(true)}>
+              <Upload size={16} /> Import
+            </Button>
+            <Button onClick={() => setAdding(true)}>
+              <Plus size={16} /> Add product
+            </Button>
+          </div>
         )}
       </div>
 
@@ -204,6 +211,7 @@ export default function ProductsTab({ can, onOpenProduct }) {
       {total > 0 && <p className="mt-2 text-xs text-muted">{total === 1 ? '1 product' : `${total} products`}</p>}
       <Pagination page={page} pages={pages} onChange={setPage} />
 
+      {importing && <ImportModal onClose={() => setImporting(false)} />}
       {adding && <ProductFormModal categories={categories} canSeeCosts={canSeeCosts} onClose={() => setAdding(false)} onSaved={(sku) => onOpenProduct(sku._id)} />}
     </>
   );

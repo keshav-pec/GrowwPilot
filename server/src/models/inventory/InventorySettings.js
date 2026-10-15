@@ -25,7 +25,9 @@ const inventorySettingsSchema = new mongoose.Schema(
     },
 
     branchOwnerSeesCosts: { type: Boolean, default: true }, // PRD: "own branch; configurable"
-    setupCompletedAt: { type: Date, default: null }, // first-time setup guide finished (Phase 3)
+    // First-time setup guide: when each step was done, and when it was finished
+    setupSteps: { locationsAt: { type: Date, default: null } },
+    setupCompletedAt: { type: Date, default: null },
   },
   { timestamps: true, collection: 'inventory_settings' }
 );

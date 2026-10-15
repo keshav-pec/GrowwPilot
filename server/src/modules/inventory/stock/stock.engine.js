@@ -133,6 +133,59 @@ export async function postMovement(ctx, movement, session) {
   return { transaction, entries };
 }
 
+// Opening stock for many products just added at this branch (spreadsheet import): one OPENING movement
+// per product, written in a few bulk steps so up to 2,000 products fit in one transaction.
+// items: [{ skuId, qty, unitCost? (paise per counting unit) }]. The products must have no stock here yet.
+export async function postOpeningStock(ctx, { branchId, locationId, requestKey, items }, session) {
+  if (!session) throw new Error('postOpeningStock must run inside a transaction');
+  if (items.length === 0) return;
+  if (items.some((i) => !Number.isInteger(i.qty) || i.qty <= 0)) throw new AppError(400, 'VALIDATION_ERROR', 'Quantities must be whole numbers');
+
+  const skuIds = items.map((i) => i.skuId);
+  const [store, usedHere, hasStock] = await Promise.all([
+    InventoryLocation.findOne(scoped(ctx, { _id: locationId, branchId, kind: 'STORE' })).session(session).lean(),
+    InventorySkuBranch.countDocuments(scoped(ctx, { branchId, skuId: { $in: skuIds } })).session(session),
+    InventoryBalance.exists(scoped(ctx, { branchId, skuId: { $in: skuIds } })).session(session),
+  ]);
+  if (!store) throw new AppError(404, 'NOT_FOUND', 'Stock location not found');
+  if (usedHere !== new Set(skuIds.map(String)).size) throw new AppError(404, 'NOT_FOUND', 'Product not found at this branch');
+  if (hasStock) throw new Error('postOpeningStock is only for products without stock');
+
+  // No stock yet, so the average cost is simply the opening cost (nothing is guessed when there is none)
+  const costed = items.filter((i) => i.unitCost != null);
+  if (costed.length > 0) {
+    await InventorySkuBranch.bulkWrite(
+      costed.map((i) => ({ updateOne: { filter: { orgId: ctx.orgId, branchId, skuId: i.skuId }, update: { $set: { avgCost: i.unitCost } } } })),
+      { session }
+    );
+  }
+  await InventoryBalance.bulkWrite(
+    items.map((i) => ({
+      updateOne: { filter: { orgId: ctx.orgId, locationId, skuId: i.skuId }, update: { $inc: { qty: i.qty, version: 1 }, $setOnInsert: { branchId } }, upsert: true },
+    })),
+    { session }
+  );
+
+  const postedAt = new Date();
+  const header = { orgId: ctx.orgId, branchId, type: 'OPENING', actorId: ctx.userId, actorName: ctx.userName, actorRole: actorRole(ctx), requestKey, occurredAt: postedAt, postedAt };
+  const transactions = await InventoryTransaction.insertMany(items.map(() => header), { session });
+  await InventoryLedgerEntry.insertMany(
+    items.map((i, n) => ({
+      orgId: ctx.orgId,
+      branchId,
+      transactionId: transactions[n]._id,
+      skuId: i.skuId,
+      locationId,
+      qty: i.qty,
+      unitCost: i.unitCost ?? null,
+      bucket: 'OPENING',
+      occurredAt: postedAt,
+      postedAt,
+    })),
+    { session }
+  );
+}
+
 // Store + in use for one product at a branch
 async function branchOnHand(ctx, branchId, skuId, session) {
   const balances = await InventoryBalance.find(scoped(ctx, { branchId, skuId })).select('qty').session(session).lean();

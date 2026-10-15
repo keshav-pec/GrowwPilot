@@ -8,7 +8,8 @@ import { Badge, Button, Card, Input, Modal, Spinner } from '../../../components/
 const KIND_LABEL = { STORE: 'Store', IN_USE: 'In use', STATION: 'Station' };
 
 // Stores and stations at the selected branch. Main store and In use are always there.
-export default function LocationsCard() {
+// canEdit: owners may add, rename and close them; everyone else just sees them.
+export default function LocationsCard({ canEdit = true }) {
   const locationsQuery = useLocations();
   const saveLocation = useSaveLocation();
   const [editing, setEditing] = useState(null); // { kind } to add, or a location to rename
@@ -27,14 +28,16 @@ export default function LocationsCard() {
     <Card
       title="Stores and stations"
       actions={
-        <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setEditing({ kind: 'STORE' })}>
-            <Plus size={14} /> Store
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => setEditing({ kind: 'STATION' })}>
-            <Plus size={14} /> Station
-          </Button>
-        </div>
+        canEdit && (
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setEditing({ kind: 'STORE' })}>
+              <Plus size={14} /> Store
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setEditing({ kind: 'STATION' })}>
+              <Plus size={14} /> Station
+            </Button>
+          </div>
+        )
       }
     >
       <p className="mb-3 text-sm text-muted">
@@ -53,16 +56,18 @@ export default function LocationsCard() {
                 <Badge tone={l.kind === 'STATION' ? 'gold' : 'brown'}>{l.isMain ? 'Main store' : KIND_LABEL[l.kind]}</Badge>
                 {!l.active && <Badge>Closed</Badge>}
               </span>
-              <span className="flex gap-1">
-                <Button size="sm" variant="ghost" onClick={() => setEditing(l)}>
-                  Rename
-                </Button>
-                {!l.isMain && l.kind !== 'IN_USE' && (
-                  <Button size="sm" variant="ghost" onClick={() => toggleActive(l)} loading={saveLocation.isPending && saveLocation.variables?._id === l._id}>
-                    {l.active ? 'Close' : 'Reopen'}
+              {canEdit && (
+                <span className="flex gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(l)}>
+                    Rename
                   </Button>
-                )}
-              </span>
+                  {!l.isMain && l.kind !== 'IN_USE' && (
+                    <Button size="sm" variant="ghost" onClick={() => toggleActive(l)} loading={saveLocation.isPending && saveLocation.variables?._id === l._id}>
+                      {l.active ? 'Close' : 'Reopen'}
+                    </Button>
+                  )}
+                </span>
+              )}
             </li>
           ))}
         </ul>

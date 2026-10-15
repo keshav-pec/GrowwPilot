@@ -7,6 +7,8 @@ import { capabilities, inventoryRole } from './permissions.js';
 import { getBranchSettings } from './settings/settings.service.js';
 import skuRoutes from './skus/skus.routes.js';
 import locationRoutes from './locations/locations.routes.js';
+import importRoutes from './imports/imports.routes.js';
+import setupRoutes from './setup/setup.routes.js';
 
 const router = Router();
 
@@ -23,5 +25,7 @@ router.get('/access', async (req, res) => {
 
 router.use('/skus', skuRoutes);
 router.use('/locations', locationRoutes);
+router.use('/imports', importRoutes);
+router.use('/setup', setupRoutes);
 
 export default router;

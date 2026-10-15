@@ -1,8 +1,11 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
 
+const widths = { md: 'max-w-lg', wide: 'max-w-5xl' };
+
 // A centred popup. Closes on the X button, the Escape key, or a click on the dark background.
-export default function Modal({ open, onClose, title, footer, children }) {
+// size: 'md' (forms) or 'wide' (big tables)
+export default function Modal({ open, onClose, title, footer, size = 'md', children }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -15,7 +18,7 @@ export default function Modal({ open, onClose, title, footer, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-xl bg-bg shadow-xl"
+        className={`flex max-h-[90vh] w-full ${widths[size]} flex-col rounded-xl bg-bg shadow-xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-3">

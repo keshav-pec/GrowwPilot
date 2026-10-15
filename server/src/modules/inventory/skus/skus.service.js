@@ -1,5 +1,4 @@
 import {
-  Counter,
   InventoryAllocation,
   InventoryBalance,
   InventoryLedgerEntry,
@@ -20,6 +19,7 @@ import { describeQty } from '../units.js';
 import { postMovement } from '../stock/stock.engine.js';
 import { availableToIssue, branchStock } from '../stock/stock.queries.js';
 import { ensureBranchLocations, listLocations } from '../locations/locations.service.js';
+import { reserveSkuCodes } from './skuCodes.js';
 
 const PAGE_SIZE = 50;
 const HISTORY_PAGE_SIZE = 25;
@@ -81,15 +81,6 @@ async function assertCodeAndBarcodesFree(ctx, { code, barcodes = [] }, exceptId,
   }
 }
 
-// SKU-000123: one counter per salon. Skips numbers someone already typed in as their own code.
-async function nextSkuCode(ctx, session) {
-  for (;;) {
-    const counter = await Counter.findOneAndUpdate({ _id: `sku:${ctx.orgId}` }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after', session });
-    const code = `SKU-${String(counter.seq).padStart(6, '0')}`;
-    if (!(await InventorySku.exists(scoped(ctx, { code })).session(session))) return code;
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Add a product at the selected branch, with its opening stock as a movement (never by setting a balance)
 // ---------------------------------------------------------------------------
@@ -106,7 +97,7 @@ export async function createSku(ctx, input, key) {
   return runOnce(ctx, { key, operation: 'inventory.sku.create' }, async (session) => {
     await assertCodeAndBarcodesFree(ctx, { code, barcodes: product.barcodes }, null, session);
     const [sku] = await InventorySku.create(
-      [{ ...product, orgId: ctx.orgId, code: code ?? (await nextSkuCode(ctx, session)), createdBy: ctx.userId }],
+      [{ ...product, orgId: ctx.orgId, code: code ?? (await reserveSkuCodes(ctx, 1, session))[0], createdBy: ctx.userId }],
       { session }
     );
     await InventorySkuBranch.create([{ orgId: ctx.orgId, branchId, skuId: sku._id, reorderPoint, reorderQty, leadTimeDays }], { session });
