@@ -11,8 +11,9 @@ const router = Router();
 // Owners only. Which branches each owner sees is decided in the service.
 router.use(requireAuth, tenantContext, requireRole('OWNER'));
 
-// GET /api/activity?page=2
-router.get('/', validate({ query: z.object({ page: z.coerce.number().int().min(1).default(1) }) }), async (req, res) => {
+// GET /api/activity?page=2&area=payroll
+const querySchema = z.object({ page: z.coerce.number().int().min(1).default(1), area: z.enum(['payroll', 'inventory']).optional() });
+router.get('/', validate({ query: querySchema }), async (req, res) => {
   res.json(await listActivity(req.ctx, req.valid.query));
 });
 

@@ -5,6 +5,8 @@ import { requireRole } from '../../middleware/requireRole.js';
 import { requireAddon } from '../../middleware/requireAddon.js';
 import { capabilities, inventoryRole } from './permissions.js';
 import { getBranchSettings } from './settings/settings.service.js';
+import skuRoutes from './skus/skus.routes.js';
+import locationRoutes from './locations/locations.routes.js';
 
 const router = Router();
 
@@ -18,5 +20,8 @@ router.get('/access', async (req, res) => {
   const settings = await getBranchSettings(req.ctx, branchId);
   res.json({ branchId, role: inventoryRole(req.ctx), can: capabilities(req.ctx, settings) });
 });
+
+router.use('/skus', skuRoutes);
+router.use('/locations', locationRoutes);
 
 export default router;

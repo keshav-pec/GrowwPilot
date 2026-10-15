@@ -41,7 +41,7 @@ export function usePayRequests(status) {
 export function useActivity(page) {
   return useQuery({
     queryKey: ['activity', page],
-    queryFn: () => api.get('/activity', { params: { page } }).then((res) => res.data),
+    queryFn: () => api.get('/activity', { params: { page, area: 'payroll' } }).then((res) => res.data),
     placeholderData: keepPreviousData, // keep the old page on screen while the next one loads
   });
 }

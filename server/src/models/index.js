@@ -25,3 +25,11 @@ export { default as EmployeeAdvance } from './EmployeeAdvance.js';
 
 // Inventory add-on (INVENTORY_PLAN.md)
 export { default as InventorySettings } from './inventory/InventorySettings.js';
+export { default as InventorySku } from './inventory/InventorySku.js';
+export { default as InventorySkuBranch } from './inventory/InventorySkuBranch.js';
+export { default as InventoryLocation } from './inventory/InventoryLocation.js';
+export { default as InventoryBalance } from './inventory/InventoryBalance.js';
+export { default as InventoryTransaction } from './inventory/InventoryTransaction.js';
+export { default as InventoryLedgerEntry } from './inventory/InventoryLedgerEntry.js';
+export { default as InventoryAllocation } from './inventory/InventoryAllocation.js';
+export { default as IdempotencyRecord } from './IdempotencyRecord.js';

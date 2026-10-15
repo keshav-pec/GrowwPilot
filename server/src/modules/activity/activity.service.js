@@ -19,9 +19,14 @@ export async function logActivity(ctx, { action, branchId, staffId, summary, bef
   );
 }
 
+// Inventory actions are named inventory.*; every other logged action is a pay change
+const AREAS = { inventory: { action: /^inventory\./ }, payroll: { action: { $not: /^inventory\./ } } };
+
 // Newest first. The business owner sees every branch; a branch owner only their own branches.
-export async function listActivity(ctx, { page }) {
+// `area` shows only pay changes or only stock changes.
+export async function listActivity(ctx, { page, area }) {
   const filter = ctx.isPrimaryOwner ? scoped(ctx) : scoped(ctx, { branchId: { $in: ctx.allowedBranchIds } });
+  if (area) Object.assign(filter, AREAS[area]);
   const [items, total] = await Promise.all([
     ActivityLog.find(filter)
       .sort({ createdAt: -1 })
