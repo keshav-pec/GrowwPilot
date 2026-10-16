@@ -118,3 +118,17 @@ export function rememberChoice(branchId, choice) {
     // private window: nothing is remembered
   }
 }
+
+// Why a completed service couldn't take its stock
+export const EXCEPTION_REASON_LABEL = {
+  NOT_ENOUGH_STOCK: 'Not enough stock',
+  NOT_STOCKED_HERE: 'Not stocked at this branch',
+  PRODUCT_INACTIVE: 'Product deactivated',
+  NO_OPEN_HANDOUT: 'No open bottle',
+};
+
+// A recipe in a line: "1 kit Facial kit · 60 ml Developer · Shampoo (linked)"
+export function describeRecipe(recipe) {
+  if (!recipe || recipe.lines.length === 0) return 'Uses nothing';
+  return recipe.lines.map((l) => (l.deducts ? `${formatQty(l.qty, l.sku)} ${l.sku.name}` : `${l.sku.name} (linked)`)).join(' · ');
+}

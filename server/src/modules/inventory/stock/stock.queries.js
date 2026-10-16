@@ -6,10 +6,9 @@ import { scoped } from '../../../utils/scoped.js';
 // In store and in use per product at one branch: { [skuId]: { inStore, inUse } }
 // Pass the session to read inside a transaction (e.g. to answer with the balances after a change).
 export async function branchStock(ctx, branchId, skuIds, session = null) {
-  const [locations, balances] = await Promise.all([
-    InventoryLocation.find(scoped(ctx, { branchId })).select('kind').session(session).lean(),
-    InventoryBalance.find(scoped(ctx, { branchId, skuId: { $in: skuIds } })).select('skuId locationId qty').session(session).lean(),
-  ]);
+  // One after the other, so this is safe as the first read of a transaction too
+  const locations = await InventoryLocation.find(scoped(ctx, { branchId })).select('kind').session(session).lean();
+  const balances = await InventoryBalance.find(scoped(ctx, { branchId, skuId: { $in: skuIds } })).select('skuId locationId qty').session(session).lean();
   const kindOf = Object.fromEntries(locations.map((l) => [String(l._id), l.kind]));
 
   const stock = Object.fromEntries(skuIds.map((id) => [String(id), { inStore: 0, inUse: 0 }]));

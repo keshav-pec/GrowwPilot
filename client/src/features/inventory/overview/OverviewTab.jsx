@@ -12,6 +12,7 @@ import WriteOffModal from '../actions/WriteOffModal';
 import ReportProblemModal from '../actions/ReportProblemModal';
 import HandoutsList from './HandoutsList';
 import RequestsCard from './RequestsCard';
+import AutomationCard from './AutomationCard';
 
 function Stat({ label, value, tone = 'text-brown' }) {
   return (
@@ -30,7 +31,7 @@ export default function OverviewTab({ can, onOpenProduct }) {
 
   if (overviewQuery.isPending) return <Spinner size={24} />;
   if (overviewQuery.isError) return <p className="text-sm text-danger">{overviewQuery.error.message}</p>;
-  const { totals, needToOrder, handover, recent } = overviewQuery.data;
+  const { totals, needToOrder, handover, recent, automationIssues } = overviewQuery.data;
   const handlesRequests = can['inventory.writeOff'];
 
   const quickActions = [
@@ -62,6 +63,7 @@ export default function OverviewTab({ can, onOpenProduct }) {
       </div>
 
       <RequestsCard handlesRequests={handlesRequests} />
+      {automationIssues > 0 && <AutomationCard can={can} />}
 
       {handover.length > 0 && (
         <Card title="Needs handing over" className="border-danger/40">

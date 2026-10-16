@@ -14,7 +14,7 @@ const inventoryAllocationEventSchema = new mongoose.Schema(
     orgId: ref('Organization', { required: true }),
     branchId: ref('Branch', { required: true }),
     allocationId: ref('InventoryAllocation', { required: true }),
-    type: { type: String, enum: ['ISSUED', 'FINISHED', 'RETURNED', 'MOVED', 'WRITTEN_OFF', 'CORRECTED', 'HANDOVER_NEEDED'], required: true },
+    type: { type: String, enum: ['ISSUED', 'FINISHED', 'RETURNED', 'MOVED', 'WRITTEN_OFF', 'CORRECTED', 'HANDOVER_NEEDED', 'SERVICE_USE'], required: true },
     qty: { type: Number, default: 0 },
     from: { type: recipientSchema, default: null },
     to: { type: recipientSchema, default: null },

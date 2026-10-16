@@ -50,6 +50,10 @@ const RULES = {
   'inventory.createPurchaseOrder': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: NEEDS_APPROVAL, FRONT_DESK: false },
   'inventory.approvePurchaseOrder': { BUSINESS_OWNER: true, BRANCH_OWNER: upTo('branchOwnerPoApproval', DENY), INVENTORY: false, FRONT_DESK: false },
   'inventory.receive': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: true, FRONT_DESK: delegated('receive') },
+  // Automatic use by services: post or dismiss uses that couldn't be taken, correct a measured amount
+  'inventory.resolveExceptions': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: true, FRONT_DESK: false },
+  'inventory.dismissExceptions': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: false, FRONT_DESK: false },
+  'inventory.correctServiceUse': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: true, FRONT_DESK: false },
   'inventory.viewRecipes': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: true, FRONT_DESK: false },
   'inventory.editRecipes': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: false, FRONT_DESK: false },
   'inventory.countStock': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: true, FRONT_DESK: false },

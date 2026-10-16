@@ -12,6 +12,8 @@ import setupRoutes from './setup/setup.routes.js';
 import allocationRoutes from './allocations/allocations.routes.js';
 import movementRoutes from './movements/movements.routes.js';
 import requestRoutes from './approvals/approvals.routes.js';
+import recipeRoutes from './recipes/recipes.routes.js';
+import automationRoutes from './automation/automation.routes.js';
 import { getOverview } from './overview/overview.service.js';
 
 const router = Router();
@@ -34,6 +36,8 @@ router.use('/setup', setupRoutes);
 router.use('/allocations', allocationRoutes);
 router.use('/movements', movementRoutes);
 router.use('/requests', requestRoutes);
+router.use('/recipes', recipeRoutes);
+router.use('/automation', automationRoutes);
 
 // GET /api/inventory/overview — the Overview tab for the selected branch
 router.get('/overview', async (req, res) => {

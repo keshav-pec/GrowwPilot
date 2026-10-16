@@ -11,11 +11,13 @@ import LocationsCard from './settings/LocationsCard';
 import SetupGuide from './setup/SetupGuide';
 import SetupChecklist from './setup/SetupChecklist';
 import OverviewTab from './overview/OverviewTab';
+import RecipesTab from './recipes/RecipesTab';
 
 // The tabs. Overview and Purchasing are filled in by later phases (INVENTORY_PLAN.md).
 const TABS = [
   { value: 'overview', label: 'Overview' },
   { value: 'products', label: 'Products' },
+  { value: 'recipes', label: 'Recipes', action: 'inventory.viewRecipes' }, // owners and inventory logins
   { value: 'purchasing', label: 'Purchasing' },
   { value: 'settings', label: 'Settings', action: 'inventory.manageSettings' }, // owners only
 ];
@@ -105,6 +107,7 @@ export default function InventoryPage() {
             </>
           )}
           {tab === 'products' && <ProductsTab can={can} onOpenProduct={(id) => update({ product: id })} />}
+          {tab === 'recipes' && <RecipesTab can={can} />}
           {tab === 'purchasing' && (
             <EmptyState icon={ClipboardList} title="No purchase orders yet" message="Suppliers, purchase orders and receiving deliveries will live here." />
           )}

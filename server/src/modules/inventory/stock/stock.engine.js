@@ -150,11 +150,10 @@ export async function postOpeningStock(ctx, { branchId, locationId, requestKey, 
   if (items.some((i) => !Number.isInteger(i.qty) || i.qty <= 0)) throw new AppError(400, 'VALIDATION_ERROR', 'Quantities must be whole numbers');
 
   const skuIds = items.map((i) => i.skuId);
-  const [store, usedHere, hasStock] = await Promise.all([
-    InventoryLocation.findOne(scoped(ctx, { _id: locationId, branchId, kind: 'STORE' })).session(session).lean(),
-    InventorySkuBranch.countDocuments(scoped(ctx, { branchId, skuId: { $in: skuIds } })).session(session),
-    InventoryBalance.exists(scoped(ctx, { branchId, skuId: { $in: skuIds } })).session(session),
-  ]);
+  // One after the other: reads in a transaction must not race to start it
+  const store = await InventoryLocation.findOne(scoped(ctx, { _id: locationId, branchId, kind: 'STORE' })).session(session).lean();
+  const usedHere = await InventorySkuBranch.countDocuments(scoped(ctx, { branchId, skuId: { $in: skuIds } })).session(session);
+  const hasStock = await InventoryBalance.exists(scoped(ctx, { branchId, skuId: { $in: skuIds } })).session(session);
   if (!store) throw new AppError(404, 'NOT_FOUND', 'Stock location not found');
   if (usedHere !== new Set(skuIds.map(String)).size) throw new AppError(404, 'NOT_FOUND', 'Product not found at this branch');
   if (hasStock) throw new Error('postOpeningStock is only for products without stock');

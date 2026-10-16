@@ -4,6 +4,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import { useSetSkuStatus, useSku, useSkuMovements, useUseSkuHere } from '../../../api/inventory/skus';
 import { useHandouts } from '../../../api/inventory/allocations';
 import { useCorrectFinish } from '../../../api/inventory/movements';
+import { useCorrectServiceUse } from '../../../api/inventory/automation';
 import { SKU_TYPE_LABEL, WAY_OF_USE_LABEL, costPerStockUnit, formatQty, isMeasured, movementLabel, newRequestKey } from '../../../lib/inventory';
 import { formatAmount } from '../../../lib/money';
 import { formatDateTime } from '../../../lib/time';
@@ -185,7 +186,7 @@ export default function ProductDrawer({ skuId, categories, can, onClose }) {
           </Section>
 
           <Section title="Movement history">
-            <MovementHistory sku={sku} showCosts={canSeeCosts} canCorrect={can['inventory.correctFinish']} />
+            <MovementHistory sku={sku} showCosts={canSeeCosts} canCorrect={can['inventory.correctFinish']} canCorrectUse={can['inventory.correctServiceUse']} />
           </Section>
         </>
       )}
@@ -217,10 +218,11 @@ export default function ProductDrawer({ skuId, categories, can, onClose }) {
 }
 
 // Every change to this product's stock at the branch (INV-13), newest first. Nothing here can be edited.
-function MovementHistory({ sku, showCosts, canCorrect }) {
+function MovementHistory({ sku, showCosts, canCorrect, canCorrectUse }) {
   const { activeBranch } = useAuth();
   const [page, setPage] = useState(1);
   const [correcting, setCorrecting] = useState(null); // a FINISH movement to undo
+  const [fixingUse, setFixingUse] = useState(null); // a measured service use whose amount was different
   const historyQuery = useSkuMovements(sku._id, page);
 
   if (historyQuery.isPending) return <Spinner size={20} />;
@@ -248,6 +250,12 @@ function MovementHistory({ sku, showCosts, canCorrect }) {
               {showCosts && m.unitCost != null && ` · ${formatAmount(costPerStockUnit(m.unitCost, sku))} per ${sku.stockUnit}`}
             </p>
             {m.note && <p className="mt-0.5 text-xs text-ink">{m.note}</p>}
+            {m.serviceUse && <p className="mt-0.5 text-xs text-muted">For {m.serviceUse.serviceName}</p>}
+            {canCorrectUse && m.serviceUse && isMeasured(sku) && (
+              <button type="button" className="mt-1 text-xs text-brown underline" onClick={() => setFixingUse(m)}>
+                Used a different amount? Correct it
+              </button>
+            )}
             {canCorrect && m.type === 'FINISH' && (
               <button type="button" className="mt-1 text-xs text-brown underline" onClick={() => setCorrecting(m)}>
                 Finished by mistake? Undo
@@ -258,6 +266,7 @@ function MovementHistory({ sku, showCosts, canCorrect }) {
       </ul>
       <Pagination page={page} pages={pages} onChange={setPage} />
       {correcting && <CorrectFinishModal movement={correcting} sku={sku} onClose={() => setCorrecting(null)} />}
+      {fixingUse && <CorrectUseModal movement={fixingUse} sku={sku} onClose={() => setFixingUse(null)} />}
     </>
   );
 }
@@ -301,6 +310,53 @@ function CorrectFinishModal({ movement, sku, onClose }) {
       </p>
       <Input id="correct-note" label="What went wrong" autoFocus placeholder="e.g. Marked the wrong bottle" value={note} onChange={(e) => setNote(e.target.value)} />
       {correct.isError && <p className="mt-2 text-sm text-danger">{correct.error.message}</p>}
+    </Modal>
+  );
+}
+
+// "Used 110 ml, not 90": only the difference is posted, linked to the original use
+function CorrectUseModal({ movement, sku, onClose }) {
+  const correct = useCorrectServiceUse();
+  const [key] = useState(newRequestKey);
+  const [actual, setActual] = useState('');
+  const [note, setNote] = useState('');
+
+  function save() {
+    correct.mutate(
+      { key, id: movement.serviceUse._id, actualQty: Number(actual), note: note || undefined },
+      {
+        onSuccess: () => {
+          toast.success('Corrected');
+          onClose();
+        },
+      }
+    );
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`${sku.name} used for ${movement.serviceUse.serviceName}`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={save} loading={correct.isPending} disabled={!/^\d+$/.test(actual)}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-muted">
+          The recipe took {formatQty(-movement.qty, sku)}. Type what was really used in total; only the difference is taken (or put back).
+        </p>
+        <Input id="actual-used" label={`Really used (${sku.baseUnit})`} inputMode="numeric" autoFocus value={actual} onChange={(e) => setActual(e.target.value)} />
+        <Input id="use-note" label="Note (optional)" placeholder="e.g. Long, thick hair" value={note} onChange={(e) => setNote(e.target.value)} />
+        {correct.isError && <p className="text-sm text-danger">{correct.error.message}</p>}
+      </div>
     </Modal>
   );
 }

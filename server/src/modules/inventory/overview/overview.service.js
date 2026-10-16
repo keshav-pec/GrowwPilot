@@ -1,4 +1,13 @@
-import { InventoryAllocation, InventoryApproval, InventoryLedgerEntry, InventorySku, InventorySkuBranch, InventoryTransaction } from '../../../models/index.js';
+import {
+  InventoryAllocation,
+  InventoryApproval,
+  InventoryException,
+  InventoryLedgerEntry,
+  InventoryOutbox,
+  InventorySku,
+  InventorySkuBranch,
+  InventoryTransaction,
+} from '../../../models/index.js';
 import { scoped } from '../../../utils/scoped.js';
 import { can } from '../permissions.js';
 import { getBranchSettings } from '../settings/settings.service.js';
@@ -14,6 +23,7 @@ export async function getOverview(ctx) {
   const settings = await getBranchSettings(ctx, branchId);
   const canSeeCosts = can(ctx, 'inventory.viewCosts', { settings }).allowed;
   const handlesRequests = can(ctx, 'inventory.writeOff', { settings, value: 0 }).allowed;
+  const handlesExceptions = can(ctx, 'inventory.resolveExceptions', { settings }).allowed;
 
   const rows = await InventorySkuBranch.find(scoped(ctx, { branchId, active: true })).lean();
   const skus = await InventorySku.find(scoped(ctx, { _id: { $in: rows.map((r) => r.skuId) }, status: 'active' })).select(UNIT_FIELDS).lean();
@@ -35,10 +45,12 @@ export async function getOverview(ctx) {
   }
   needToOrder.sort((a, b) => a.available - b.available);
 
-  const [openHandouts, handover, waiting, recent] = await Promise.all([
+  const [openHandouts, handover, waiting, exceptions, failedEvents, recent] = await Promise.all([
     InventoryAllocation.countDocuments(scoped(ctx, { branchId, status: 'OPEN' })),
     InventoryAllocation.find(scoped(ctx, { branchId, status: 'OPEN', needsHandover: true })).sort({ createdAt: 1 }).lean(),
     handlesRequests ? InventoryApproval.countDocuments(scoped(ctx, { branchId, status: 'PENDING' })) : 0,
+    handlesExceptions ? InventoryException.countDocuments(scoped(ctx, { branchId, status: 'OPEN' })) : 0,
+    handlesExceptions ? InventoryOutbox.countDocuments(scoped(ctx, { branchId, status: 'FAILED' })) : 0,
     recentActivity(ctx, branchId, { mineOnly: ctx.role === 'FRONT_DESK' }),
   ]);
   const skuOf = Object.fromEntries(skus.map((s) => [String(s._id), s]));
@@ -54,6 +66,7 @@ export async function getOverview(ctx) {
     needToOrder: needToOrder.slice(0, 10),
     handover: handover.map((h) => ({ ...h, sku: skuOf[String(h.skuId)] })),
     waitingRequests: waiting,
+    automationIssues: exceptions + failedEvents, // services that couldn't take their stock
     recent,
   };
 }

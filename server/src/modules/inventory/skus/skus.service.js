@@ -1,6 +1,7 @@
 import {
   InventoryAllocation,
   InventoryBalance,
+  InventoryConsumptionEvent,
   InventoryLedgerEntry,
   InventorySku,
   InventorySkuBranch,
@@ -354,6 +355,11 @@ export async function listSkuMovements(ctx, id, { page }) {
   ]);
   const transactions = await InventoryTransaction.find(scoped(ctx, { _id: { $in: entries.map((e) => e.transactionId) } })).lean();
   const transactionOf = Object.fromEntries(transactions.map((t) => [String(t._id), t]));
+  // Automatic uses by services (their amount can be corrected for measured products)
+  const uses = await InventoryConsumptionEvent.find(scoped(ctx, { transactionId: { $in: transactions.filter((t) => t.type === 'SERVICE_USE').map((t) => t._id) }, correctsId: null }))
+    .select('transactionId serviceName')
+    .lean();
+  const useOf = Object.fromEntries(uses.map((u) => [String(u.transactionId), u]));
 
   const items = entries.map((e) => {
     const t = transactionOf[String(e.transactionId)];
@@ -372,6 +378,7 @@ export async function listSkuMovements(ctx, id, { page }) {
         actorRole: t.actorRole,
         heldBy: t.heldBy?.kind ? t.heldBy : null,
         correctsId: t.correctsId,
+        serviceUse: useOf[String(t._id)] ?? null, // { _id, serviceName }
         occurredAt: e.occurredAt,
         postedAt: e.postedAt,
       },

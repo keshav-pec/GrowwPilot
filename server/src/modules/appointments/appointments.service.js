@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Appointment, Branch } from '../../models/index.js';
 import { OPEN_APPOINTMENT_STATUSES } from '../../config/constants.js';
 import { AppError } from '../../utils/AppError.js';
@@ -6,6 +7,7 @@ import { escapeRegex } from '../../utils/regex.js';
 import { dayRangeUTC } from '../../utils/time.js';
 import { APPOINTMENT_TRANSITIONS, assertTransition } from '../../utils/stateMachine.js';
 import { bookWithLock, prepareBooking, withStaffLock } from './scheduling.service.js';
+import { enqueueServiceCompleted, processSoon } from '../inventory/automation/outbox.js';
 
 // Upcoming, still-open appointments that match `filter`, e.g. { branchId } or { 'items.staffId': id }.
 // Used to stop an owner from archiving a branch or deactivating a stylist who still has bookings.
@@ -103,16 +105,27 @@ export async function setAppointmentStatus(ctx, id, { status, reason }) {
   const current = await getAppointment(ctx, id);
   assertTransition(APPOINTMENT_TRANSITIONS, current.status, status);
 
-  // Only update if the status is still what we just read. If two people click at once, one gets a clear error.
-  const updated = await Appointment.findOneAndUpdate(
-    scoped(ctx, { _id: id, status: current.status }),
-    {
-      $set: { status },
-      $push: { statusHistory: { from: current.status, to: status, by: ctx.userId, at: new Date(), reason } },
-    },
-    { new: true }
-  ).lean();
+  // With the Inventory add-on, completing a visit also records a "service completed" event in the same
+  // transaction; its stock is then taken in the background (inventory/automation/outbox.js).
+  const usesStock = status === 'COMPLETED' && ctx.addons?.includes('inventory');
 
-  if (!updated) throw new AppError(409, 'STATUS_CHANGED', 'This appointment was just updated by someone else. Please refresh.');
+  async function save(session = null) {
+    // Only update if the status is still what we just read. If two people click at once, one gets a clear error.
+    const updated = await Appointment.findOneAndUpdate(
+      scoped(ctx, { _id: id, status: current.status }),
+      {
+        $set: { status },
+        $push: { statusHistory: { from: current.status, to: status, by: ctx.userId, at: new Date(), reason } },
+      },
+      { returnDocument: 'after', session }
+    ).lean();
+    if (!updated) throw new AppError(409, 'STATUS_CHANGED', 'This appointment was just updated by someone else. Please refresh.');
+    if (usesStock) await enqueueServiceCompleted(ctx, updated, session);
+    return updated;
+  }
+
+  if (!usesStock) return save();
+  const updated = await mongoose.connection.transaction((session) => save(session));
+  processSoon();
   return updated;
 }

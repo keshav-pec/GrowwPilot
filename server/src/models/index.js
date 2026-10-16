@@ -36,3 +36,7 @@ export { default as IdempotencyRecord } from './IdempotencyRecord.js';
 export { default as InventoryImport } from './inventory/InventoryImport.js';
 export { default as InventoryAllocationEvent } from './inventory/InventoryAllocationEvent.js';
 export { default as InventoryApproval } from './inventory/InventoryApproval.js';
+export { default as InventoryRecipe } from './inventory/InventoryRecipe.js';
+export { default as InventoryConsumptionEvent } from './inventory/InventoryConsumptionEvent.js';
+export { default as InventoryException } from './inventory/InventoryException.js';
+export { default as InventoryOutbox } from './inventory/InventoryOutbox.js';
