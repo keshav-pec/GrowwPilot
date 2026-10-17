@@ -132,3 +132,15 @@ export function describeRecipe(recipe) {
   if (!recipe || recipe.lines.length === 0) return 'Uses nothing';
   return recipe.lines.map((l) => (l.deducts ? `${formatQty(l.qty, l.sku)} ${l.sku.name}` : `${l.sku.name} (linked)`)).join(' · ');
 }
+
+// Purchase order statuses, in words
+export const PO_STATUS = {
+  DRAFT: ['Draft', 'neutral'],
+  PENDING_APPROVAL: ['Waiting for approval', 'gold'],
+  APPROVED: ['Approved', 'brown'],
+  ORDERED: ['Ordered', 'brown'],
+  PARTIALLY_RECEIVED: ['Part received', 'orange'],
+  RECEIVED: ['Received', 'brown'],
+  CLOSED: ['Closed', 'neutral'],
+  CANCELED: ['Cancelled', 'neutral'],
+};

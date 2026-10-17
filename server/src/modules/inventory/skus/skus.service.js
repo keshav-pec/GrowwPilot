@@ -21,6 +21,7 @@ import { postMovement } from '../stock/stock.engine.js';
 import { availableToIssue, branchStock } from '../stock/stock.queries.js';
 import { ensureBranchLocations, listLocations } from '../locations/locations.service.js';
 import { reserveSkuCodes } from './skuCodes.js';
+import { findSupplier } from '../suppliers/suppliers.service.js';
 
 const PAGE_SIZE = 50;
 const HISTORY_PAGE_SIZE = 25;
@@ -28,7 +29,7 @@ const productLink = (id) => `/app/inventory?tab=products&product=${id}`;
 
 // The fields that describe the product itself (the same at every branch)
 const PRODUCT_FIELDS = ['name', 'category', 'brand', 'barcodes', 'type', 'stockUnit', 'wayOfUse', 'baseUnit', 'unitsPerStockUnit'];
-const BRANCH_FIELDS = ['reorderPoint', 'reorderQty', 'leadTimeDays'];
+const BRANCH_FIELDS = ['reorderPoint', 'reorderQty', 'leadTimeDays', 'preferredSupplierId'];
 
 // What I may do here, with the selected branch's settings
 async function access(ctx) {
@@ -92,7 +93,8 @@ export async function createSku(ctx, input, key) {
   if (input.openingUnitCost != null && !canSeeCosts) throw new AppError(403, 'PERMISSION_DENIED', 'Only owners can enter costs');
 
   const { mainStore } = await ensureBranchLocations(ctx, branchId);
-  const { openingQty, openingUnitCost, reorderPoint = null, reorderQty = null, leadTimeDays = null, code, ...product } = input;
+  const { openingQty, openingUnitCost, reorderPoint = null, reorderQty = null, leadTimeDays = null, preferredSupplierId = null, code, ...product } = input;
+  if (preferredSupplierId) await findSupplier(ctx, preferredSupplierId);
   normalizeUnits(product);
 
   return runOnce(ctx, { key, operation: 'inventory.sku.create' }, async (session) => {
@@ -101,7 +103,7 @@ export async function createSku(ctx, input, key) {
       [{ ...product, orgId: ctx.orgId, code: code ?? (await reserveSkuCodes(ctx, 1, session))[0], createdBy: ctx.userId }],
       { session }
     );
-    await InventorySkuBranch.create([{ orgId: ctx.orgId, branchId, skuId: sku._id, reorderPoint, reorderQty, leadTimeDays }], { session });
+    await InventorySkuBranch.create([{ orgId: ctx.orgId, branchId, skuId: sku._id, reorderPoint, reorderQty, leadTimeDays, preferredSupplierId }], { session });
 
     let summary = `Added the product ${sku.name} (${sku.code})`;
     if (openingQty > 0) {
@@ -152,6 +154,7 @@ export async function updateSku(ctx, id, input, key) {
       throw new AppError(409, 'COUNTING_CHANGE_BLOCKED', `${sku.name} already has stock history, so how it is counted can’t change. Add it as a new product instead.`);
     }
   }
+  if (branchChanges.preferredSupplierId) await findSupplier(ctx, branchChanges.preferredSupplierId);
   if (Object.keys(branchChanges).length > 0 && !(await InventorySkuBranch.exists(scoped(ctx, { branchId, skuId: sku._id })))) {
     throw new AppError(409, 'NOT_USED_HERE', `${sku.name} isn’t used at this branch yet`);
   }
@@ -229,13 +232,14 @@ export async function useSkuHere(ctx, id, key) {
 // ---------------------------------------------------------------------------
 // Products screen: search by name, code or barcode (a barcode scanner types into the search box)
 // ---------------------------------------------------------------------------
-export async function listSkus(ctx, { search, category, wayOfUse, status, needToOrder, scope, page }) {
+export async function listSkus(ctx, { search, category, wayOfUse, supplierId, status, needToOrder, scope, page }) {
   const branchId = ctx.activeBranchId;
   const { canSeeCosts } = await access(ctx);
 
   const branchRows = await InventorySkuBranch.find(scoped(ctx, { branchId, active: true })).lean();
   const usedHere = branchRows.map((r) => r.skuId);
   const filter = scoped(ctx, { _id: scope === 'branch' ? { $in: usedHere } : { $nin: usedHere } });
+  if (supplierId && scope === 'branch') filter._id = { $in: branchRows.filter((r) => String(r.preferredSupplierId) === supplierId).map((r) => r.skuId) };
   if (status !== 'all') filter.status = status;
   if (category) filter.category = category;
   if (wayOfUse) filter.wayOfUse = wayOfUse;
@@ -312,6 +316,7 @@ export async function getSku(ctx, id) {
         reorderPoint: here?.reorderPoint ?? null,
         reorderQty: here?.reorderQty ?? null,
         leadTimeDays: here?.leadTimeDays ?? null,
+        preferredSupplierId: here?.preferredSupplierId ?? null,
         avgCost: here?.avgCost ?? null,
         value: here?.avgCost != null ? Math.round((inStore + inUse) * here.avgCost) : null,
       },

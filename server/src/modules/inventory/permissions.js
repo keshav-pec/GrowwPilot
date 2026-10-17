@@ -49,6 +49,9 @@ const RULES = {
   'inventory.reportProblem': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: true, FRONT_DESK: true },
   'inventory.createPurchaseOrder': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: NEEDS_APPROVAL, FRONT_DESK: false },
   'inventory.approvePurchaseOrder': { BUSINESS_OWNER: true, BRANCH_OWNER: upTo('branchOwnerPoApproval', DENY), INVENTORY: false, FRONT_DESK: false },
+  'inventory.manageSuppliers': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: true, FRONT_DESK: false },
+  'inventory.directReceipt': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: true, FRONT_DESK: false }, // a delivery without an order
+  'inventory.returnToSupplier': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: true, FRONT_DESK: false },
   'inventory.receive': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: true, FRONT_DESK: delegated('receive') },
   // Automatic use by services: post or dismiss uses that couldn't be taken, correct a measured amount
   'inventory.resolveExceptions': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: true, FRONT_DESK: false },

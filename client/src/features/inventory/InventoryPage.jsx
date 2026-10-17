@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ClipboardList, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useInventoryAccess } from '../../api/inventory/access';
 import { useSetup } from '../../api/inventory/setup';
@@ -12,13 +12,17 @@ import SetupGuide from './setup/SetupGuide';
 import SetupChecklist from './setup/SetupChecklist';
 import OverviewTab from './overview/OverviewTab';
 import RecipesTab from './recipes/RecipesTab';
+import PurchasingTab from './purchasing/PurchasingTab';
+import OrderDrawer from './purchasing/OrderDrawer';
+import StockCountTab from './stockCount/StockCountTab';
 
-// The tabs. Overview and Purchasing are filled in by later phases (INVENTORY_PLAN.md).
+// The tabs (INVENTORY_PLAN.md). `action`: only shown to people who may do it.
 const TABS = [
   { value: 'overview', label: 'Overview' },
   { value: 'products', label: 'Products' },
   { value: 'recipes', label: 'Recipes', action: 'inventory.viewRecipes' }, // owners and inventory logins
   { value: 'purchasing', label: 'Purchasing' },
+  { value: 'count', label: 'Stock count', action: 'inventory.countStock' }, // owners and inventory logins
   { value: 'settings', label: 'Settings', action: 'inventory.manageSettings' }, // owners only
 ];
 
@@ -61,6 +65,7 @@ export default function InventoryPage() {
   else if (tabs.some((t) => t.value === requested)) tab = requested;
   else if (!requested && newToInventory) tab = 'setup';
   const productId = searchParams.get('product');
+  const orderId = searchParams.get('order');
 
   // Opening the guide puts it in the URL, so it stays open while the first products are added
   useEffect(() => {
@@ -108,9 +113,8 @@ export default function InventoryPage() {
           )}
           {tab === 'products' && <ProductsTab can={can} onOpenProduct={(id) => update({ product: id })} />}
           {tab === 'recipes' && <RecipesTab can={can} />}
-          {tab === 'purchasing' && (
-            <EmptyState icon={ClipboardList} title="No purchase orders yet" message="Suppliers, purchase orders and receiving deliveries will live here." />
-          )}
+          {tab === 'purchasing' && <PurchasingTab can={can} onOpenOrder={(id) => update({ order: id })} />}
+          {tab === 'count' && <StockCountTab />}
           {tab === 'settings' && (
             <div className="grid gap-4">
               <LocationsCard />
@@ -121,6 +125,7 @@ export default function InventoryPage() {
       )}
 
       {productId && <ProductDrawer skuId={productId} can={can} onClose={() => update({ product: null })} />}
+      {orderId && <OrderDrawer orderId={orderId} canSeeCosts={can['inventory.viewCosts']} onClose={() => update({ order: null })} />}
     </>
   );
 }

@@ -41,7 +41,7 @@ export function calculateCheckout(subtotal, { discountType, discountValue, payme
 }
 
 // "Andheri" -> "AND"
-function branchCode(name) {
+export function branchCode(name) {
   return name.replace(/[^a-z]/gi, '').slice(0, 3).toUpperCase() || 'BR';
 }
 

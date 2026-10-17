@@ -5,6 +5,7 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useSaveSku } from '../../../api/inventory/skus';
+import { useSuppliers } from '../../../api/inventory/suppliers';
 import { BASE_UNITS, SKU_TYPES, STOCK_UNITS, WAYS_OF_USE, isMeasured, newRequestKey } from '../../../lib/inventory';
 import { isValidRupees, toPaise } from '../../../lib/money';
 import { Button, Input, Modal, Select } from '../../../components/ui';
@@ -28,6 +29,7 @@ const schema = z
     code: z.string().trim().refine((v) => v === '' || /^[A-Za-z0-9-]{2,30}$/.test(v), 'Use letters, numbers and dashes only'),
     reorderPoint: whole,
     reorderQty: whole,
+    preferredSupplierId: z.string(),
     unitCost: z.string().refine((v) => v.trim() === '' || isValidRupees(v), 'Enter an amount like 450 or 450.50'),
   })
   .superRefine((v, ctx) => {
@@ -45,6 +47,7 @@ const schema = z
 export default function ProductFormModal({ product, categories = [], canSeeCosts, reorderOnly = false, onClose, onSaved }) {
   const sku = product?.sku;
   const saveSku = useSaveSku();
+  const suppliers = useSuppliers().data ?? [];
   const [key] = useState(newRequestKey); // one per form: a double click saves once
   const [moreOpen, setMoreOpen] = useState(reorderOnly);
 
@@ -74,6 +77,7 @@ export default function ProductFormModal({ product, categories = [], canSeeCosts
       code: '',
       reorderPoint: levelText(product?.branch.reorderPoint),
       reorderQty: levelText(product?.branch.reorderQty),
+      preferredSupplierId: product?.branch.preferredSupplierId ?? '',
       unitCost: '',
     },
   });
@@ -87,7 +91,7 @@ export default function ProductFormModal({ product, categories = [], canSeeCosts
   function onSubmit(v) {
     const unitsPer = measured ? Number(v.unitsPerStockUnit) : 1;
     const level = (text) => (text === '' ? null : Number(text) * unitsPer);
-    const reorder = { reorderPoint: level(v.reorderPoint), reorderQty: level(v.reorderQty) };
+    const reorder = { reorderPoint: level(v.reorderPoint), reorderQty: level(v.reorderQty), preferredSupplierId: v.preferredSupplierId || null };
 
     let values;
     if (reorderOnly) {
@@ -232,6 +236,7 @@ export default function ProductFormModal({ product, categories = [], canSeeCosts
               {...register('reorderPoint')}
             />
             <Input label={`How many to order (${stockUnit}s)`} inputMode="numeric" placeholder="Not set" error={errors.reorderQty?.message} {...register('reorderQty')} />
+            <Select label="Usual supplier (this branch)" placeholder="None" options={suppliers.map((s) => ({ value: s._id, label: s.name }))} {...register('preferredSupplierId')} />
             {!sku && canSeeCosts && (
               <Input
                 label={`Cost per ${stockUnit} (₹, optional)`}

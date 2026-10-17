@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Package, Plus, Search, Upload } from 'lucide-react';
 import { fetchSkus, useSkus, useUseSkuHere } from '../../../api/inventory/skus';
+import { useSuppliers } from '../../../api/inventory/suppliers';
 import { WAYS_OF_USE, WAY_OF_USE_LABEL, formatQty, newRequestKey } from '../../../lib/inventory';
 import { formatAmount } from '../../../lib/money';
 import { useDebounce } from '../../../lib/useDebounce';
@@ -21,7 +22,8 @@ const STATUS_OPTIONS = [
 export default function ProductsTab({ can, onOpenProduct }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({ category: '', wayOfUse: '', status: 'active', needToOrder: false });
+  const [filters, setFilters] = useState({ category: '', wayOfUse: '', supplierId: '', status: 'active', needToOrder: false });
+  const suppliers = useSuppliers().data ?? [];
   const [otherProducts, setOtherProducts] = useState(false); // the salon's products not used at this branch yet
   const [page, setPage] = useState(1);
   const [adding, setAdding] = useState(false);
@@ -33,6 +35,7 @@ export default function ProductsTab({ can, onOpenProduct }) {
     search: debouncedSearch || undefined,
     category: filters.category || undefined,
     wayOfUse: filters.wayOfUse || undefined,
+    supplierId: filters.supplierId || undefined,
     status: filters.status,
     needToOrder: filters.needToOrder || undefined,
     scope: otherProducts ? 'salon' : 'branch',
@@ -118,7 +121,7 @@ export default function ProductsTab({ can, onOpenProduct }) {
         ]),
   ];
 
-  const filtered = Boolean(debouncedSearch || filters.category || filters.wayOfUse || filters.needToOrder || filters.status !== 'active');
+  const filtered = Boolean(debouncedSearch || filters.category || filters.wayOfUse || filters.supplierId || filters.needToOrder || filters.status !== 'active');
 
   return (
     <>
@@ -158,6 +161,9 @@ export default function ProductsTab({ can, onOpenProduct }) {
           onChange={(e) => setFilter('category', e.target.value)}
         />
         <Select aria-label="Way of use" placeholder="Every way of use" options={WAYS_OF_USE} value={filters.wayOfUse} onChange={(e) => setFilter('wayOfUse', e.target.value)} />
+        {suppliers.length > 0 && (
+          <Select aria-label="Supplier" placeholder="Every supplier" options={suppliers.map((s) => ({ value: s._id, label: s.name }))} value={filters.supplierId} onChange={(e) => setFilter('supplierId', e.target.value)} />
+        )}
         <Select aria-label="Status" options={STATUS_OPTIONS} value={filters.status} onChange={(e) => setFilter('status', e.target.value)} />
         {!otherProducts && (
           <label className="flex items-center gap-2 text-sm">

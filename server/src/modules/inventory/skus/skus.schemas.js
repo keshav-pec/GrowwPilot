@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { BASE_UNITS, SKU_TYPES, WAYS_OF_USE } from '../../../config/inventory.js';
-import { paise } from '../../../utils/schemas.js';
+import { objectId, paise } from '../../../utils/schemas.js';
 
 const wholeNumber = z.number().int('Use a whole number').min(0, 'Can’t be below zero');
 // Optional text: an empty box is the same as leaving it out
@@ -27,6 +27,7 @@ const branchFields = {
   reorderPoint: wholeNumber.nullable().optional(),
   reorderQty: wholeNumber.nullable().optional(),
   leadTimeDays: z.number().int().min(0).max(365).nullable().optional(),
+  preferredSupplierId: objectId.nullable().optional(), // who this branch usually orders it from
 };
 
 const measuredNeedsUnits = (p, ctx) => {
@@ -82,6 +83,7 @@ export const listSkusSchema = z.object({
   search: z.string().trim().max(100).optional(),
   category: z.string().trim().max(60).optional(),
   wayOfUse: z.enum(WAYS_OF_USE).optional(),
+  supplierId: objectId.optional(), // this branch orders it from this supplier
   status: z.enum(['active', 'inactive', 'all']).default('active'),
   needToOrder: flag.optional(),
   // branch: products used at the selected branch. salon: the salon's other products, not used here yet

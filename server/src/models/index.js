@@ -40,3 +40,7 @@ export { default as InventoryRecipe } from './inventory/InventoryRecipe.js';
 export { default as InventoryConsumptionEvent } from './inventory/InventoryConsumptionEvent.js';
 export { default as InventoryException } from './inventory/InventoryException.js';
 export { default as InventoryOutbox } from './inventory/InventoryOutbox.js';
+export { default as InventorySupplier } from './inventory/InventorySupplier.js';
+export { default as InventoryPurchaseOrder } from './inventory/InventoryPurchaseOrder.js';
+export { default as InventoryGoodsReceipt } from './inventory/InventoryGoodsReceipt.js';
+export { default as InventoryStockCount } from './inventory/InventoryStockCount.js';
