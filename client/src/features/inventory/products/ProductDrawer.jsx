@@ -14,6 +14,7 @@ import HandoutsList from '../overview/HandoutsList';
 import IssueModal from '../actions/IssueModal';
 import WriteOffModal from '../actions/WriteOffModal';
 import ReportProblemModal from '../actions/ReportProblemModal';
+import PhotosSection from '../catalogue/PhotosSection';
 
 function Section({ title, children }) {
   return (
@@ -167,6 +168,10 @@ export default function ProductDrawer({ skuId, categories, can, onClose }) {
               </Section>
             </>
           )}
+
+          <Section title="Photos">
+            <PhotosSection sku={sku} canEdit={data.canEdit} />
+          </Section>
 
           <Section title="Details">
             <dl className="grid grid-cols-2 gap-3 text-sm">

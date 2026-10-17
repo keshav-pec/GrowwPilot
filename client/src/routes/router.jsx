@@ -25,6 +25,7 @@ import AttendancePage from '../features/attendance/AttendancePage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import PayrollPage from '../features/payroll/PayrollPage';
 import InventoryPage from '../features/inventory/InventoryPage';
+import CataloguePrintPage from '../features/inventory/catalogue/CataloguePrintPage';
 import NotFoundPage from './NotFoundPage';
 import { Spinner } from '../components/ui';
 
@@ -72,7 +73,10 @@ export const router = createBrowserRouter([
           // Inventory add-on: owners, front desk and inventory logins (who see only this page)
           {
             element: <ProtectedRoute roles={['OWNER', 'FRONT_DESK', 'INVENTORY']} addon="inventory" />,
-            children: [{ path: 'inventory', element: <InventoryPage /> }],
+            children: [
+              { path: 'inventory', element: <InventoryPage /> },
+              { path: 'inventory/catalogue', element: <CataloguePrintPage /> }, // printable catalogue
+            ],
           },
 
           // Owner and front desk

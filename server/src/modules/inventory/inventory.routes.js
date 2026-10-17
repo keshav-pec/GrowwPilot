@@ -19,6 +19,7 @@ import purchasingRoutes from './purchasing/purchasing.routes.js';
 import stockCountRoutes from './stockCounts/stockCounts.routes.js';
 import settingsRoutes from './settings/settings.routes.js';
 import reportRoutes from './reports/reports.routes.js';
+import imageRoutes from './images/images.routes.js';
 import { getOverview } from './overview/overview.service.js';
 
 const router = Router();
@@ -34,6 +35,7 @@ router.get('/access', async (req, res) => {
   res.json({ branchId, role: inventoryRole(req.ctx), can: capabilities(req.ctx, settings) });
 });
 
+router.use('/skus', imageRoutes); // photos: /skus/:id/images...
 router.use('/skus', skuRoutes);
 router.use('/locations', locationRoutes);
 router.use('/imports', importRoutes);

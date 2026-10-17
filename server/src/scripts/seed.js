@@ -23,6 +23,8 @@ import { writeOff } from '../modules/inventory/movements/movements.service.js';
 import { reportProblem } from '../modules/inventory/approvals/approvals.service.js';
 import { createOrder, moveOrder, receiveOrder, submitOrder } from '../modules/inventory/purchasing/purchasing.service.js';
 import { markSetupStep } from '../modules/inventory/setup/setup.service.js';
+import { addImages } from '../modules/inventory/images/images.service.js';
+import sharp from 'sharp';
 import { DESERT_ROSE_CUSTOMERS, DESERT_ROSE_SERVICES, GLAMOUR_CUSTOMERS, GLAMOUR_SERVICES, LEADS } from './seed-data.js';
 
 const { Organization, Branch, User, Staff, Service, Combo, Customer, Appointment, Invoice, Lead, Attendance, Counter } = models;
@@ -453,6 +455,14 @@ await createOrder(keeper, { supplierId: String(beautyMart._id), lines: [{ skuId:
 await writeOff(owner, { skuId: String(sku.conditioner._id), locationId: String(mainStore), qty: 1, reason: 'DAMAGE', direction: 'REMOVE', note: 'Cap cracked in delivery' }, key());
 await writeOff(keeper, { skuId: String(sku.facialKit._id), locationId: String(mainStore), qty: 5, reason: 'EXPIRY', direction: 'REMOVE', note: 'Batch expired last week' }, key()); // ₹2,400: waits for an owner
 await reportProblem(desk, { skuId: String(sku.gloves._id), locationId: String(mainStore), reason: 'DAMAGE', qty: 1, note: 'Box got wet near the sink' }, key());
+// Simple generated photos for a few products, so the catalogue has pictures (real photos are uploaded in the app)
+const photoOf = (label, colour) =>
+  sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"><rect width="800" height="800" fill="${colour}"/><text x="400" y="420" font-family="Arial, sans-serif" font-size="64" fill="#ffffff" text-anchor="middle">${label}</text></svg>`))
+    .png()
+    .toBuffer();
+for (const [product, label, colour] of [[sku.shampoo, 'Shampoo', '#6b4226'], [sku.facialKit, 'Facial kit', '#c9a227'], [sku.developer, 'Developer', '#8a5a3b'], [sku.wax, 'Wax', '#b08d1f']]) {
+  await addImages(owner, String(product._id), [{ buffer: await photoOf(label, colour), originalname: `${product.code}.png` }], key());
+}
 await markSetupStep(owner, 'locations', key());
 await markSetupStep(owner, 'done', key());
 
@@ -462,7 +472,7 @@ await markSetupStep(owner, 'done', key());
 console.log(`\nSeeded: 2 salons, 3 branches, ${Object.keys(staff).length} staff, ${GLAMOUR_SERVICES.length + DESERT_ROSE_SERVICES.length} services, 2 combos,`);
 console.log(`        ${glamourCustomers.length + desertCustomers.length} customers, ${LEADS.length} leads, ${appointments.length} appointments, ${invoices.length} invoices, ${attendance.length} attendance records`);
 console.log(`        8 pay setups (2 front desk), 1 pay change request waiting for approval, 1 locked payroll month with payments, 1 advance, ${await models.CommissionEntry.countDocuments()} commission lines`);
-console.log(`        Inventory (Glamour Andheri): ${Object.keys(sku).length} products, 3 recipes, 4 hand-outs, 2 purchase orders, 1 write-off waiting for approval, 1 problem report`);
+console.log(`        Inventory (Glamour Andheri): ${Object.keys(sku).length} products, 3 recipes, 4 hand-outs, 2 purchase orders, 1 write-off waiting for approval, 1 problem report, 4 product photos`);
 console.log(`Today is centred on ${A.toFormat('h:mm a')} at Andheri (${A.zoneName}).`);
 console.log('\nEvery account uses the password:', DEMO_PASSWORD);
 console.table([

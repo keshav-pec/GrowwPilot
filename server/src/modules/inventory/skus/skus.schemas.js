@@ -89,6 +89,7 @@ export const listSkusSchema = z.object({
   // branch: products used at the selected branch. salon: the salon's other products, not used here yet
   scope: z.enum(['branch', 'salon']).default('branch'),
   page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(2000).default(50), // the printable catalogue asks for everything
 });
 
 export const pageSchema = z.object({ page: z.coerce.number().int().min(1).default(1) });

@@ -38,7 +38,7 @@ async function access(ctx) {
 }
 
 // A product of my salon (another salon's id is simply "not found")
-async function findSku(ctx, id, session) {
+export async function findSku(ctx, id, session) {
   const sku = await InventorySku.findOne(scoped(ctx, { _id: id })).session(session ?? null).lean();
   if (!sku) throw new AppError(404, 'NOT_FOUND', 'Product not found');
   return sku;
@@ -46,7 +46,7 @@ async function findSku(ctx, id, session) {
 
 // The business owner edits any product. Branch owners and inventory logins only edit products
 // used nowhere but their own branches (reorder levels for their branch are always theirs to set).
-async function canEditProduct(ctx, sku) {
+export async function canEditProduct(ctx, sku) {
   if (ctx.isPrimaryOwner) return true;
   const branchIds = await InventorySkuBranch.find(scoped(ctx, { skuId: sku._id, active: true })).distinct('branchId');
   return branchIds.every((id) => ctx.allowedBranchIds.includes(String(id)));
@@ -232,7 +232,7 @@ export async function useSkuHere(ctx, id, key) {
 // ---------------------------------------------------------------------------
 // Products screen: search by name, code or barcode (a barcode scanner types into the search box)
 // ---------------------------------------------------------------------------
-export async function listSkus(ctx, { search, category, wayOfUse, supplierId, status, needToOrder, scope, page }) {
+export async function listSkus(ctx, { search, category, wayOfUse, supplierId, status, needToOrder, scope, page, perPage = PAGE_SIZE }) {
   const branchId = ctx.activeBranchId;
   const { canSeeCosts } = await access(ctx);
 
@@ -280,9 +280,9 @@ export async function listSkus(ctx, { search, category, wayOfUse, supplierId, st
   const exact = search ? rows.filter((r) => r.barcodes.includes(search) || r.code === search.toUpperCase()) : [];
 
   return {
-    rows: rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    rows: rows.slice((page - 1) * perPage, page * perPage),
     page,
-    pages: Math.max(Math.ceil(rows.length / PAGE_SIZE), 1),
+    pages: Math.max(Math.ceil(rows.length / perPage), 1),
     total: rows.length,
     categories: categories.sort(),
     exactMatchId: exact.length === 1 ? exact[0]._id : null,

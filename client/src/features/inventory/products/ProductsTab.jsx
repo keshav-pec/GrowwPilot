@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Package, Plus, Search, Upload } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Images, LayoutGrid, List, Package, Plus, Printer, Search, Upload } from 'lucide-react';
 import { fetchSkus, useSkus, useUseSkuHere } from '../../../api/inventory/skus';
 import { useSuppliers } from '../../../api/inventory/suppliers';
 import { WAYS_OF_USE, WAY_OF_USE_LABEL, formatQty, newRequestKey } from '../../../lib/inventory';
@@ -10,6 +11,8 @@ import { useDebounce } from '../../../lib/useDebounce';
 import { Badge, Button, EmptyState, Pagination, Select, Table } from '../../../components/ui';
 import ProductFormModal from './ProductFormModal';
 import ImportModal from '../import/ImportModal';
+import CatalogueGrid from '../catalogue/CatalogueGrid';
+import BulkPhotosModal from '../catalogue/BulkPhotosModal';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -28,6 +31,23 @@ export default function ProductsTab({ can, onOpenProduct }) {
   const [page, setPage] = useState(1);
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [bulkPhotos, setBulkPhotos] = useState(false);
+  // List or catalogue (photo cards); remembered in this browser
+  const [view, setView] = useState(() => {
+    try {
+      return localStorage.getItem('gp_inventory_view') === 'catalogue' ? 'catalogue' : 'list';
+    } catch {
+      return 'list';
+    }
+  });
+  function changeView(next) {
+    setView(next);
+    try {
+      localStorage.setItem('gp_inventory_view', next);
+    } catch {
+      // private window: not remembered
+    }
+  }
   const useHere = useUseSkuHere();
 
   const debouncedSearch = useDebounce(search.trim());
@@ -173,21 +193,47 @@ export default function ProductsTab({ can, onOpenProduct }) {
         )}
       </div>
 
-      {canEdit && (
-        <button
-          type="button"
-          onClick={() => {
-            setOtherProducts((v) => !v);
-            setPage(1);
-          }}
-          className="mb-3 text-sm text-brown underline"
-        >
-          {otherProducts ? '← Back to this branch’s products' : 'Show the salon’s products not used at this branch'}
-        </button>
-      )}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        {canEdit ? (
+          <button
+            type="button"
+            onClick={() => {
+              setOtherProducts((v) => !v);
+              setPage(1);
+            }}
+            className="text-sm text-brown underline"
+          >
+            {otherProducts ? '← Back to this branch’s products' : 'Show the salon’s products not used at this branch'}
+          </button>
+        ) : (
+          <span />
+        )}
+        {!otherProducts && (
+          <div className="flex flex-wrap items-center gap-2">
+            {canEdit && (
+              <Button size="sm" variant="ghost" onClick={() => setBulkPhotos(true)}>
+                <Images size={14} /> Upload photos in bulk
+              </Button>
+            )}
+            <Link to="/app/inventory/catalogue" className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm hover:bg-surface">
+              <Printer size={14} /> Print catalogue
+            </Link>
+            <div className="flex rounded-lg border border-border" role="group" aria-label="View">
+              <button type="button" aria-pressed={view === 'list'} onClick={() => changeView('list')} className={`flex items-center gap-1 px-3 py-1.5 text-sm ${view === 'list' ? 'bg-gold/20 font-medium' : ''}`}>
+                <List size={14} /> List
+              </button>
+              <button type="button" aria-pressed={view === 'catalogue'} onClick={() => changeView('catalogue')} className={`flex items-center gap-1 px-3 py-1.5 text-sm ${view === 'catalogue' ? 'bg-gold/20 font-medium' : ''}`}>
+                <LayoutGrid size={14} /> Catalogue
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {skusQuery.isError ? (
         <p className="text-sm text-danger">{skusQuery.error.message}</p>
+      ) : view === 'catalogue' && !otherProducts && rows.length > 0 ? (
+        <CatalogueGrid rows={rows} onOpen={onOpenProduct} />
       ) : (
         <Table
           columns={columns}
@@ -218,6 +264,7 @@ export default function ProductsTab({ can, onOpenProduct }) {
       <Pagination page={page} pages={pages} onChange={setPage} />
 
       {importing && <ImportModal onClose={() => setImporting(false)} />}
+      {bulkPhotos && <BulkPhotosModal onClose={() => setBulkPhotos(false)} />}
       {adding && <ProductFormModal categories={categories} canSeeCosts={canSeeCosts} onClose={() => setAdding(false)} onSaved={(sku) => onOpenProduct(sku._id)} />}
     </>
   );

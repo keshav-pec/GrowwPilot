@@ -21,7 +21,20 @@ const inventorySkuSchema = new mongoose.Schema(
     baseUnit: { type: String, enum: [...BASE_UNITS, null], default: null },
     unitsPerStockUnit: wholeNumber({ min: 1, default: 1 }),
 
-    status: { type: String, enum: ['active', 'inactive'], default: 'active' }, // inactive keeps all its history
+    // Up to 4 photos, one of them the main one. The files live in the image store (GridFS for now).
+    images: [
+      {
+        fileId: { type: mongoose.Schema.Types.ObjectId, required: true }, // 1000 px
+        thumbId: { type: mongoose.Schema.Types.ObjectId, required: true }, // 240 px
+        isMain: { type: Boolean, default: false },
+        width: Number,
+        height: Number,
+        originalName: String,
+        uploadedBy: { id: ref('User'), name: String },
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' }, // inactive keeps all its history (and photos)
     version: { type: Number, default: 1 }, // goes up on every edit; a stale edit is refused (STALE_VERSION)
     createdBy: ref('User'),
   },

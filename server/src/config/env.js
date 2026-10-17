@@ -13,6 +13,8 @@ const envSchema = z.object({
   CLIENT_ORIGIN: z.url().default('http://localhost:5173'),
   // How many proxies sit in front of the API (Vercel -> Render = 2). Needed to see the real visitor IP.
   TRUST_PROXY: z.coerce.number().int().min(0).default(1),
+  // Where product photos are kept. Only MongoDB GridFS for now; a Cloudinary store can be added later.
+  IMAGE_STORAGE: z.enum(['gridfs']).default('gridfs'),
 });
 
 const result = envSchema.safeParse(process.env);
