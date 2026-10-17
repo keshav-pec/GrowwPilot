@@ -8,7 +8,7 @@ import { todayInZone } from '../../utils/time.js';
 import { findStaff } from '../staff/staff.service.js';
 import { recordPayrollAction } from './monthlyPayroll.service.js';
 import { markPayrollStale } from './payrollStale.js';
-import { advanceRepayment } from './monthlyPay.rules.js';
+import { advanceRepayment, monthName } from './monthlyPay.rules.js';
 
 // Salary payments, payslips and advances. Owners only (branch owners: their branches).
 // - Payments go against a LOCKED month, so they always match a final amount.
@@ -16,7 +16,6 @@ import { advanceRepayment } from './monthlyPay.rules.js';
 // - A wrong payment is cancelled with a reason; it is never edited or deleted.
 
 const METHOD_LABEL = { CASH: 'cash', UPI: 'UPI', BANK: 'bank transfer' };
-const monthName = (month) => DateTime.fromISO(`${month}-01`).toFormat('LLLL yyyy');
 
 // One person's line in a month, at a branch this user may use
 async function findItem(ctx, itemId) {

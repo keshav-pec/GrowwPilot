@@ -137,6 +137,7 @@ export async function assertStaffBookable(branch, lines, items) {
   }
 
   const absence = await Attendance.findOne({
+    orgId: branch.orgId,
     staffId: { $in: lines.map((line) => line.staff._id) },
     date,
     status: { $in: ABSENT_STATUSES },
@@ -226,7 +227,7 @@ export function withStaffLock(ctx, branch, items, write, { excludeAppointmentId 
   const staffIds = [...new Set(items.map((item) => String(item.staffId)))];
 
   return mongoose.connection.transaction(async (session) => {
-    await Staff.updateMany({ _id: { $in: staffIds } }, { $inc: { scheduleVersion: 1 } }, { session });
+    await Staff.updateMany(scoped(ctx, { _id: { $in: staffIds } }), { $inc: { scheduleVersion: 1 } }, { session });
 
     const conflicts = await findConflicts(ctx, items, { session, excludeAppointmentId });
     if (conflicts.length > 0) {
@@ -282,7 +283,7 @@ export async function getAvailability(ctx, { date, staffId, duration, excludeApp
   const result = { date, timezone: zone, staffId, duration: minutes, slots: [] };
 
   if (staff.status !== 'active') return { ...result, reason: `${staff.name} is not active` };
-  const absence = await Attendance.findOne({ staffId, date, status: { $in: ABSENT_STATUSES } }).lean();
+  const absence = await Attendance.findOne(scoped(ctx, { staffId, date, status: { $in: ABSENT_STATUSES } })).lean();
   if (absence) return { ...result, reason: `${staff.name} is marked ${absence.status} on this day` };
 
   const opens = DateTime.fromISO(`${date}T${branch.openTime}`, { zone });

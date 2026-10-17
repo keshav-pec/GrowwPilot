@@ -65,7 +65,7 @@ export async function createInvoice(ctx, input) {
       const counter = await Counter.findOneAndUpdate(
         { _id: `invoice:${branch._id}` },
         { $inc: { seq: 1 } },
-        { upsert: true, new: true, session }
+        { upsert: true, returnDocument: 'after', session }
       );
 
       const [invoice] = await Invoice.create(

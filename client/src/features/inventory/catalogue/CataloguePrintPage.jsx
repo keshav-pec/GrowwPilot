@@ -29,7 +29,7 @@ export default function CataloguePrintPage() {
       <header className="mb-4">
         <h1 className="text-2xl font-bold text-brown">{user.org?.name} product catalogue</h1>
         <p className="text-sm text-muted">
-          {activeBranch?.name} · {rows.length} products · {DateTime.now().toFormat('d LLL yyyy')}
+          {activeBranch?.name} · {rows.length} products · {DateTime.now().setZone(activeBranch?.timezone).toFormat('d LLL yyyy')}
         </p>
       </header>
 

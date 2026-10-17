@@ -12,6 +12,9 @@ import { DateTime } from 'luxon';
 import { formatAmount } from '../../utils/money.js';
 import { describePay, formatDay } from './payPlan.rules.js';
 
+// "2026-10" -> "October 2026"
+export const monthName = (month) => DateTime.fromISO(`${month}-01`).toFormat('LLLL yyyy');
+
 // "2026-10" -> { start: '2026-10-01', end: '2026-10-31', days: 31 }
 export function monthBounds(month) {
   const first = DateTime.fromISO(`${month}-01`);

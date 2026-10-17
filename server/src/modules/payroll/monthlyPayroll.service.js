@@ -10,7 +10,7 @@ import { findStaff } from '../staff/staff.service.js';
 import { actorRole, logActivity } from '../activity/activity.service.js';
 import { businessOwnerIds, notify } from '../notifications/notifications.service.js';
 import { paidBillsBetween, syncCommissions } from './commission.service.js';
-import { advanceRepayment, calculateMonthlyPay, monthBounds } from './monthlyPay.rules.js';
+import { advanceRepayment, calculateMonthlyPay, monthBounds, monthName } from './monthlyPay.rules.js';
 
 // Monthly payroll for the branch picked in the branch switcher. Owners only (branch owners: their branches).
 // A draft month is worked out again when opened (if it's a few minutes old) or on "Recalculate".
@@ -19,7 +19,6 @@ import { advanceRepayment, calculateMonthlyPay, monthBounds } from './monthlyPay
 const STALE_AFTER_MINUTES = 5;
 const MONTH_LINK = (month) => `/app/payroll?tab=month&month=${month}`;
 
-const monthName = (month) => DateTime.fromISO(`${month}-01`).toFormat('LLLL yyyy');
 
 async function activeBranch(ctx) {
   const branch = await Branch.findOne(scoped(ctx, { _id: ctx.activeBranchId })).select('name timezone').lean();

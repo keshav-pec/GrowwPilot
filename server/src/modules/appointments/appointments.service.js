@@ -91,7 +91,7 @@ export async function updateAppointment(ctx, id, input) {
       const updated = await Appointment.findOneAndUpdate(
         scoped(ctx, { _id: id, status: 'BOOKED' }),
         { $set: { items, startAt: items[0].startAt, endAt: items.at(-1).endAt, totalPrice, comboId: comboId ?? null, notes: input.notes } },
-        { new: true, session }
+        { returnDocument: 'after', session }
       );
       if (!updated) throw new AppError(409, 'NOT_EDITABLE', 'This appointment was just changed by someone else. Please refresh.');
       return updated;

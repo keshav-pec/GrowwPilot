@@ -1,16 +1,15 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { DateTime } from 'luxon';
 import { Trash2 } from 'lucide-react';
 import { useAuth } from '../../../auth/AuthContext';
 import { useEndRecipe, useRecipeHistory, useSaveRecipe } from '../../../api/inventory/recipes';
 import { WAY_OF_USE_LABEL, describeRecipe, isMeasured, newRequestKey } from '../../../lib/inventory';
 import { Badge, Button, ConfirmDialog, Input, Modal, Spinner, Tabs } from '../../../components/ui';
 import { ProductPicker } from '../actions/fields';
+import { formatDateTime, fromLocalInput } from '../../../lib/time';
 
 // Only these are taken per service; finish-mode and by-hand products can only be linked (for reports)
 const AUTOMATIC = ['SERVICE_UNITS', 'SERVICE_MEASURED'];
-const when = (iso) => DateTime.fromISO(iso).toFormat('d LLL yyyy, h:mm a');
 
 // One service's recipe: for all branches or just this one, its versions, and changing it
 export default function RecipeModal({ row, can, onClose }) {
@@ -20,6 +19,9 @@ export default function RecipeModal({ row, can, onClose }) {
   const [confirmEnd, setConfirmEnd] = useState(false);
   const endRecipe = useEndRecipe();
   const history = useRecipeHistory(row.service._id, scope);
+  const zone = activeBranch?.timezone;
+  const when = (iso) => formatDateTime(iso, zone);
+  const past = (history.data ?? []).filter((v) => v.effectiveTo && new Date(v.effectiveTo) <= new Date());
 
   const part = row[scope]; // { current, upcoming }
   const canEdit = can['inventory.editRecipes'] && (scope === 'branch' || (user.role === 'OWNER' && user.allBranches));
@@ -52,7 +54,7 @@ export default function RecipeModal({ row, can, onClose }) {
       />
 
       {editing ? (
-        <RecipeForm service={row.service} scope={scope} start={part.current} onDone={() => setEditing(false)} />
+        <RecipeForm service={row.service} scope={scope} start={part.current} zone={zone} onDone={() => setEditing(false)} />
       ) : (
         <>
           <p className="mb-3 text-sm text-muted">
@@ -67,7 +69,7 @@ export default function RecipeModal({ row, can, onClose }) {
           </p>
 
           {part.current ? (
-            <RecipeLines recipe={part.current} />
+            <RecipeLines recipe={part.current} zone={zone} />
           ) : (
             <p className="mb-4 rounded-lg border border-dashed border-border p-4 text-sm text-muted">No recipe {scope === 'branch' ? 'for this branch' : 'for all branches'} right now.</p>
           )}
@@ -92,22 +94,20 @@ export default function RecipeModal({ row, can, onClose }) {
           <h3 className="mb-2 text-sm font-semibold text-brown">Earlier versions</h3>
           {history.isPending ? (
             <Spinner size={20} />
-          ) : (history.data ?? []).filter((v) => v.effectiveTo && new Date(v.effectiveTo) <= new Date()).length === 0 ? (
+          ) : past.length === 0 ? (
             <p className="text-sm text-muted">None yet.</p>
           ) : (
             <ul className="divide-y divide-border rounded-lg border border-border text-sm">
-              {history.data
-                .filter((v) => v.effectiveTo && new Date(v.effectiveTo) <= new Date())
-                .map((v) => (
-                  <li key={v._id} className="px-3 py-2">
-                    <p className="font-medium">
-                      Version {v.version} · {when(v.effectiveFrom)} to {when(v.effectiveTo)}
-                    </p>
-                    <p className="text-muted">
-                      {describeRecipe(v)} · set by {v.createdBy?.name}
-                    </p>
-                  </li>
-                ))}
+              {past.map((v) => (
+                <li key={v._id} className="px-3 py-2">
+                  <p className="font-medium">
+                    Version {v.version} · {when(v.effectiveFrom)} to {when(v.effectiveTo)}
+                  </p>
+                  <p className="text-muted">
+                    {describeRecipe(v)} · set by {v.createdBy?.name}
+                  </p>
+                </li>
+              ))}
             </ul>
           )}
         </>
@@ -130,7 +130,7 @@ export default function RecipeModal({ row, can, onClose }) {
   );
 }
 
-function RecipeLines({ recipe }) {
+function RecipeLines({ recipe, zone }) {
   return (
     <div className="mb-4 overflow-x-auto rounded-lg border border-border">
       <table className="w-full text-left text-sm">
@@ -159,14 +159,14 @@ function RecipeLines({ recipe }) {
         </tbody>
       </table>
       <p className="px-3 py-2 text-xs text-muted">
-        Version {recipe.version}, since {when(recipe.effectiveFrom)}, set by {recipe.createdBy?.name}
+        Version {recipe.version}, since {formatDateTime(recipe.effectiveFrom, zone)}, set by {recipe.createdBy?.name}
       </p>
     </div>
   );
 }
 
 // A new version: the products and amounts (typed by an owner, never suggested), and when it starts
-function RecipeForm({ service, scope, start, onDone }) {
+function RecipeForm({ service, scope, start, zone, onDone }) {
   const saveRecipe = useSaveRecipe();
   const [key] = useState(newRequestKey);
   const [lines, setLines] = useState(() =>
@@ -194,7 +194,7 @@ function RecipeForm({ service, scope, start, onDone }) {
         key,
         serviceId: service._id,
         scope,
-        effectiveFrom: startsLater && startsAt ? DateTime.fromISO(startsAt).toISO() : undefined,
+        effectiveFrom: startsLater && startsAt ? fromLocalInput(startsAt, zone) : undefined,
         note: note || undefined,
         lines: lines.map((l) => ({ skuId: l.sku._id, qty: l.deducts ? Number(l.qty) : null, deducts: l.deducts, useStoreIfNeeded: l.useStoreIfNeeded })),
       },

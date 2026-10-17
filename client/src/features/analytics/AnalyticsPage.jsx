@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DateTime } from 'luxon';
 import { Download } from 'lucide-react';
@@ -42,6 +43,29 @@ function DataTable({ columns, rows }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+// A date box that only updates the report once a full, sensible date is typed.
+// While typing a year, browsers report dates like "0002-10-17"; those stay in the box but don't load a report.
+function DateBox({ label, value, min, max, onPick }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]); // a preset button changed it
+
+  return (
+    <Input
+      type="date"
+      aria-label={label}
+      value={draft}
+      min={min}
+      max={max}
+      onChange={(e) => {
+        const date = e.target.value;
+        setDraft(date);
+        if (date && date >= min && date <= max) onPick(date);
+      }}
+      className="w-40"
+    />
   );
 }
 
@@ -95,9 +119,9 @@ export default function AnalyticsPage() {
             </button>
           ))}
         </div>
-        <Input type="date" aria-label="From" value={filters.from} max={filters.to} onChange={(e) => e.target.value && setFilters({ from: e.target.value })} className="w-40" />
+        <DateBox label="From" value={filters.from} min="2000-01-01" max={filters.to} onPick={(from) => setFilters({ from })} />
         <span className="pb-2 text-sm text-muted">to</span>
-        <Input type="date" aria-label="To" value={filters.to} min={filters.from} onChange={(e) => e.target.value && setFilters({ to: e.target.value })} className="w-40" />
+        <DateBox label="To" value={filters.to} min={filters.from} max={today} onPick={(to) => setFilters({ to })} />
         <div className="w-44">
           <Select
             aria-label="Branch"
@@ -194,7 +218,7 @@ export default function AnalyticsPage() {
             </Card>
 
             <Card title="Payment mix" className="min-w-0">
-              <HBarChart data={data.paymentMix.map((m) => ({ ...m, name: METHOD[m.method] }))} valueKey="amount" label="Amount" format={rupees} />
+              <HBarChart data={data.paymentMix.filter((m) => m.amount > 0).map((m) => ({ ...m, name: METHOD[m.method] }))} valueKey="amount" label="Amount" format={rupees} />
               <DataTable
                 rows={data.paymentMix}
                 columns={[

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { DateTime } from 'luxon';
+import { useAuth } from '../../../auth/AuthContext';
 import { useOrder, useOrderStep } from '../../../api/inventory/purchasing';
 import { PO_STATUS, formatQty, newRequestKey } from '../../../lib/inventory';
 import { formatAmount, isValidRupees, toPaise } from '../../../lib/money';
@@ -12,6 +13,7 @@ const STEP_DONE = { submit: 'Sent', order: 'Marked as ordered', cancel: 'Cancell
 
 // One purchase order (INV-11): its lines, what has arrived, and the next step
 export default function OrderDrawer({ orderId, canSeeCosts, onClose }) {
+  const { activeBranch } = useAuth();
   const orderQuery = useOrder(orderId);
   const step = useOrderStep();
   const [open, setOpen] = useState(null); // 'edit' | 'receive' | 'sendBack'
@@ -105,7 +107,7 @@ export default function OrderDrawer({ orderId, canSeeCosts, onClose }) {
                 <li key={r._id} className="px-3 py-2">
                   <p>{r.lines.map((l) => `${l.qty} × ${l.skuName}`).join(', ')}</p>
                   <p className="text-xs text-muted">
-                    {DateTime.fromISO(r.at).toFormat('d LLL, h:mm a')} · {r.by?.name}
+                    {DateTime.fromISO(r.at, { zone: activeBranch?.timezone }).toFormat('d LLL, h:mm a')} · {r.by?.name}
                     {r.invoiceNumber && ` · invoice ${r.invoiceNumber}`}
                     {r.overReceipt?.reason && ` · more than ordered: ${r.overReceipt.reason}`}
                   </p>

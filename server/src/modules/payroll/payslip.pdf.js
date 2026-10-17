@@ -2,6 +2,7 @@
 import PDFDocument from 'pdfkit';
 import { DateTime } from 'luxon';
 import { formatMoney } from '../../utils/money.js';
+import { monthName as nameOfMonth } from './monthlyPay.rules.js';
 
 const BROWN = '#6B4226';
 const MUTED = '#6B6B6B';
@@ -44,7 +45,7 @@ function section(doc, title, lines) {
 export function writePayslipPdf(stream, { item, run, branch, salonName, payments }) {
   const doc = new PDFDocument({ size: 'A4', margin: 40, info: { Title: `Payslip ${item.staffName} ${item.month}` } });
   doc.pipe(stream);
-  const monthName = DateTime.fromISO(`${item.month}-01`).toFormat('LLLL yyyy');
+  const monthName = nameOfMonth(item.month);
   const locked = run.status === 'locked';
 
   // ----- Title -----

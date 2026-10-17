@@ -101,7 +101,7 @@ export async function setLeadStatus(ctx, id, status) {
   assertTransition(LEAD_TRANSITIONS, lead.status, status);
 
   // Only update if the status is still what we just read (two people clicking at once)
-  const updated = await Lead.findOneAndUpdate(scoped(ctx, { _id: id, status: lead.status }), { $set: { status } }, { new: true }).populate(POPULATE);
+  const updated = await Lead.findOneAndUpdate(scoped(ctx, { _id: id, status: lead.status }), { $set: { status } }, { returnDocument: 'after' }).populate(POPULATE);
   if (!updated) throw new AppError(409, 'STATUS_CHANGED', 'This lead was just updated by someone else. Please refresh.');
   return updated;
 }
@@ -112,7 +112,7 @@ export async function addNote(ctx, id, text) {
   const updated = await Lead.findOneAndUpdate(
     scoped(ctx, { _id: id }),
     { $push: { notes: { text, by: ctx.userId, at: new Date() } } },
-    { new: true }
+    { returnDocument: 'after' }
   ).populate([...POPULATE, { path: 'notes.by', select: 'name' }]);
   return updated;
 }
@@ -154,7 +154,7 @@ export async function convertLead(ctx, id, payload) {
         $set: { status: 'APPOINTMENT_BOOKED', customerId: customer._id, appointmentId: appointment._id },
         $push: { notes: { text: 'Converted to an appointment', by: ctx.userId, at: new Date() } },
       },
-      { new: true, session }
+      { returnDocument: 'after', session }
     );
     if (!updatedLead) throw new AppError(409, 'LEAD_CLOSED', 'This lead was just changed by someone else. Please refresh.');
 

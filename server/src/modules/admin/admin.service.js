@@ -110,7 +110,7 @@ export async function createOrg(input) {
 
 // Activate or deactivate a salon. Its users are locked out on their very next request (see requireAuth).
 export async function setOrgStatus(id, status) {
-  const org = await Organization.findByIdAndUpdate(id, { status }, { new: true }).lean();
+  const org = await Organization.findByIdAndUpdate(id, { status }, { returnDocument: 'after' }).lean();
   if (!org) throw new AppError(404, 'NOT_FOUND', 'Salon not found');
   return org;
 }

@@ -1,10 +1,12 @@
 import { DateTime } from 'luxon';
 import { PackageCheck } from 'lucide-react';
+import { useAuth } from '../../../auth/AuthContext';
 import { useReceipts } from '../../../api/inventory/purchasing';
 import { Badge, EmptyState, Spinner } from '../../../components/ui';
 
 // Recent deliveries (with or without an order) and returns to suppliers at this branch
 export default function DeliveriesList() {
+  const { activeBranch } = useAuth();
   const receiptsQuery = useReceipts();
   if (receiptsQuery.isPending) return <Spinner size={24} />;
   const receipts = receiptsQuery.data ?? [];
@@ -19,7 +21,7 @@ export default function DeliveriesList() {
             {r.lines.map((l) => `${l.qty} × ${l.skuName}`).join(', ')}
           </p>
           <p className="text-xs text-muted">
-            {DateTime.fromISO(r.at).toFormat('d LLL, h:mm a')} · {r.by?.name}
+            {DateTime.fromISO(r.at, { zone: activeBranch?.timezone }).toFormat('d LLL, h:mm a')} · {r.by?.name}
             {r.supplierName && ` · ${r.supplierName}`}
             {r.poNumber && ` · ${r.poNumber}`}
             {r.invoiceNumber && ` · invoice ${r.invoiceNumber}`}

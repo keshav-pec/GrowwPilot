@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { DateTime } from 'luxon';
 import { ClipboardCheck } from 'lucide-react';
 import { useCountStep, useSaveCounts, useStartCount, useStockCounts } from '../../../api/inventory/stockCounts';
+import { useAuth } from '../../../auth/AuthContext';
+import { formatDateTime } from '../../../lib/time';
 import { formatQty, isMeasured, newRequestKey } from '../../../lib/inventory';
 import { Badge, Button, Card, EmptyState, Input, Modal, Spinner } from '../../../components/ui';
 
-const when = (iso) => DateTime.fromISO(iso).toFormat('d LLL yyyy, h:mm a');
 const unitOf = (sku) => (isMeasured(sku) ? sku.baseUnit : `${sku.stockUnit}s`);
 const differs = (line, counted) => counted !== '' && counted != null && Number(counted) !== line.expected;
 
 // Stock count: count the stores and each hand-out, give a reason for every difference, and an owner approves.
 // Approved differences are posted as corrections; balances are never typed over.
 export default function StockCountTab() {
+  const { activeBranch } = useAuth();
   const countsQuery = useStockCounts();
   const start = useStartCount();
 
@@ -47,7 +48,7 @@ export default function StockCountTab() {
             {past.map((c) => (
               <li key={c._id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <span>
-                  {when(c.cutoffAt)}
+                  {formatDateTime(c.cutoffAt, activeBranch?.timezone)}
                   {c.countedBy && ` · counted by ${c.countedBy.name}`}
                   {c.reviewedBy && ` · approved by ${c.reviewedBy.name}`}
                 </span>
@@ -62,6 +63,7 @@ export default function StockCountTab() {
 }
 
 function Counting({ count }) {
+  const { activeBranch } = useAuth();
   const save = useSaveCounts();
   const step = useCountStep();
   const [values, setValues] = useState(() => Object.fromEntries(count.lines.map((l) => [l._id, { counted: l.counted ?? '', reason: l.reason ?? '' }])));
@@ -96,7 +98,7 @@ function Counting({ count }) {
 
   return (
     <Card
-      title={`Stock count started ${when(count.cutoffAt)}`}
+      title={`Stock count started ${formatDateTime(count.cutoffAt, activeBranch?.timezone)}`}
       actions={
         <Button size="sm" variant="ghost" onClick={() => step.mutate({ key: newRequestKey(), id: count._id, step: 'cancel' }, { onError: (err) => toast.error(err.message) })}>
           Cancel count
@@ -178,6 +180,7 @@ function Counting({ count }) {
 }
 
 function Review({ count, canApprove }) {
+  const { activeBranch } = useAuth();
   const step = useCountStep();
   const [sendingBack, setSendingBack] = useState(false);
   const changed = count.lines.filter((l) => l.counted != null && l.counted !== l.expected);
@@ -187,7 +190,7 @@ function Review({ count, canApprove }) {
   }
 
   return (
-    <Card title={`Stock count from ${when(count.cutoffAt)}: waiting for review`}>
+    <Card title={`Stock count from ${formatDateTime(count.cutoffAt, activeBranch?.timezone)}: waiting for review`}>
       <p className="mb-3 text-sm text-muted">Counted by {count.countedBy?.name}.</p>
       {changed.length === 0 ? (
         <p className="mb-4 text-sm">Everything matched the records.</p>

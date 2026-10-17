@@ -7,6 +7,7 @@ const BROWN = '#6B4226';
 const MUTED = '#6B6B6B';
 const LINE = '#E5E5E0';
 const WEEKDAYS = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const METHOD = { CASH: 'Cash', UPI: 'UPI', CARD: 'Card' };
 
 // The built-in PDF fonts have no ₹ sign, so the PDF writes "Rs." instead
 const money = (paise) => formatMoney(paise).replace('₹', 'Rs. ');
@@ -143,7 +144,7 @@ export function writeSalesPdf(stream, { data, salonName, stamp }) {
       { header: 'Amount', width: 130, align: 'right' },
       { header: 'Share', width: 80, align: 'right' },
     ],
-    data.paymentMix.map((m) => [m.method, m.payments, money(m.amount), orDash(m.share, '%')])
+    data.paymentMix.map((m) => [METHOD[m.method], m.payments, money(m.amount), orDash(m.share, '%')])
   );
 
   doc.font('Helvetica').fontSize(8).fillColor(MUTED).text('Revenue = invoices paid in the period. Service value = list price of completed services (before discounts and combo prices).');

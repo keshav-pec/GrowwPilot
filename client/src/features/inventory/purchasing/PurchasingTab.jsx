@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ClipboardList, PackagePlus, Plus, Undo2 } from 'lucide-react';
 import { DateTime } from 'luxon';
+import { useAuth } from '../../../auth/AuthContext';
 import { useOrders } from '../../../api/inventory/purchasing';
 import { PO_STATUS } from '../../../lib/inventory';
 import { formatAmount } from '../../../lib/money';
@@ -19,6 +20,7 @@ const STATUS_FILTER = [
 
 // Purchasing: orders, what to order, deliveries and suppliers
 export default function PurchasingTab({ can, onOpenOrder }) {
+  const { activeBranch } = useAuth();
   const [section, setSection] = useState('orders');
   const [status, setStatus] = useState('open');
   const [open, setOpen] = useState(null); // 'order' | 'receive' | 'return'
@@ -39,7 +41,7 @@ export default function PurchasingTab({ can, onOpenOrder }) {
     { key: 'status', header: 'Status', render: (o) => <Badge tone={PO_STATUS[o.status][1]}>{PO_STATUS[o.status][0]}</Badge> },
     { key: 'lines', header: 'Products', render: (o) => o.lines.length },
     ...(canSeeCosts ? [{ key: 'total', header: 'Total', render: (o) => (o.total != null ? formatAmount(o.total) : '—') }] : []),
-    { key: 'createdAt', header: 'Created', render: (o) => DateTime.fromISO(o.createdAt).toFormat('d LLL') },
+    { key: 'createdAt', header: 'Created', render: (o) => DateTime.fromISO(o.createdAt, { zone: activeBranch?.timezone }).toFormat('d LLL') },
   ];
 
   return (

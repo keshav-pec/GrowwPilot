@@ -37,7 +37,7 @@ export async function getAnalytics(ctx, { from, to, branchId }) {
   const bookingsMatch = { orgId, status: { $ne: 'CANCELLED' }, ...dateRangeFilter(branches, 'startAt', from, to) };
   const invoicesMatch = { orgId, ...dateRangeFilter(branches, 'paidAt', from, to) };
   const leadsMatch = { orgId, ...dateRangeFilter(branches, 'createdAt', from, to) };
-  const days = DateTime.fromISO(to).diff(DateTime.fromISO(from), 'days').days + 1;
+  const days = Math.round(DateTime.fromISO(to).diff(DateTime.fromISO(from), 'days').days) + 1;
 
   const [bookingsByBranch, revenueByBranch, byStylist, byService, bySource, byMethod, slotGroups] = await Promise.all([
     // Branch demand: bookings (not cancelled) and revenue (invoices) per branch
@@ -120,8 +120,10 @@ export async function getAnalytics(ctx, { from, to, branchId }) {
     const key = `${group._id.day}-${group._id.hour}`;
     counts[key] = (counts[key] ?? 0) + group.count;
   }
-  const firstHour = Math.min(...branches.map((b) => Number(b.openTime.slice(0, 2))));
-  const lastHour = Math.max(...branches.map((b) => Number(b.closeTime.slice(0, 2)) - (b.closeTime.endsWith(':00') ? 1 : 0)));
+  // Opening hours, widened to any hour that has bookings (e.g. booked before the opening hours were changed)
+  const bookedHours = slotGroups.flat().map((group) => group._id.hour);
+  const firstHour = Math.min(...branches.map((b) => Number(b.openTime.slice(0, 2))), ...bookedHours);
+  const lastHour = Math.max(...branches.map((b) => Number(b.closeTime.slice(0, 2)) - (b.closeTime.endsWith(':00') ? 1 : 0)), ...bookedHours);
   const hours = Array.from({ length: lastHour - firstHour + 1 }, (_, i) => firstHour + i);
   const slots = [1, 2, 3, 4, 5, 6, 7].flatMap((day) => hours.map((hour) => ({ day, hour, count: counts[`${day}-${hour}`] ?? 0 })));
 

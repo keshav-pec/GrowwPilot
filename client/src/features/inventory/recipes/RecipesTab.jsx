@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BookOpen, Search } from 'lucide-react';
 import { DateTime } from 'luxon';
+import { useAuth } from '../../../auth/AuthContext';
 import { useRecipes } from '../../../api/inventory/recipes';
 import { describeRecipe } from '../../../lib/inventory';
 import { Badge, EmptyState, Spinner } from '../../../components/ui';
@@ -8,6 +9,7 @@ import RecipeModal from './RecipeModal';
 
 // Service recipes (INV-09): what each service uses. Owners edit; inventory logins can look.
 export default function RecipesTab({ can }) {
+  const { activeBranch } = useAuth();
   const recipesQuery = useRecipes();
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState(null);
@@ -49,7 +51,7 @@ export default function RecipesTab({ can }) {
                   <div>
                     <p className="font-medium">{r.service.name}</p>
                     <p className="text-sm text-muted">{r.applies ? describeRecipe(recipe) : 'No recipe: takes no stock'}</p>
-                    {upcoming && <p className="text-xs text-brown">Changes on {DateTime.fromISO(upcoming.effectiveFrom).toFormat('d LLL, h:mm a')}</p>}
+                    {upcoming && <p className="text-xs text-brown">Changes on {DateTime.fromISO(upcoming.effectiveFrom, { zone: activeBranch?.timezone }).toFormat('d LLL, h:mm a')}</p>}
                   </div>
                   {r.applies && <Badge tone={r.applies === 'branch' ? 'gold' : 'brown'}>{r.applies === 'branch' ? 'This branch' : 'All branches'}</Badge>}
                 </button>
