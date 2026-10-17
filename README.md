@@ -9,11 +9,12 @@ GrowwPilot runs many salons on one platform. Each salon (an *organization*) has 
 
 | Role | Email | What to try |
 |---|---|---|
-| Super Admin | `admin@growwpilot.com` | Onboard a salon, deactivate one |
-| Owner, all branches | `owner@glamour.com` | Dashboard, analytics + PDF, team, catalogue |
+| Super Admin | `admin@growwpilot.com` | Onboard a salon, deactivate one, switch the Inventory add-on on or off |
+| Owner, all branches | `owner@glamour.com` | Dashboard, analytics + PDF, team, catalogue, Inventory (approve a write-off, review an order) |
 | Owner, one branch | `bandra.owner@glamour.com` | Same screens, limited to the Bandra branch |
 | Front desk | `desk.andheri@glamour.com` | Day board, booking, checkout, leads, attendance |
 | Front desk | `desk.bandra@glamour.com` | The Bandra branch |
+| Inventory login | `inventory.andheri@glamour.com` | Inventory only, at Andheri: issue, finish & replace, deliveries, stock count |
 | Owner, another salon | `owner@desertrose.com` | A second salon in Dubai (different timezone) |
 | Front desk, another salon | `desk@desertrose.com` | |
 
@@ -42,9 +43,10 @@ GrowwPilot runs many salons on one platform. Each salon (an *organization*) has 
 
 | Who | Logs in? | Main screens |
 |---|---|---|
-| **Super Admin** (GrowwPilot team) | Yes | Salon list with search and status filter; onboarding (salon + first branch + owner login in one step); activate or deactivate a salon |
+| **Super Admin** (GrowwPilot team) | Yes | Salon list with search and status filter; onboarding (salon + first branch + owner login in one step); activate or deactivate a salon; switch paid add-ons (Inventory) on or off |
 | **Owner** | Yes | **Dashboard** (Salon Pulse, KPIs, Requires attention), **Analytics** (demand charts + sales PDF), **Payroll** (pay setup, commission, monthly payroll, salary payments, payslips, advances, activity log), branches, team (staff, front desk logins, branch owners), services and combos, plus everything the front desk sees |
 | **Front desk** | Yes | **Day board**, booking (multi-service or combo), appointment list, customers, leads (and convert to appointment), checkout with split payments, staff attendance, **Staff pay** (see how each person is paid, request a change). Works in **one branch only**. |
+| **Inventory login** (add-on) | Yes | **Inventory only**, for one branch: products, issuing and finishing stock, write-offs (up to a limit), purchase orders (sent for approval), deliveries, stock counts, reports without costs |
 | **Staff** (stylists) | No | A record: booked on appointments, attendance marked by the front desk, paid through payroll |
 | **Front desk member** | Their front desk login, if linked | A team member of type *Front desk*: never booked, attendance marked like stylists, paid a salary, per day or per hour (no commission). Their pay is for owners only. |
 | **Customer** | No | A record: created by the front desk or by converting a lead |
@@ -68,7 +70,27 @@ There are **two kinds of owner**: the **primary owner** (shown as **Business own
 - **Payments** (full or part; cash, UPI, bank) only against locked months, **payslip PDFs**, and **advances** taken back monthly.
 - **Every change is logged** in an activity log that can't be edited, and a **bell** notifies the business owner of changes made by others, branch owners of requests to approve, and the front desk of the answers.
 
-**Help assistant:** owners and front desk users also get a round chat button at the bottom right. Ask it *"how do I take a split payment?"* or *"what does Salon Pulse mean?"* and it answers with the steps **for your role**, links you to the right screen, and tells a front desk user who to ask for owner-only tasks. The **Need help?** link in the sidebar still emails GrowwPilot support.
+**Inventory & Procurement** (a paid add-on, built from the *Inventory & Procurement PRD v1*; full plan and decisions in [`INVENTORY_PLAN.md`](INVENTORY_PLAN.md)). The Super Admin switches it on per salon; when it's off, every inventory screen and API is closed and nothing else changes.
+
+| | Business owner | Branch owner | Inventory login | Front desk |
+|---|---|---|---|---|
+| See stock | Every branch | Their branches | Their branch | Their branch |
+| Add or edit products | Yes | Products used only at their branches | Products used only at their branch | No |
+| Issue / move / return, mark finished, receive | Yes | Yes | Yes | Only what an owner switches on (finish is on by default) |
+| Use / write off / adjust | Yes | Up to their limit | Up to the branch limit | **Report a problem** only |
+| Purchase orders | Create and approve | Create; approve up to their limit | Create (always sent for approval) | No |
+| Recipes, stock count approval, settings | Yes | Their branches | Recipes view only; count | No |
+| Costs and stock value | Yes | Their branches (unless turned off) | No | No |
+
+- **Every stock change is a movement** in a history that can't be edited. Balances are never typed in; opening stock, counts and corrections are movements too, and stock can never go below zero, even when two people act at once.
+- **Four ways stock is used:** whole bottles handed out and used up when someone marks them **finished** (with *Finish & replace* in one step); a set number of units **per service**; a set amount of ml or g **per service**; or recorded **by hand**. Measured products are counted in whole ml or g and shown as *"3 bottles + 400 ml"*.
+- **Service recipes:** completing an appointment takes its stock automatically in the background (once per service, never twice), from the branch where it happened. If stock is short nothing goes negative; it waits in an exceptions list to post later.
+- **Purchasing:** suppliers, reorder suggestions (counting stock already on approved orders), purchase orders with approval limits, part deliveries, over-receipt only with the business owner's OK, returns to suppliers, and **stock counts** an owner approves.
+- **First-time setup guide** with a **CSV import** that shows every row (✅ / ⚠️ / ❌, duplicates flagged) before anything is saved.
+- **Reports** (stock summary, low stock, use, waste, purchasing, stock value, bottle efficiency…) with **CSV export**; cost columns are removed on the server for anyone who can't see costs.
+- **Inventory logins** are created by owners in **Team → Inventory logins**, one branch each.
+
+**Help assistant:** owners, front desk and inventory users also get a round chat button at the bottom right. Ask it *"how do I take a split payment?"* or *"what does Salon Pulse mean?"* and it answers with the steps **for your role**, links you to the right screen, and tells a front desk user who to ask for owner-only tasks. The **Need help?** link in the sidebar still emails GrowwPilot support.
 
 ---
 
@@ -91,19 +113,21 @@ flowchart LR
 ```
 server/src/
   config/        env.js (checks env vars at start-up), db.js, constants.js
-  middleware/    auth (who are you), tenantContext (which salon/branches), requireRole, validate (Zod), errorHandler
+  middleware/    auth (who are you), tenantContext (which salon/branches), requireRole, requireAddon, idempotency, validate (Zod), errorHandler
   modules/       one folder per feature: *.routes.js, *.controller.js, *.service.js, *.schemas.js
                  admin, auth, branches, staff, users, services, combos, customers, appointments
                  (+ scheduling.service.js = the booking engine), leads, invoices, attendance, dashboard, analytics,
-                 payroll (pay setups, commission, monthly payroll, payments, payslips, advances), activity, notifications
-  models/        one Mongoose model per collection
+                 payroll (pay setups, commission, monthly payroll, payments, payslips, advances), activity, notifications,
+                 inventory (permissions.js, stock/stock.engine.js = the only code that writes stock, products, locations,
+                 imports, allocations, movements, approvals, recipes, automation, suppliers, purchasing, stockCounts, reports)
+  models/        one Mongoose model per collection (inventory/ for the add-on's collections)
   utils/         time (branch time <-> UTC), money (paise), phone, scoped, stateMachine, appointmentAlerts
   scripts/       seed.js, isolation-smoke-test.js
 server/tests/    Vitest tests (in-memory MongoDB replica set)
 client/src/
   api/           axios client + React Query hooks per feature
   components/    ui/ kit (Button, Input, Modal, Drawer, Table...) + shared pieces
-  features/      admin, auth, dashboard, appointments, customers, leads, checkout, attendance, team, catalog, branches, analytics, payroll
+  features/      admin, auth, dashboard, appointments, customers, leads, checkout, attendance, team, catalog, branches, analytics, payroll, inventory
   layouts/       AdminLayout, AppLayout (role-based sidebar + branch switcher)
   routes/        router.jsx, ProtectedRoute.jsx
 ```
@@ -159,6 +183,34 @@ erDiagram
   EMPLOYEE_ADVANCE { ObjectId staffId int amount int monthlyRepayment string firstMonth }
 ```
 
+**Inventory add-on** (collections named `inventory_*`; every row has `orgId`, branch rows also `branchId`):
+
+```mermaid
+erDiagram
+  ORGANIZATION ||--o{ INVENTORY_SKU : "products (salon-wide)"
+  INVENTORY_SKU ||--o{ INVENTORY_SKU_BRANCH : "used at a branch (reorder levels, average cost)"
+  BRANCH ||--o{ INVENTORY_LOCATION : "Main store, In use, stations"
+  INVENTORY_LOCATION ||--o{ INVENTORY_BALANCE : "quick lookup, rebuildable"
+  INVENTORY_TRANSACTION ||--|{ INVENTORY_LEDGER_ENTRY : "signed lines (append-only)"
+  INVENTORY_ALLOCATION ||--o{ INVENTORY_ALLOCATION_EVENT : "hand-out history"
+  SERVICE ||--o{ INVENTORY_RECIPE : "versions"
+  APPOINTMENT ||--o{ INVENTORY_CONSUMPTION_EVENT : "stock used per service line"
+  INVENTORY_SUPPLIER ||--o{ INVENTORY_PURCHASE_ORDER : supplies
+  INVENTORY_PURCHASE_ORDER ||--o{ INVENTORY_GOODS_RECEIPT : "deliveries"
+  BRANCH ||--o{ INVENTORY_STOCK_COUNT : counts
+
+  INVENTORY_SKU { string code "unique per salon" string[] barcodes "unique per salon" string wayOfUse string stockUnit string baseUnit int unitsPerStockUnit int version }
+  INVENTORY_BALANCE { ObjectId locationId ObjectId skuId "unique together" int qty ">= 0" }
+  INVENTORY_TRANSACTION { string type string reason object actor object heldBy ObjectId correctsId "unique" date occurredAt date postedAt }
+  INVENTORY_LEDGER_ENTRY { ObjectId transactionId ObjectId skuId ObjectId locationId int qty "signed" number unitCost string bucket }
+  INVENTORY_ALLOCATION { object recipient int issuedQty int remainingQty string status bool needsHandover }
+  INVENTORY_RECIPE { ObjectId serviceId ObjectId branchId "null = salon-wide" int version date effectiveFrom date effectiveTo object[] lines }
+  INVENTORY_CONSUMPTION_EVENT { string key "unique: salon+branch+appointment+service line+recipe line" int recipeVersion int qty }
+  INVENTORY_PURCHASE_ORDER { string number "PO-AND-000045" string status object[] lines int total }
+```
+
+Also: `inventory_settings` (front desk switches, approval limits), `inventory_approvals` (write-offs waiting, problem reports), `inventory_exceptions` (automatic uses that couldn't be posted), `inventory_outbox` ("service completed" events), `inventory_imports` (CSV previews, removed after 24 h) and `idempotency_records` (the saved answer for each `Idempotency-Key`, 7 days).
+
 **Important indexes:** `customer (orgId, phone)` unique (no duplicate customers), `invoice.appointmentId` unique (no double checkout), `attendance (staffId, date)` unique, `appointment (orgId, branchId, startAt)` and `appointment (items.staffId, items.startAt)` for the day board and clash checks. Payroll: `payPlan (staffId, effectiveFrom)`, `commissionEntry (invoiceId, itemId, type)`, `payrollRun (branchId, month)`, `payrollItem (runId, staffId)` and `payrollPayment (orgId, idempotencyKey)` are all unique, so nothing is counted or paid twice. Payroll also has pay change requests, special commission rates, bonuses/deductions, the activity log and notifications (not drawn).
 
 ---
@@ -182,7 +234,7 @@ npm install
 npm run dev
 ```
 
-**Demo data** (`npm run seed`): 2 salons, 3 branches (Mumbai and Dubai timezones), 8 staff, 10 services, 2 combos, 13 customers, 9 leads (every status and source, some overdue), about 100 appointments over 4 weeks (every status, multi-service and combo bookings, split payments, discounts) with 85 invoices, and 2 weeks of attendance. **Today's appointments are placed around the current time**, so the day board and dashboard always show something happening: a customer waiting, a possible no-show, one running late, a bill not collected, and tomorrow's booking with a stylist on leave. **Payroll:** every Glamour stylist has a pay setup (one of each kind), front desk members Kavya (Andheri, ₹15,000/month) and Ritu (Bandra, ₹600/day) are linked to their logins, Rahul has a special 15% rate on Hair Colour, a front desk pay request waits for approval, Andheri's payroll from two months ago is locked and partly paid, last month has a bonus, and Neha has an advance. Desert Rose staff have no pay setup, to show that state. (Seed during opening hours for the best picture: after closing time, today's later bookings are already in the past and show up as possible no-shows.) The seed refuses to run when `NODE_ENV=production` unless you pass `-- --force`.
+**Demo data** (`npm run seed`): 2 salons, 3 branches (Mumbai and Dubai timezones), 8 staff, 10 services, 2 combos, 13 customers, 9 leads (every status and source, some overdue), about 100 appointments over 4 weeks (every status, multi-service and combo bookings, split payments, discounts) with 85 invoices, and 2 weeks of attendance. **Today's appointments are placed around the current time**, so the day board and dashboard always show something happening: a customer waiting, a possible no-show, one running late, a bill not collected, and tomorrow's booking with a stylist on leave. **Payroll:** every Glamour stylist has a pay setup (one of each kind), front desk members Kavya (Andheri, ₹15,000/month) and Ritu (Bandra, ₹600/day) are linked to their logins, Rahul has a special 15% rate on Hair Colour, a front desk pay request waits for approval, Andheri's payroll from two months ago is locked and partly paid, last month has a bonus, and Neha has an advance. Desert Rose staff have no pay setup, to show that state. **Inventory:** Glamour Studio has the add-on. Andheri is set up with 7 products (bottles, kits, measured colour and developer), 2 stations, 2 suppliers, recipes for Facial, Hair Colour and Haircut, 4 hand-outs, a part-delivered order and a draft, a write-off waiting for approval and a front desk problem report. Bandra has nothing yet, so Vikram sees the setup guide. Desert Rose doesn't have the add-on. (Seed during opening hours for the best picture: after closing time, today's later bookings are already in the past and show up as possible no-shows.) The seed refuses to run when `NODE_ENV=production` unless you pass `-- --force`.
 
 ---
 
@@ -190,7 +242,7 @@ npm run dev
 
 ```bash
 cd server
-npm test                  # 154 Vitest tests, on a temporary in-memory MongoDB replica set (never your real data)
+npm test                  # 465 Vitest tests, on a temporary in-memory MongoDB replica set (never your real data)
 npm run smoke:isolation   # tenant isolation check against a running API with the demo seed (see section 12)
 ```
 
@@ -202,7 +254,28 @@ The tests cover the parts where a bug would cost money or trust:
 - **Checkout:** ₹1,530 = 1,000 + 500 + 30 works; ₹30 short fails; discount larger than the bill fails; paying twice (including two desks at the same moment) fails; invoice numbers never skip.
 - **Dashboard warnings:** no-show, waiting and running-late rules.
 - **Payroll:** each way of paying; mid-month pay changes; absences not cutting salary; the PRD's commission example (₹2,500 service, ₹200 off, 10% = ₹230); combos and two stylists on one bill; a rate change never changing past commission; commission and payments never counted twice (including two identical requests at the same moment); locking refused while something must be fixed, and a locked month refusing every change; part payments, overpayment rules, cancelled payments, staff who have left; advances; and that branch owners, the front desk and another salon only reach what they're allowed to. **Front desk pay:** never booked, no commission, moving a stylist to the front desk only once their pay fits, the separate front desk totals, and an API test that logs in as each role and tries every front desk pay action (owners only; front desk logins can't reach any of it).
+- **Inventory:** every PRD acceptance test that applies (map below), plus: stock never going below zero when five people take the last bottles at once, the same request sent twice changing stock once, approval limits for write-offs and orders, CSV import duplicates, recipe versions never overlapping, the add-on switch, and an API test that logs in as the business owner, a branch owner of another branch, an inventory login and the front desk and tries **every inventory action** (and cost visibility in screens and CSV exports).
 - **Help assistant:** 35 typical questions land on the right topic; answers are limited to the asker's role (front desk vs owner, main owner vs branch owner); unknown questions get an honest "not sure" with suggestions.
+
+**Inventory acceptance tests (PRD AC01–AC30)** — all in `server/tests/`:
+
+| PRD test | What it checks | File |
+|---|---|---|
+| AC01 | Opening receipt of 10 bottles: store 10 and a movement | `inventoryProducts.test.js` |
+| AC02–AC09 | Issue, finish, finish & replace, replacement out of stock, duplicate finish, simultaneous finishes, moving a hand-out, returning unused | `inventoryDaily.test.js` |
+| AC10–AC14 | Facial takes one kit, duplicate completion, cancelled visit, finish-mode shampoo never per wash, measured use and corrections posting only the difference | `inventoryRecipes.test.js` |
+| AC15 | Retail sale deducts once; refund doesn't restock | *Not in this release* (checkout is services-only) |
+| AC16–AC18 | Waste kept apart from use, low stock on available-to-issue, front desk can't see costs or write off | `inventoryDaily.test.js`, `inventoryRolesMatrix.test.js` |
+| AC19 | Branch owner can't reach other branches | `inventoryRolesMatrix.test.js`, `inventoryAccess.test.js` |
+| AC20 | Another salon's ids are refused | `inventoryProducts.test.js`, `inventoryDaily.test.js` |
+| AC21, AC22 | Part receipt posts only what arrived; a stock count posts movements, never overwrites | `inventoryPurchasing.test.js` |
+| AC23 | Recipe edits don't change past use | `inventoryRecipes.test.js` |
+| AC24 | Every balance matches the movement history after mixed actions | `inventoryProducts`, `inventoryDaily`, `inventoryRecipes`, `inventoryPurchasing`, `inventoryImport` |
+| AC25, AC26 | A closed hand-out can't be finished twice; a stylist leaving flags their hand-outs | `inventoryDaily.test.js` |
+| AC27 | Exports respect cost permissions | `inventoryRolesMatrix.test.js` |
+| AC28 | A failed event replays without double deduction | `inventoryRecipes.test.js` |
+| AC29 | CSV import previews duplicates before saving | `inventoryImport.test.js` |
+| AC30 | Reorder suggestions count approved orders | `inventoryPurchasing.test.js` |
 
 ---
 
@@ -215,6 +288,7 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 3. **Vercel (web app):** import the repo with **root directory `client`** (framework: Vite). In `client/vercel.json`, replace `YOUR-RENDER-SERVICE` with your Render service name. Deploy.
 4. **Seed production once, on purpose:** in Render's shell run `npm run seed -- --force`.
 5. Log in on the Vercel URL. Optionally run `API_URL=https://<your-vercel-url> npm run smoke:isolation` from your machine.
+6. **Inventory add-on (per salon):** log in as Super Admin, open the salon and click **Switch on** next to Inventory. The owner then creates the first inventory login in **Team → Inventory logins** (one branch each, temporary password shown once). Completed services take stock in a background job inside the API process; it also retries every 3 minutes, so no extra service is needed.
 
 ---
 
@@ -248,6 +322,7 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 - **Converting a lead** reuses the booking form and says upfront whether the customer already exists (*"Existing customer found: Priya S. The booking will be linked to her profile."*).
 - **The help assistant feels like a chat, but stays honest.** It shows typing dots, then the answer types itself out, like an AI chat. Every answer says which help article it came from and offers a button to open that screen. It answers for *your* role only: a front desk user asking how to add a stylist is told that owners do that, not given steps for a page they can't open. When it doesn't understand, it says so and suggests questions instead of guessing. It stays open with its history as you move between pages, and it doesn't replace the **Need help?** email link.
 - **Payroll is built for the owner, not an accountant.** The pay form asks "How do you pay this person?" in plain words and shows a worked example month. The monthly payroll opens on a single total and a short "things to check" list, each with a link to fix it; details live in a side panel per person. Mistakes are hard to make: locking needs a tick-box confirmation, payments can't exceed what's owed, and nothing is ever deleted (it's cancelled or corrected with a reason, and logged).
+- **Inventory is built for the salon floor, not a warehouse.** The Overview has three big buttons (Issue product, Mark finished, Adjust stock) and a list of what's in use; *Finish & replace* is one step with the replacement ticked and filled in. Adding a product asks for five things only. Measured products are typed as *full bottles + an open amount*. A barcode scanner works in every product search. Things that need someone (write-offs to approve, problem reports, services that couldn't take stock, hand-outs of a stylist who left) wait on the Overview with one-click actions, and the bell tells the right people.
 - **Charts:** every chart shows one series in one colour, the heatmap uses a single hue from light to dark (checked with a palette validator), and every chart has a table of the same numbers, so nothing depends on hovering or on colour alone. Statuses always pair an icon with a text label.
 
 ---
@@ -267,7 +342,11 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 - **Validation twice:** Zod on the server for every request (the source of truth), and on the client for instant feedback.
 - **Security basics:** helmet headers, CORS limited to the client URL, a 100 kB body limit, env vars checked at start-up, error responses without stack traces in production, and no secrets in the repo.
 - **Payroll money can always be explained.** Pay setups are dated and never edited once started. Commission lines and payroll items can't be updated (the models refuse it), and each commission line keeps the rate it used. Locking a month saves a fingerprint (SHA-256) of every amount. Payments carry an `Idempotency-Key`, so a double click is recorded once, and each payment bumps the month's paid total inside its transaction, so two payments at the same moment can't both slip under the amount owed (the same write-conflict trick as bookings). Every payroll change goes into an append-only activity log in the same transaction as the change.
-- **Help assistant = the simplest possible retrieval** (`server/src/modules/help/`). There's no AI model, no document upload and no chunking: the "documents" are 41 hand-written help topics in `help.knowledge.js`, each with keywords, the roles it's for, and an answer (optionally a different answer per role). For each question the server:
+- **One place writes stock.** `inventory/stock/stock.engine.js` posts every movement inside a transaction: each line changes its balance with a conditional `$inc` that only matches when enough is left (so two people can't both take the last bottle), then writes the append-only header and lines. Balances can always be rebuilt from the lines; owners can run that check from Settings. Average cost is moving, per product per branch.
+- **Safe to repeat.** Every inventory change needs an `Idempotency-Key`; the answer is saved in the same transaction as the change (`middleware/idempotency.js`), so a double click or retry gets the first answer back.
+- **Automatic use with an outbox.** Completing an appointment writes a "service completed" event in the same transaction; a background job handles it right after and a sweep retries failures. Each service line and recipe line has a unique key, so replays never deduct twice.
+- **Permissions in one table** (`inventory/permissions.js`): `can(ctx, 'inventory.writeOff', { settings, value })` returns allowed / needs approval, with the branch's front desk switches and limits. The server checks it on every request; hidden buttons are only a convenience. Cost fields are stripped on the server.
+- **Help assistant = the simplest possible retrieval** (`server/src/modules/help/`). There's no AI model, no document upload and no chunking: the "documents" are 50 hand-written help topics in `help.knowledge.js`, each with keywords, the roles it's for, and an answer (optionally a different answer per role). For each question the server:
   1. **cleans the text:** lower case, no punctuation, drops filler words ("how do I…"), trims plurals and maps synonyms (stylist / barber / beautician → *staff*, appointment → *booking*);
   2. **scores every topic:** a keyword counts when all its words are in the question, worth 1 point per word (strong single words like *checkout* are worth 2); on a tie a specific topic ("cancel a booking") beats a general one ("booking");
   3. **answers for the asker:** the role comes from the session, never from the request. If the role is allowed it gets the steps (and a link); if not, it gets *who* can do it instead; below 2 points it says it isn't sure and suggests questions.
@@ -284,6 +363,7 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 - **Revenue signal compares with the last 4 same weekdays.** Simple and explainable, but it says "No data" for a new salon's first month.
 - **Some pages load all rows for the selected day or branch** (with a limit) instead of full pagination. Customers are paginated because that list grows forever.
 - **Server-side PDF** uses pdfkit's built-in fonts, so amounts show as "Rs." instead of "₹".
+- **Inventory's background job runs inside the API process** instead of a separate queue service. It's simpler to deploy on one Render service; events are stored in MongoDB (the outbox), so a restart only delays them until the next sweep.
 - **Keyword matching instead of a real AI model for the help assistant.** It's free, instant, can't make things up, and every answer is written and checked by us, but it only understands questions whose words overlap its keywords, and it has no memory of the conversation. Swapping the matcher for an LLM later only changes `help.matcher.js`; the role rules and the chat window stay the same.
 
 ---
@@ -297,6 +377,7 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 - No buffer time between appointments and no stylist-specific working hours (the branch's opening hours apply to everyone).
 - The Render free plan sleeps when idle, so the first request after a while can take 30–60 s.
 - Analytics "utilisation" counts every day in the range as a working day (minus marked absences).
+- Inventory: no retail selling at checkout yet (AC15), no moving stock between branches, a completed service can't be reversed (the app has no "un-complete"), no camera barcode scanning (USB/Bluetooth scanners work), no product images yet (Phase 8), and reports cover one or all of your branches but not a custom set.
 - Payroll: stylists don't log in, so there's no "My earnings" screen (owners download payslips instead); front desk members can't see their own payslip yet; no PF, ESI, TDS or professional tax (add them as deductions until a payroll expert has reviewed them); one service can't be split between two stylists; notifications are in the app only (no email); monthly pay periods only.
 
 ---
@@ -316,9 +397,10 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 | Body | assign a lead to their user, make their stylist a customer's favourite | 400 `INVALID_ASSIGNEE` / `INVALID_STAFF` ✅ |
 | Query | analytics for their branch | 404 ✅ |
 | URL | read or set their stylist's pay, give their stylist an advance, pay their payroll line, download their payslip | 404 ✅ |
-| Header | `X-Branch-Id` = their branch (staff list, dashboard, monthly payroll) | 403 `BRANCH_FORBIDDEN` ✅ |
+| Header | `X-Branch-Id` = their branch (staff list, dashboard, monthly payroll, inventory overview and reports) | 403 `BRANCH_FORBIDDEN` ✅ |
+| Inventory | Desert Rose (no add-on) opening, editing or finishing Glamour's products, orders and hand-outs | 403 `ADDON_DISABLED` ✅ |
 
-**All 26 attempts were blocked.** A front desk user sending another branch of their *own* salon in `X-Branch-Id` is also refused (403).
+**All 32 attempts were blocked.** (Two salons that both have Inventory are tested in `server/tests`: another salon's inventory ids are not found, 404.) A front desk user sending another branch of their *own* salon in `X-Branch-Id` is also refused (403).
 
 ---
 
@@ -335,4 +417,4 @@ This project was built with assistance from **Claude Code** (Anthropic's AI codi
 
 ## 14. Future scope
 
-Ordered roughly by value (from the plan's bonus phases): automated API/E2E test suite, walk-in quick add, an audit log for the rest of the app (payroll already has one), drag-to-reschedule and a week view, a staff free/busy view, real-time sync with WebSockets, a "win back" list of customers who haven't returned, WhatsApp confirmations and reminders, before/after photos, emailing the sales PDF, an LLM-backed help assistant that can also answer questions about your own data (the current one matches keywords over a fixed help knowledge base), staff logins with their own earnings page, commission slabs and target bonuses, statutory deductions (PF, ESI, TDS) after legal review, and no-show tracking with reminders.
+Ordered roughly by value (from the plan's bonus phases): automated API/E2E test suite, walk-in quick add, an audit log for the rest of the app (payroll already has one), drag-to-reschedule and a week view, a staff free/busy view, real-time sync with WebSockets, a "win back" list of customers who haven't returned, WhatsApp confirmations and reminders, before/after photos, emailing the sales PDF, an LLM-backed help assistant that can also answer questions about your own data (the current one matches keywords over a fixed help knowledge base), staff logins with their own earnings page, commission slabs and target bonuses, statutory deductions (PF, ESI, TDS) after legal review, and no-show tracking with reminders. **Inventory:** product images and a printable catalogue (planned as Phase 8), retail selling at checkout, moving stock between branches, reversing a completed service, photo/AI catalogue import, camera barcode scanning, Cloudinary image storage, plan-based billing for add-ons, and stock events for other systems.

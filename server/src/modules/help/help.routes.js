@@ -12,8 +12,8 @@ const askSchema = z.object({
 
 const router = Router();
 
-// The in-app assistant is for salon staff who log in (owners and front desk)
-router.use(requireAuth, tenantContext, requireRole('OWNER', 'FRONT_DESK'));
+// The in-app assistant is for salon staff who log in (owners, front desk and inventory logins)
+router.use(requireAuth, tenantContext, requireRole('OWNER', 'FRONT_DESK', 'INVENTORY'));
 
 router.get('/start', async (req, res) => {
   res.json(await helpService.start(req.ctx, req.user));

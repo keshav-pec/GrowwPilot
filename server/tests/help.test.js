@@ -102,3 +102,26 @@ describe('When it does not understand', () => {
     }
   });
 });
+
+describe('Inventory add-on topics', () => {
+  const withInventory = (who) => ({ ...who, addons: ['inventory'] });
+  const inventoryLogin = { audience: 'INVENTORY', name: 'Suresh', branch: 'Andheri', salon: 'Glamour Studio', addons: ['inventory'] };
+
+  it('answers the three PRD questions', () => {
+    expect(answerQuestion('How do I set up inventory?', withInventory(owner)).topicId).toBe('inventory-setup');
+    expect(answerQuestion('how do I mark a bottle finished?', withInventory(desk)).topicId).toBe('inventory-finish');
+    expect(answerQuestion('why didn’t a service deduct stock?', inventoryLogin).topicId).toBe('inventory-no-deduction');
+  });
+
+  it('gives the front desk their own steps, and inventory logins theirs', () => {
+    expect(answerQuestion('a bottle broke, how do I write off', withInventory(desk)).answer).toMatch(/Report a problem/);
+    expect(answerQuestion('change a recipe', inventoryLogin).answer).toMatch(/Only the owners change them/);
+    expect(answerQuestion('how do I book an appointment', inventoryLogin).kind).toBe('not-allowed');
+  });
+
+  it('tells salons without the add-on that it is a paid add-on', () => {
+    const reply = answerQuestion('How do I set up inventory?', { ...owner, addons: [] });
+    expect(reply.kind).toBe('not-allowed');
+    expect(reply.answer).toMatch(/paid add-on/);
+  });
+});

@@ -1,6 +1,7 @@
 // The assistant's knowledge: one entry per help topic.
 //
-// audiences:  who the steps are for. PRIMARY_OWNER (sees every branch), BRANCH_OWNER (some branches), FRONT_DESK
+// audiences:  who the steps are for. PRIMARY_OWNER (sees every branch), BRANCH_OWNER (some branches), FRONT_DESK, INVENTORY
+// addon:      the topic belongs to a paid add-on (e.g. 'inventory'); salons without it are told so
 // keywords:   words that point to this topic. A phrase counts when ALL its words are in the question.
 //             Each word is worth 1 point; a leading "*" makes a single strong word worth 2 points.
 // answer:     the reply. "for" gives a different reply to a specific audience.
@@ -11,39 +12,43 @@
 
 const OWNERS = ['PRIMARY_OWNER', 'BRANCH_OWNER'];
 const EVERYONE = ['PRIMARY_OWNER', 'BRANCH_OWNER', 'FRONT_DESK'];
+// Inventory add-on: inventory logins only see inventory, so they join these lists only
+const ALL = [...EVERYONE, 'INVENTORY'];
+const STOCK_KEEPERS = [...OWNERS, 'INVENTORY'];
 
 export const KNOWLEDGE = [
   // ---------------------------------------------------------------- small talk
   {
     id: 'greeting',
     title: 'Hello',
-    audiences: EVERYONE,
+    audiences: ALL,
     keywords: ['*hi', '*hello', '*hey', 'good morning', 'good evening'],
     answer: 'Hi {name}! I’m the GrowwPilot assistant. Ask me how to do anything in the app, like booking, checkout or leads.',
   },
   {
     id: 'thanks',
     title: 'Thanks',
-    audiences: EVERYONE,
+    audiences: ALL,
     keywords: ['*thanks', '*thank', '*great', '*awesome', '*cool'],
     answer: 'Happy to help, {name}! Ask me anything else whenever you need.',
   },
   {
     id: 'capabilities',
     title: 'What I can help with',
-    audiences: EVERYONE,
+    audiences: ALL,
     keywords: ['what can you do', 'who are you', 'help', 'what you know'],
     answer: 'I know how every screen in GrowwPilot works, and I answer for your role.',
     for: {
       FRONT_DESK: 'I can help with everything you do at {branch}: booking and rescheduling, the day board, customers, leads, checkout and split payments, and staff attendance.',
       PRIMARY_OWNER: 'I can help with the dashboard, analytics and the sales PDF, your team, services, combos and branches, plus everything the front desk does.',
       BRANCH_OWNER: 'I can help with the dashboard, analytics, your staff and front desk logins, plus everything the front desk does at your branches.',
+      INVENTORY: 'I can help with stock at {branch}: products, issuing and finishing bottles, write-offs, purchase orders, deliveries and stock counts.',
     },
   },
   {
     id: 'support',
     title: 'Talking to a person',
-    audiences: EVERYONE,
+    audiences: ALL,
     keywords: ['*support', 'talk to human', 'contact team', 'real person', 'email support', 'call someone'],
     answer: 'You can reach the GrowwPilot team any time with the **Need help?** link at the bottom of the sidebar (it emails support@growwpilot.com).',
   },
@@ -233,18 +238,19 @@ export const KNOWLEDGE = [
   {
     id: 'password',
     title: 'Passwords',
-    audiences: EVERYONE,
+    audiences: ALL,
     keywords: ['*password', 'forgot password', 'reset password', 'change password', 'cant login', 'cannot login', 'locked out'],
     answer: 'Owners reset front desk passwords in **Team → Front desk logins**: click the person, then **Reset password**. A new temporary password is shown once to share with them.',
     for: {
       FRONT_DESK: 'Please ask your salon owner. They can reset your password in **Team → Front desk logins** and give you a new temporary password.',
+      INVENTORY: 'Please ask your salon owner. They can reset your password in **Team → Inventory logins** and give you a new temporary password.',
       PRIMARY_OWNER: 'You can reset front desk and branch owner passwords in **Team** (click the person, then **Reset password**; the new temporary password is shown once). To change your own password, contact GrowwPilot support with the **Need help?** link.',
     },
   },
   {
     id: 'logged-out',
     title: 'Getting logged out',
-    audiences: EVERYONE,
+    audiences: ALL,
     keywords: ['logged out', '*logout', 'log out', 'session ended', 'kicked out', 'sign out', '*deactivated'],
     answer:
       'You’re logged out when your session ends, when your account is deactivated, or when the salon is deactivated. Log in again; if it says your account or salon is deactivated, contact your owner or GrowwPilot support.',
@@ -431,6 +437,115 @@ export const KNOWLEDGE = [
     denied: 'The activity log is for owners. Your **bell** at the top shows the answers to your pay change requests.',
     link: { label: 'Activity log', to: '/app/payroll?tab=activity' },
   },
+
+  // ---------------------------------------------------------------- inventory add-on
+  {
+    id: 'inventory-setup',
+    title: 'Setting up inventory',
+    addon: 'inventory',
+    audiences: STOCK_KEEPERS,
+    keywords: ['set up inventory', 'setup inventory', 'start inventory', 'inventory setup', 'add product', 'import product', '*csv', 'upload product', 'product spreadsheet', 'new product'],
+    answer:
+      'Open **Inventory**. The first time, a short setup guide opens:\n1. Check **Main store** and add stations (chairs or areas) if you hand products to them.\n2. Add your products: **upload a spreadsheet (CSV)** from the template, or add them one by one. Only name, category, stock unit and way of use are needed.\n3. **Check before saving**: fix or leave out rows marked ❌; duplicates are flagged.\n4. Done. Later you can import more from **Products → Import**.',
+    denied: 'Inventory is set up by the owners and the inventory login.',
+    link: { label: 'Inventory', to: '/app/inventory?tab=products' },
+  },
+  {
+    id: 'inventory-finish',
+    title: 'Marking a bottle finished',
+    addon: 'inventory',
+    audiences: ALL,
+    keywords: ['mark finished', '*finished', 'bottle finished', 'finish bottle', 'empty bottle', 'bottle empty', 'replace bottle', 'finish replace', 'used up'],
+    answer:
+      'In **Inventory → Overview**, click **Mark finished** (or **Finished** next to the hand-out). Pick who had it, check the amount, and keep **Issue a replacement** ticked to hand out a new one in the same step. If the store has none left, the finish is still saved and the product shows on **Need to order**.',
+    for: {
+      FRONT_DESK:
+        'In **Inventory → Overview**, click **Mark finished**, pick who had it and save. (Your owner can switch this off in Inventory settings; it is on by default.) If you may also issue stock, tick **Issue a replacement** to hand out a new one in the same step.',
+    },
+    link: { label: 'Inventory', to: '/app/inventory?tab=overview' },
+  },
+  {
+    id: 'inventory-no-deduction',
+    title: 'Why a service didn’t take stock',
+    addon: 'inventory',
+    audiences: STOCK_KEEPERS,
+    keywords: ['didnt deduct', 'not deducted', 'didnt take stock', 'stock not taken', 'service didnt', 'stock not reduced', 'recipe not working', 'why stock', 'stock didnt change', '*exception'],
+    answer:
+      'Stock is taken a moment after a visit is marked **Completed**, using the service’s recipe. If nothing was taken, check:\n- The service has a **recipe** (Inventory → Recipes) that was in use at that time.\n- The product is set to be taken **per service** (finish-mode products are only linked, never taken per service).\n- The visit was **Completed**, not cancelled.\n- If stock was short, it waits under **Services that couldn’t take their stock** on the Overview: restock, then **Post now**. A failed one has **Retry**.',
+    denied: 'The owners and the inventory login look after automatic stock use. Please tell them which visit it was.',
+    link: { label: 'Overview', to: '/app/inventory?tab=overview' },
+  },
+  {
+    id: 'inventory-issue',
+    title: 'Issuing a product',
+    addon: 'inventory',
+    audiences: ALL,
+    keywords: ['issue product', '*issue', 'hand out', 'give bottle', 'give product', 'product staff', 'stock staff'],
+    answer:
+      'In **Inventory → Overview**, click **Issue product**, find the product (or scan it), choose the store, who gets it (salon floor, a station or a stylist) and how many. It moves from the store to **In use**; it is used up only when someone marks it finished.',
+    for: {
+      FRONT_DESK: 'If your owner has switched it on for the front desk, use **Inventory → Issue product**. Otherwise ask the inventory login or an owner to issue it.',
+    },
+    link: { label: 'Inventory', to: '/app/inventory?tab=overview' },
+  },
+  {
+    id: 'inventory-write-off',
+    title: 'Broken, lost or expired stock',
+    addon: 'inventory',
+    audiences: ALL,
+    keywords: ['write off', 'damaged product', 'broken bottle', 'lost bottle', 'expired product', 'adjust stock', 'report problem', '*spilled', 'stock wrong'],
+    answer:
+      'Use **Adjust stock** on the Overview (or **Write off** next to a hand-out): choose the product, where it is, how many and why. A lost bottle is “Lost”, not finished. Above your limit, add a note and an owner approves it before stock changes.',
+    for: {
+      FRONT_DESK: 'Click **Report a problem** in Inventory: say what happened and how many. The owner and the inventory login are told and take care of it; you’ll see what they did.',
+    },
+    link: { label: 'Inventory', to: '/app/inventory?tab=overview' },
+  },
+  {
+    id: 'inventory-order',
+    title: 'Ordering and receiving stock',
+    addon: 'inventory',
+    audiences: STOCK_KEEPERS,
+    keywords: ['purchase order', 'order stock', '*reorder', 'need order', '*supplier', 'receive delivery', 'delivery arrived', 'order product'],
+    answer:
+      'In **Inventory → Purchasing**, open **Need to order** for products at their reorder level (stock already on approved orders is counted), tick them and click **Create draft orders**. Send the order; it may need an owner’s approval. When the delivery comes, open the order and click **Receive delivery**: only what arrived goes into the store, and part deliveries are fine.',
+    denied: 'Purchase orders are handled by the owners and the inventory login.',
+    link: { label: 'Purchasing', to: '/app/inventory?tab=purchasing' },
+  },
+  {
+    id: 'inventory-count',
+    title: 'Counting stock',
+    addon: 'inventory',
+    audiences: STOCK_KEEPERS,
+    keywords: ['stock count', 'count stock', '*stocktake', 'stock take', 'physical count'],
+    answer:
+      'Open **Inventory → Stock count** and click **Start a stock count**. Type what you find in each store and for each hand-out, give a reason for every difference, then **send for review**. An owner approves, and the differences are posted as corrections.',
+    denied: 'Stock counts are done by the owners and the inventory login.',
+    link: { label: 'Stock count', to: '/app/inventory?tab=count' },
+  },
+  {
+    id: 'inventory-recipes',
+    title: 'Service recipes',
+    addon: 'inventory',
+    audiences: STOCK_KEEPERS,
+    keywords: ['*recipe', 'service use product', 'product per service', 'colour per service', 'how much product'],
+    answer:
+      'In **Inventory → Recipes**, open a service and click **Change recipe**: add the products it uses and how much (you type the amounts). A recipe can be for all branches or just this one. Each change is a new version from now (or a later time); past services keep what they used.',
+    for: { INVENTORY: 'You can see every recipe in **Inventory → Recipes**. Only the owners change them.' },
+    denied: 'Service recipes are set by the owners.',
+    link: { label: 'Recipes', to: '/app/inventory?tab=recipes' },
+  },
+  {
+    id: 'inventory-reports',
+    title: 'Inventory reports',
+    addon: 'inventory',
+    audiences: STOCK_KEEPERS,
+    keywords: ['inventory report', 'stock report', 'export stock', 'stock value', '*wastage', 'product use report', 'download stock'],
+    answer:
+      'Open **Inventory → Reports**, pick a report (stock summary, low stock, use by product, waste, purchasing…) and the dates, then click **Download CSV** to open it in Excel. Costs are shown only to owners.',
+    denied: 'Inventory reports are for the owners and the inventory login.',
+    link: { label: 'Reports', to: '/app/inventory?tab=reports' },
+  },
 ];
 
 // Shown when the question doesn't match anything, and when the chat opens
@@ -438,4 +553,5 @@ export const STARTER_QUESTIONS = {
   PRIMARY_OWNER: ['What does Salon Pulse mean?', 'How do I add a new service?', 'How do I export the sales PDF?', 'How do I add a front desk login?'],
   BRANCH_OWNER: ['What does Salon Pulse mean?', 'How do I add a stylist?', 'How do I export the sales PDF?', 'How do I reset a front desk password?'],
   FRONT_DESK: ['How do I book an appointment?', 'How do I take a split payment?', 'How do I convert a lead?', 'How do I mark a stylist absent?'],
+  INVENTORY: ['How do I set up inventory?', 'How do I mark a bottle finished?', 'Why didn’t a service deduct stock?', 'How do I receive a delivery?'],
 };

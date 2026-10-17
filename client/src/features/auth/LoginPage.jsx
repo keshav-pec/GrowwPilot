@@ -14,6 +14,7 @@ const DEMO_ACCOUNTS = [
   ['Owner · Glamour Studio (all branches)', 'owner@glamour.com'],
   ['Branch owner · Bandra only', 'bandra.owner@glamour.com'],
   ['Front desk · Andheri', 'desk.andheri@glamour.com'],
+  ['Inventory · Andheri', 'inventory.andheri@glamour.com'],
   ['Owner · Desert Rose (Dubai)', 'owner@desertrose.com'],
 ];
 

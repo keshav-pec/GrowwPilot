@@ -51,7 +51,7 @@ const fill = (text, who) => text.replaceAll('{name}', who.name).replaceAll('{bra
 
 const DEFAULT_DENIED = 'That’s something your salon owner does, so I can’t walk you through it. Please ask them, or use the **Need help?** link to contact GrowwPilot support.';
 
-// who: { audience: 'PRIMARY_OWNER' | 'BRANCH_OWNER' | 'FRONT_DESK', name, branch, salon }
+// who: { audience: 'PRIMARY_OWNER' | 'BRANCH_OWNER' | 'FRONT_DESK' | 'INVENTORY', name, branch, salon, addons }
 export function answerQuestion(question, who) {
   const questionWords = new Set(toTokens(question));
 
@@ -75,6 +75,20 @@ export function answerQuestion(question, who) {
   }
 
   const { entry } = top;
+  // A topic from a paid add-on the salon doesn't have
+  if (entry.addon && !who.addons?.includes(entry.addon)) {
+    const isOwner = who.audience === 'PRIMARY_OWNER' || who.audience === 'BRANCH_OWNER';
+    return {
+      kind: 'not-allowed',
+      topicId: entry.id,
+      topic: entry.title,
+      answer: isOwner
+        ? 'Inventory is a paid add-on and isn’t switched on for your salon yet. Use the **Need help?** link to ask GrowwPilot support about it.'
+        : 'Inventory isn’t switched on for your salon. Please ask your salon owner.',
+      link: null,
+      suggestions: [],
+    };
+  }
   const allowed = entry.audiences.includes(who.audience);
   const text = allowed ? (entry.for?.[who.audience] ?? entry.answer) : (entry.denied ?? DEFAULT_DENIED);
 

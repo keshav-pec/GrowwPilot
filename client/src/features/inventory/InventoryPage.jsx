@@ -1,13 +1,13 @@
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Settings } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useInventoryAccess } from '../../api/inventory/access';
 import { useSetup } from '../../api/inventory/setup';
-import { EmptyState, PageHeader, Spinner, Tabs } from '../../components/ui';
+import { PageHeader, Spinner, Tabs } from '../../components/ui';
 import ProductsTab from './products/ProductsTab';
 import ProductDrawer from './products/ProductDrawer';
-import LocationsCard from './settings/LocationsCard';
+import SettingsTab from './settings/SettingsTab';
+import ReportsTab from './reports/ReportsTab';
 import SetupGuide from './setup/SetupGuide';
 import SetupChecklist from './setup/SetupChecklist';
 import OverviewTab from './overview/OverviewTab';
@@ -23,6 +23,7 @@ const TABS = [
   { value: 'recipes', label: 'Recipes', action: 'inventory.viewRecipes' }, // owners and inventory logins
   { value: 'purchasing', label: 'Purchasing' },
   { value: 'count', label: 'Stock count', action: 'inventory.countStock' }, // owners and inventory logins
+  { value: 'reports', label: 'Reports', action: 'inventory.viewReports' }, // owners and inventory logins (without costs)
   { value: 'settings', label: 'Settings', action: 'inventory.manageSettings' }, // owners only
 ];
 
@@ -115,12 +116,8 @@ export default function InventoryPage() {
           {tab === 'recipes' && <RecipesTab can={can} />}
           {tab === 'purchasing' && <PurchasingTab can={can} onOpenOrder={(id) => update({ order: id })} />}
           {tab === 'count' && <StockCountTab />}
-          {tab === 'settings' && (
-            <div className="grid gap-4">
-              <LocationsCard />
-              <EmptyState icon={Settings} title="More settings coming" message="What the front desk may do, and approval limits, will be set here." />
-            </div>
-          )}
+          {tab === 'reports' && <ReportsTab can={can} />}
+          {tab === 'settings' && <SettingsTab />}
         </>
       )}
 

@@ -10,7 +10,8 @@ async function whoIsAsking(ctx, user) {
     Organization.findById(ctx.orgId).select('name').lean(),
   ]);
   return {
-    audience: user.role === 'FRONT_DESK' ? 'FRONT_DESK' : ctx.isPrimaryOwner ? 'PRIMARY_OWNER' : 'BRANCH_OWNER',
+    audience: ['FRONT_DESK', 'INVENTORY'].includes(user.role) ? user.role : ctx.isPrimaryOwner ? 'PRIMARY_OWNER' : 'BRANCH_OWNER',
+    addons: ctx.addons ?? [], // topics from add-ons the salon doesn't have are answered differently
     name: user.name.split(' ')[0], // "Kavya (Andheri desk)" -> "Kavya"
     branch: branch?.name ?? 'your branch',
     salon: org?.name ?? 'your salon',

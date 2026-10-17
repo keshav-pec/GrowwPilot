@@ -1,5 +1,6 @@
 // Wipes the database and fills it with a realistic demo: 2 salons, 3 branches, staff, services,
-// combos, customers, leads, 4 weeks of appointment history with invoices, and a busy "today".
+// combos, customers, leads, 4 weeks of appointment history with invoices, a busy "today", payroll,
+// and the Inventory add-on for Glamour Studio's Andheri branch (Bandra is left to show the setup guide).
 // Today's appointments are placed around the CURRENT time, so the day board and dashboard always look alive.
 //
 // Run with: npm run seed        (refuses to run in production unless you add -- --force)
@@ -13,6 +14,15 @@ import * as models from '../models/index.js';
 import * as payroll from '../modules/payroll/payroll.service.js';
 import * as monthlyPayroll from '../modules/payroll/monthlyPayroll.service.js';
 import * as salaryPayments from '../modules/payroll/payments.service.js';
+import { createLocation } from '../modules/inventory/locations/locations.service.js';
+import { createSupplier } from '../modules/inventory/suppliers/suppliers.service.js';
+import { createSku } from '../modules/inventory/skus/skus.service.js';
+import { saveRecipe } from '../modules/inventory/recipes/recipes.service.js';
+import { finish, issue } from '../modules/inventory/allocations/allocations.service.js';
+import { writeOff } from '../modules/inventory/movements/movements.service.js';
+import { reportProblem } from '../modules/inventory/approvals/approvals.service.js';
+import { createOrder, moveOrder, receiveOrder, submitOrder } from '../modules/inventory/purchasing/purchasing.service.js';
+import { markSetupStep } from '../modules/inventory/setup/setup.service.js';
 import { DESERT_ROSE_CUSTOMERS, DESERT_ROSE_SERVICES, GLAMOUR_CUSTOMERS, GLAMOUR_SERVICES, LEADS } from './seed-data.js';
 
 const { Organization, Branch, User, Staff, Service, Combo, Customer, Appointment, Invoice, Lead, Attendance, Counter } = models;
@@ -391,11 +401,68 @@ await monthlyPayroll.addAdjustment(anitaAtAndheri, {
 });
 
 // ===========================================================================
+// 7. Inventory add-on: Glamour Studio has it (Andheri is set up, Bandra isn't yet); Desert Rose doesn't.
+//    Made through the real inventory code, so every stock change is a movement in the history.
+// ===========================================================================
+await Organization.updateOne({ _id: glamour._id }, { $set: { 'addons.inventory.enabled': true, 'addons.inventory.enabledAt': new Date() } });
+const suresh = await User.create({ orgId: glamour._id, role: 'INVENTORY', name: 'Suresh (Andheri stock)', email: 'inventory.andheri@glamour.com', passwordHash, branchIds: [branch.Andheri._id] });
+const atAndheri = (user) => ({ ...asUser(user), activeBranchId: String(branch.Andheri._id), allowedBranchIds: user.allBranches ? asUser(user).allowedBranchIds : [String(branch.Andheri._id)], addons: ['inventory'] });
+const owner = atAndheri(anita);
+const keeper = atAndheri(suresh);
+const desk = atAndheri(kavya);
+let seedKey = 0;
+const key = () => `seed-inventory-${++seedKey}`;
+
+const colourBar = (await createLocation(owner, { kind: 'STATION', name: 'Colour bar' }, key())).location;
+await createLocation(owner, { kind: 'STATION', name: 'Chair 1' }, key());
+const lakme = (await createSupplier(owner, { name: 'Lakme Pro Distributors', contactName: 'Sanjay', phone: '9819900011', paymentTerms: '30 days', leadTimeDays: 3 }, key())).supplier;
+const beautyMart = (await createSupplier(keeper, { name: 'Beauty Mart Wholesale', phone: '9819900022', paymentTerms: 'Cash on delivery', leadTimeDays: 1 }, key())).supplier;
+
+const product = async (input) => (await createSku(owner, input, key())).sku;
+const sku = {
+  shampoo: await product({ name: 'Loreal Shampoo 1L', category: 'Hair care', brand: 'Loreal', stockUnit: 'bottle', wayOfUse: 'FINISH', openingQty: 8, openingUnitCost: rupees(650), reorderPoint: 3, reorderQty: 6, preferredSupplierId: String(lakme._id), barcodes: ['8901030703461'] }),
+  conditioner: await product({ name: 'Loreal Conditioner 1L', category: 'Hair care', brand: 'Loreal', stockUnit: 'bottle', wayOfUse: 'FINISH', openingQty: 5, openingUnitCost: rupees(700), reorderPoint: 2, reorderQty: 4, preferredSupplierId: String(lakme._id) }),
+  wax: await product({ name: 'Rica Wax 800 ml', category: 'Waxing', stockUnit: 'jar', wayOfUse: 'FINISH', openingQty: 2, openingUnitCost: rupees(900), reorderPoint: 2, reorderQty: 4, preferredSupplierId: String(beautyMart._id) }),
+  facialKit: await product({ name: 'Gold facial kit', category: 'Skin', stockUnit: 'kit', wayOfUse: 'SERVICE_UNITS', openingQty: 12, openingUnitCost: rupees(480), reorderPoint: 4, reorderQty: 10, preferredSupplierId: String(beautyMart._id) }),
+  developer: await product({ name: 'Developer 6% (1 L)', category: 'Colour', stockUnit: 'bottle', wayOfUse: 'SERVICE_MEASURED', baseUnit: 'ml', unitsPerStockUnit: 1000, openingQty: 3400, openingUnitCost: rupees(550), reorderPoint: 1000, reorderQty: 3000, preferredSupplierId: String(lakme._id) }),
+  colour: await product({ name: 'Majirel colour tube 50 g', category: 'Colour', stockUnit: 'tube', wayOfUse: 'SERVICE_MEASURED', baseUnit: 'g', unitsPerStockUnit: 50, openingQty: 600, openingUnitCost: rupees(420), reorderPoint: 150, reorderQty: 500, preferredSupplierId: String(lakme._id) }),
+  gloves: await product({ name: 'Disposable gloves', category: 'Supplies', stockUnit: 'box', wayOfUse: 'MANUAL', openingQty: 6, openingUnitCost: rupees(250) }),
+};
+
+// What services use: a facial takes one kit; hair colour takes colour and developer; shampoo is linked to haircuts (for reports)
+await saveRecipe(owner, { serviceId: String(gs.Facial._id), scope: 'salon', lines: [{ skuId: String(sku.facialKit._id), qty: 1, deducts: true }] }, key());
+await saveRecipe(owner, { serviceId: String(gs['Hair Colour']._id), scope: 'salon', lines: [{ skuId: String(sku.colour._id), qty: 60, deducts: true }, { skuId: String(sku.developer._id), qty: 60, deducts: true }] }, key());
+await saveRecipe(owner, { serviceId: String(gs.Haircut._id), scope: 'salon', lines: [{ skuId: String(sku.shampoo._id), deducts: false }] }, key());
+
+// Hand-outs: shampoo with Rahul (one already finished and replaced), developer and colour at the colour bar, wax with Neha
+const mainStore = (await models.InventoryLocation.findOne({ branchId: branch.Andheri._id, isMain: true }).lean())._id;
+const rahulRecipient = { kind: 'STAFF', id: String(staff.Rahul._id) };
+const firstShampoo = (await issue(keeper, { skuId: String(sku.shampoo._id), locationId: String(mainStore), recipient: rahulRecipient, qty: 1 }, key())).allocation;
+await finish(keeper, String(firstShampoo._id), { qty: 1, replacement: { qty: 1 } }, key());
+await issue(keeper, { skuId: String(sku.developer._id), locationId: String(mainStore), recipient: { kind: 'STATION', id: String(colourBar._id) }, qty: 1000 }, key());
+await issue(keeper, { skuId: String(sku.colour._id), locationId: String(mainStore), recipient: { kind: 'STATION', id: String(colourBar._id) }, qty: 100 }, key());
+await issue(owner, { skuId: String(sku.wax._id), locationId: String(mainStore), recipient: { kind: 'STAFF', id: String(staff.Neha._id) }, qty: 1 }, key());
+
+// A part-delivered order from Lakme, a draft for Beauty Mart, a damaged conditioner and two things waiting
+const lakmeOrder = (await createOrder(owner, { supplierId: String(lakme._id), lines: [{ skuId: String(sku.shampoo._id), qty: 6, unitCost: rupees(650) }, { skuId: String(sku.developer._id), qty: 3000, unitCost: rupees(560) }], note: 'Monthly order' }, key())).order;
+await submitOrder(owner, String(lakmeOrder._id), key());
+await moveOrder(owner, String(lakmeOrder._id), 'order', {}, key());
+const orderedLines = (await models.InventoryPurchaseOrder.findById(lakmeOrder._id).lean()).lines;
+await receiveOrder(keeper, String(lakmeOrder._id), { invoiceNumber: 'LPD-20431', lines: [{ lineId: String(orderedLines[0]._id), qty: 6 }] }, key());
+await createOrder(keeper, { supplierId: String(beautyMart._id), lines: [{ skuId: String(sku.wax._id), qty: 4 }] }, key());
+await writeOff(owner, { skuId: String(sku.conditioner._id), locationId: String(mainStore), qty: 1, reason: 'DAMAGE', direction: 'REMOVE', note: 'Cap cracked in delivery' }, key());
+await writeOff(keeper, { skuId: String(sku.facialKit._id), locationId: String(mainStore), qty: 5, reason: 'EXPIRY', direction: 'REMOVE', note: 'Batch expired last week' }, key()); // ₹2,400: waits for an owner
+await reportProblem(desk, { skuId: String(sku.gloves._id), locationId: String(mainStore), reason: 'DAMAGE', qty: 1, note: 'Box got wet near the sink' }, key());
+await markSetupStep(owner, 'locations', key());
+await markSetupStep(owner, 'done', key());
+
+// ===========================================================================
 // Done
 // ===========================================================================
 console.log(`\nSeeded: 2 salons, 3 branches, ${Object.keys(staff).length} staff, ${GLAMOUR_SERVICES.length + DESERT_ROSE_SERVICES.length} services, 2 combos,`);
 console.log(`        ${glamourCustomers.length + desertCustomers.length} customers, ${LEADS.length} leads, ${appointments.length} appointments, ${invoices.length} invoices, ${attendance.length} attendance records`);
 console.log(`        8 pay setups (2 front desk), 1 pay change request waiting for approval, 1 locked payroll month with payments, 1 advance, ${await models.CommissionEntry.countDocuments()} commission lines`);
+console.log(`        Inventory (Glamour Andheri): ${Object.keys(sku).length} products, 3 recipes, 4 hand-outs, 2 purchase orders, 1 write-off waiting for approval, 1 problem report`);
 console.log(`Today is centred on ${A.toFormat('h:mm a')} at Andheri (${A.zoneName}).`);
 console.log('\nEvery account uses the password:', DEMO_PASSWORD);
 console.table([
@@ -404,6 +471,7 @@ console.table([
   { role: 'Owner (branch)', email: 'bandra.owner@glamour.com', access: 'Glamour Studio: Bandra only' },
   { role: 'Front Desk', email: 'desk.andheri@glamour.com', access: 'Glamour Studio: Andheri' },
   { role: 'Front Desk', email: 'desk.bandra@glamour.com', access: 'Glamour Studio: Bandra' },
+  { role: 'Inventory', email: 'inventory.andheri@glamour.com', access: 'Glamour Studio: Andheri, Inventory only' },
   { role: 'Owner', email: 'owner@desertrose.com', access: 'Desert Rose: Dubai Marina' },
   { role: 'Front Desk', email: 'desk@desertrose.com', access: 'Desert Rose: Dubai Marina' },
 ]);

@@ -74,7 +74,21 @@ const attempts = [
   ['Header', "X-Branch-Id = B's branch (dashboard)", () => call(a, 'GET', '/dashboard', { branch: bBranch._id }), 403],
 ];
 
-console.log(`Tenant isolation smoke test against ${API}\nLogged in as Glamour Studio, using Desert Rose's ids:\n`);
+// Inventory add-on (only Glamour Studio has it): Desert Rose aims at Glamour's inventory ids,
+// and Glamour aims its inventory screens at Desert Rose's branch
+const aSku = (await call(a, 'GET', '/inventory/skus')).json.rows[0];
+const aOrder = (await call(a, 'GET', '/inventory/purchasing/orders')).json.orders[0];
+const aHandout = (await call(a, 'GET', '/inventory/allocations')).json.handouts[0];
+attempts.push(
+  ['Inventory (B→A)', "B opens A's product", () => call(b, 'GET', `/inventory/skus/${aSku._id}`), 403],
+  ['Inventory (B→A)', "B edits A's product", () => call(b, 'PATCH', `/inventory/skus/${aSku._id}`, { body: { version: 1, name: 'Hacked' }, idempotency: true }), 403],
+  ['Inventory (B→A)', "B reads A's purchase order", () => call(b, 'GET', `/inventory/purchasing/orders/${aOrder._id}`), 403],
+  ['Inventory (B→A)', "B finishes A's hand-out", () => call(b, 'POST', `/inventory/allocations/${aHandout._id}/finish`, { body: { qty: 1 }, idempotency: true }), 403],
+  ['Header', "X-Branch-Id = B's branch (inventory overview)", () => call(a, 'GET', '/inventory/overview', { branch: bBranch._id }), 403],
+  ['Header', "X-Branch-Id = B's branch (inventory reports)", () => call(a, 'GET', '/inventory/reports/stock-summary', { branch: bBranch._id }), 403]
+);
+
+console.log(`Tenant isolation smoke test against ${API}\nLogged in as Glamour Studio, using Desert Rose's ids (and the other way round for inventory):\n`);
 const rows = [];
 for (const [where, what, request, expected] of attempts) {
   const { status, json } = await request();

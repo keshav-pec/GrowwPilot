@@ -197,7 +197,6 @@ describe('Inventory login', () => {
     ['GET', '/activity'],
     ['GET', '/users'],
     ['POST', '/users', { role: 'FRONT_DESK', name: 'Spy', email: 'spy2@g.com', branchIds: [] }],
-    ['GET', '/help/start'],
     ['GET', '/admin/orgs'],
   ];
   for (const [method, path, body] of blocked) {
@@ -206,8 +205,9 @@ describe('Inventory login', () => {
     });
   }
 
-  it('still has the bell', async () => {
+  it('still has the bell and the help assistant', async () => {
     expect((await call('inventory', 'GET', '/notifications')).status).toBe(200);
+    expect((await call('inventory', 'GET', '/help/start')).status).toBe(200);
   });
 
   it("from Andheri can't reach Bandra", async () => {

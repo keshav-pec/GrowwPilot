@@ -150,7 +150,7 @@ export default function ChatAssistant() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">GrowwPilot Assistant</p>
-              <p className="text-xs text-white/70">Answers for {user.role === 'FRONT_DESK' ? 'front desk' : user.allBranches ? 'the main owner' : 'branch owners'}</p>
+              <p className="text-xs text-white/70">Answers for {user.role === 'FRONT_DESK' ? 'front desk' : user.role === 'INVENTORY' ? 'inventory' : user.allBranches ? 'the main owner' : 'branch owners'}</p>
             </div>
             <button onClick={startOver} disabled={busy} className="rounded p-1.5 text-white/80 hover:bg-white/10 disabled:opacity-40" aria-label="Start over" title="Start over">
               <RotateCcw size={16} />

@@ -52,8 +52,8 @@ export default function AppLayout() {
           </div>
         }
       />
-      {/* Help assistant for owners and front desk (it stays open while you move between pages) */}
-      {user.role !== 'INVENTORY' && <ChatAssistant />}
+      {/* Help assistant (it stays open while you move between pages) */}
+      <ChatAssistant />
     </>
   );
 }
