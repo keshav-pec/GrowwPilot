@@ -39,11 +39,10 @@ export async function runOnce(ctx, { key, operation }, work) {
       return saved;
     });
   } catch (err) {
-    // The same key at the same moment: the other request won, so give back its answer
-    if (err.code === 11000) {
-      const winner = await IdempotencyRecord.findOne({ orgId: ctx.orgId, key }).lean();
-      if (winner) return replay(winner, operation);
-    }
+    // The same key at the same moment: the other request won (so this one hit its saved result, or found the
+    // change already made), so give back the winner's answer
+    const winner = await IdempotencyRecord.findOne({ orgId: ctx.orgId, key }).lean();
+    if (winner) return replay(winner, operation);
     throw err;
   }
 }

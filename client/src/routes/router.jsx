@@ -21,6 +21,8 @@ import LeadsPage from '../features/leads/LeadsPage';
 import LeadConvertPage from '../features/leads/LeadConvertPage';
 import CheckoutPage from '../features/checkout/CheckoutPage';
 import InvoicePage from '../features/checkout/InvoicePage';
+import BillsListPage from '../features/billing/BillsListPage';
+import BillingSettingsPage from '../features/billing/BillingSettingsPage';
 import AttendancePage from '../features/attendance/AttendancePage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import PayrollPage from '../features/payroll/PayrollPage';
@@ -93,6 +95,7 @@ export const router = createBrowserRouter([
               { path: 'leads/:id/convert', element: <LeadConvertPage /> },
               { path: 'checkout/:appointmentId', element: <CheckoutPage /> },
               { path: 'invoices/:id', element: <InvoicePage /> },
+              { path: 'bills', element: <BillsListPage /> },
               { path: 'attendance', element: <AttendancePage /> },
               { path: 'payroll', element: <PayrollPage /> }, // front desk: pay setup + requests only
             ],
@@ -114,6 +117,7 @@ export const router = createBrowserRouter([
               { path: 'branches', element: <BranchesPage /> },
               { path: 'team', element: <TeamPage /> },
               { path: 'catalog', element: <CatalogPage /> },
+              { path: 'settings/billing', element: <BillingSettingsPage /> },
               { path: 'settings/salary', element: <Navigate to="/app/payroll" replace /> }, // old link
             ],
           },

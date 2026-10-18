@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Appointment, Branch } from '../../models/index.js';
+import { Appointment, Branch, Invoice } from '../../models/index.js';
 import { OPEN_APPOINTMENT_STATUSES } from '../../config/constants.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
@@ -30,6 +30,17 @@ export async function findFutureBookings(ctx, filter) {
   }));
 }
 
+// Adds `bill` to each billed appointment: { status: 'PAID' | 'PARTIALLY_PAID' | 'UNPAID', balanceDue }
+async function withBillStatus(appointments) {
+  const ids = appointments.map((a) => a.invoiceId).filter(Boolean);
+  if (ids.length === 0) return appointments;
+  const bills = await Invoice.find({ _id: { $in: ids } }).select('settlementStatus balanceDue').lean();
+  return appointments.map((a) => {
+    const bill = a.invoiceId && bills.find((b) => String(b._id) === String(a.invoiceId));
+    return bill ? { ...a, bill: { status: bill.settlementStatus, balanceDue: bill.balanceDue } } : a;
+  });
+}
+
 // Appointments at the selected branch, with optional filters
 export async function listAppointments(ctx, { date, status, staffId, search }) {
   const filter = scoped(ctx, { branchId: ctx.activeBranchId });
@@ -49,10 +60,11 @@ export async function listAppointments(ctx, { date, status, staffId, search }) {
   }
 
   // One day: in time order. All dates: newest first.
-  return Appointment.find(filter)
+  const appointments = await Appointment.find(filter)
     .sort({ startAt: date ? 1 : -1 })
     .limit(200)
     .lean();
+  return withBillStatus(appointments);
 }
 
 // One appointment, only if it's in this salon and in a branch this user may use
@@ -61,7 +73,7 @@ export async function getAppointment(ctx, id) {
   if (!appointment || !ctx.allowedBranchIds.includes(String(appointment.branchId))) {
     throw new AppError(404, 'NOT_FOUND', 'Appointment not found');
   }
-  return appointment;
+  return (await withBillStatus([appointment]))[0];
 }
 
 export function createAppointment(ctx, input) {

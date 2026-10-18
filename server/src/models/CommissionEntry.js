@@ -15,8 +15,8 @@ const commissionEntrySchema = new mongoose.Schema(
     itemId: { type: mongoose.Schema.Types.ObjectId, required: true }, // the service line inside the appointment
     serviceId: ref('Service'),
     serviceName: { type: String, required: true },
-    day: { type: String, required: true, match: /^\d{4}-\d{2}-\d{2}$/ }, // branch-local day the bill was paid
-    saleAmount: money({ required: true }), // this service's share of what the customer actually paid
+    day: { type: String, required: true, match: /^\d{4}-\d{2}-\d{2}$/ }, // branch-local day the bill became fully paid
+    saleAmount: money({ required: true }), // what the customer paid for this service, after discounts and without GST
     rateBps: { type: Number, required: true, min: 0, max: 10000 },
     rateSource: { type: String, enum: ['service_rate', 'pay_setup'], required: true },
     ruleId: { type: mongoose.Schema.Types.ObjectId, required: true }, // the CommissionRule or PayPlan used

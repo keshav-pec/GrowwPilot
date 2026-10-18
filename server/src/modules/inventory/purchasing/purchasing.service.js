@@ -16,7 +16,7 @@ import { formatAmount } from '../../../utils/money.js';
 import { todayInZone } from '../../../utils/time.js';
 import { runOnce } from '../../../middleware/idempotency.js';
 import { notify } from '../../notifications/notifications.service.js';
-import { branchCode } from '../../invoices/invoices.service.js';
+import { branchCode } from '../../billing/settings.service.js';
 import { assertCan, can } from '../permissions.js';
 import { getBranchSettings } from '../settings/settings.service.js';
 import { recordInventoryAction } from '../activity.js';

@@ -193,9 +193,11 @@ export default function DayBoardPage() {
                                   e.stopPropagation();
                                   navigate(appointment.invoiceId ? `/app/invoices/${appointment.invoiceId}` : `/app/checkout/${appointment._id}`);
                                 }}
-                                className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium ${appointment.invoiceId ? 'border border-brown text-brown' : 'bg-brown text-white'}`}
+                                className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium ${
+                                  !appointment.invoiceId ? 'bg-brown text-white' : appointment.bill?.status === 'PAID' ? 'border border-brown text-brown' : 'border border-orange text-orange'
+                                }`}
                               >
-                                {appointment.invoiceId ? 'Paid ✓' : 'Checkout'}
+                                {!appointment.invoiceId ? 'Checkout' : appointment.bill?.status === 'PAID' ? 'Paid ✓' : 'Due'}
                               </span>
                             )}
                           </div>

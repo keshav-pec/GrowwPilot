@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useSetAppointmentStatus } from '../../api/appointments';
 import { NEXT_STEP, STATUS_LABEL, getAlert } from '../../lib/appointments';
 import { formatMoney } from '../../lib/money';
+import { SETTLEMENT } from '../../lib/billing';
 import { formatDateTime, formatTime } from '../../lib/time';
 import { Badge, Button, ConfirmDialog, Drawer, Textarea } from '../../components/ui';
 import AppointmentStatusBadge from '../../components/AppointmentStatusBadge';
@@ -62,7 +63,7 @@ export default function AppointmentDrawer({ appointment, onClose }) {
             {status === 'COMPLETED' &&
               (appointment.invoiceId ? (
                 <Button variant="secondary" onClick={() => navigate(`/app/invoices/${appointment.invoiceId}`)}>
-                  View invoice
+                  {appointment.bill?.status === 'PAID' ? 'View bill' : 'View bill · record payment'}
                 </Button>
               ) : (
                 <Button onClick={() => navigate(`/app/checkout/${appointment._id}`)}>Checkout</Button>
@@ -73,7 +74,7 @@ export default function AppointmentDrawer({ appointment, onClose }) {
         <div className="flex flex-col gap-5 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <AppointmentStatusBadge status={status} />
-            {appointment.invoiceId && <Badge tone="brown">Paid</Badge>}
+            {appointment.invoiceId && <Badge tone={SETTLEMENT[appointment.bill?.status ?? 'PAID'].tone}>{SETTLEMENT[appointment.bill?.status ?? 'PAID'].label}</Badge>}
             {alert && <Badge tone="orange">{alert}</Badge>}
           </div>
 

@@ -12,11 +12,11 @@ import { getAppointmentAlert } from '../../utils/appointmentAlerts.js';
 const OPEN_LEAD_STATUSES = ['NEW', 'CONTACTED', 'INTERESTED'];
 const AWAY = ['absent', 'leave'];
 
-// Sum of invoice totals paid between two times (revenue = invoices, so cancelled bookings never count)
+// Sum of bills issued between two times (revenue = issued bills, so cancelled bookings and drafts never count)
 async function revenueBetween(ctx, branchId, from, to) {
   const [row] = await Invoice.aggregate([
-    { $match: { orgId: new mongoose.Types.ObjectId(ctx.orgId), branchId, paidAt: { $gte: from, $lt: to } } },
-    { $group: { _id: null, total: { $sum: '$total' } } },
+    { $match: { orgId: new mongoose.Types.ObjectId(ctx.orgId), branchId, status: 'ISSUED', issuedAt: { $gte: from, $lt: to } } },
+    { $group: { _id: null, total: { $sum: '$grandTotal' } } },
   ]);
   return row?.total ?? 0;
 }
@@ -74,12 +74,14 @@ async function getAttention(ctx, branch, now, todayAppointments) {
     if (alert) items.push({ id: `${alert}-${a._id}`, kind: alert, at: a.startAt, ...alertText[alert](a), action: { label: 'Open', to: `/app/today?open=${a._id}` } });
   }
 
-  const [unpaid, overdueLeads, uncontacted, upcoming, staff, absences] = await Promise.all([
-    // b) Finished but not paid: money not collected
+  const [unbilled, dues, overdueLeads, uncontacted, upcoming, staff, absences] = await Promise.all([
+    // b) Finished but not billed yet: money not collected
     Appointment.find({ ...base, status: 'COMPLETED', invoiceId: null }).sort({ startAt: -1 }).limit(20).lean(),
-    // c) Lead follow-ups that are overdue
+    // c) Bills with something still due (part paid or unpaid)
+    Invoice.find({ ...base, status: 'ISSUED', balanceDue: { $gt: 0 } }).sort({ issuedAt: 1 }).limit(20).lean(),
+    // d) Lead follow-ups that are overdue
     Lead.find({ ...base, status: { $in: OPEN_LEAD_STATUSES }, nextFollowUpAt: { $lt: now } }).sort({ nextFollowUpAt: 1 }).limit(20).lean(),
-    // d) New leads nobody has contacted for more than 24 hours (not already listed as overdue)
+    // e) New leads nobody has contacted for more than 24 hours (not already listed as overdue)
     Lead.find({
       ...base,
       status: 'NEW',
@@ -89,14 +91,17 @@ async function getAttention(ctx, branch, now, todayAppointments) {
       .sort({ createdAt: 1 })
       .limit(20)
       .lean(),
-    // e) Upcoming bookings (next 14 days) whose stylist is inactive, absent or on leave
+    // f) Upcoming bookings (next 14 days) whose stylist is inactive, absent or on leave
     Appointment.find({ ...base, status: { $in: OPEN_APPOINTMENT_STATUSES }, startAt: { $gte: now, $lt: new Date(+now + 14 * 86400 * 1000) } }).lean(),
     Staff.find(base).select('name status').lean(),
     Attendance.find({ ...base, status: { $in: AWAY }, date: { $gte: DateTime.fromJSDate(now, { zone }).toISODate() } }).lean(),
   ]);
 
-  for (const a of unpaid) {
+  for (const a of unbilled) {
     items.push({ id: `UNPAID-${a._id}`, kind: 'UNPAID', severity: 'high', at: a.startAt, title: `${a.customerSnapshot.name} hasn't paid`, detail: `Completed ${when(a.startAt)} · ${formatMoney(a.totalPrice)}`, action: { label: 'Checkout', to: `/app/checkout/${a._id}` } });
+  }
+  for (const bill of dues) {
+    items.push({ id: `DUE-${bill._id}`, kind: 'DUE', severity: 'medium', at: bill.issuedAt, title: `${bill.customerSnapshot?.name} owes ${formatMoney(bill.balanceDue)}`, detail: `Bill ${bill.invoiceNumber} · issued ${when(bill.issuedAt)} · ${formatMoney(bill.amountPaid)} of ${formatMoney(bill.grandTotal)} paid`, action: { label: 'Record payment', to: `/app/invoices/${bill._id}` } });
   }
   for (const l of overdueLeads) {
     items.push({ id: `FOLLOW_UP-${l._id}`, kind: 'FOLLOW_UP', severity: 'medium', at: l.nextFollowUpAt, title: `Follow up with ${l.name}`, detail: `Follow-up was due ${when(l.nextFollowUpAt)} · ${l.source} lead`, action: { label: 'Open lead', to: `/app/leads?open=${l._id}` } });

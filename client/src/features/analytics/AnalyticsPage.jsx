@@ -10,7 +10,7 @@ import { Card, EmptyState, Input, PageHeader, Select, Spinner } from '../../comp
 import { HBarChart, SlotHeatmap } from './charts';
 
 const DAY_NAMES = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const METHOD = { CASH: 'Cash', UPI: 'UPI', CARD: 'Card' };
+const METHOD = { CASH: 'Cash', UPI: 'UPI', CARD: 'Card', OTHER: 'Other' };
 const rupees = (paise) => formatMoney(paise).replace(/\.00$/, '');
 const pct = (value) => (value === null ? '—' : `${value}%`);
 
@@ -232,7 +232,7 @@ export default function AnalyticsPage() {
           </div>
 
           <p className="text-xs text-muted">
-            Revenue = invoices paid in the period. Service value = list price of completed services (before discounts and combo prices).
+            Revenue = bills issued in the period (including any part still due). Service value = list price of completed services (before discounts and combo prices).
           </p>
         </div>
       )}

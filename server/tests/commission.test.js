@@ -4,8 +4,8 @@ import { ActivityLog, Appointment, CommissionEntry, CommissionRule, Counter, Inv
 import { commissionAmount, splitByPrice } from '../src/modules/payroll/commission.rules.js';
 import { recordInvoiceCommissions, syncCommissions } from '../src/modules/payroll/commission.service.js';
 import * as payroll from '../src/modules/payroll/payroll.service.js';
-import { createInvoice } from '../src/modules/invoices/invoices.service.js';
 import { createFixtures, startDb, stopDb } from './testDb.js';
+import { checkout as checkoutBill } from './billing.js';
 
 let f;
 let owner; // business owner ctx
@@ -47,10 +47,9 @@ function completed(lines, totalPrice = lines.reduce((sum, l) => sum + l[2], 0)) 
   });
 }
 
-// Checkout, paid in cash, with an optional flat discount (paise)
+// Checkout, paid in full in cash, with an optional flat bill discount (paise)
 function checkout(appointment, discount = 0) {
-  const total = appointment.totalPrice - discount;
-  return createInvoice(owner, { appointmentId: appointment._id, discountType: 'flat', discountValue: discount, payments: [{ method: 'CASH', amount: total }] });
+  return checkoutBill(owner, appointment, { billDiscount: { type: 'flat', value: discount } });
 }
 
 const salaryPlus = (percent, effectiveFrom = thisMonth) => ({ model: 'FIXED_COMMISSION', monthlyBase: 2000000, commissionBps: percent * 100, effectiveFrom });
@@ -125,7 +124,7 @@ describe('Commission at checkout', () => {
     await payroll.createPlan(owner, f.rahul._id, salaryPlus(10));
     const appt = await completed([[f.haircut, f.rahul, 50000]]);
     const invoice = await checkout(appt);
-    await recordInvoiceCommissions({ invoice, appointment: await Appointment.findById(appt._id).lean(), timezone: 'Asia/Kolkata' });
+    await recordInvoiceCommissions({ invoice: await Invoice.findById(invoice._id).lean(), appointment: await Appointment.findById(appt._id).lean(), timezone: 'Asia/Kolkata' });
     expect(await syncCommissions(f.ctxGlamour.orgId, { from: thisMonth, to: today })).toBe(0);
     expect(await CommissionEntry.countDocuments()).toBe(1);
   });

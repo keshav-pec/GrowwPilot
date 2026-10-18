@@ -4,8 +4,10 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthContext';
 import { useSaveService, useSetServiceStatus } from '../../api/catalog';
+import { useBillingSettings } from '../../api/billing';
+import { GST_RATE_OPTIONS, percentLabel } from '../../lib/billing';
 import { isValidRupees, toPaise } from '../../lib/money';
-import { Button, Input, Modal } from '../../components/ui';
+import { Button, Input, Modal, Select } from '../../components/ui';
 import CheckboxList from '../../components/CheckboxList';
 
 const CATEGORY_SUGGESTIONS = ['Hair', 'Skin', 'Nails', 'Grooming', 'Spa', 'Makeup'];
@@ -19,12 +21,15 @@ const schema = z.object({
     .refine((v) => v.trim() === '' || (Number.isInteger(Number(v)) && Number(v) >= 5), 'Whole minutes, at least 5'),
   price: z.string().refine(isValidRupees, 'Enter a price like 500 or 499.50'),
   branchIds: z.array(z.string()),
+  taxRateBps: z.string(), // '' = the salon's default rate
+  sacCode: z.string().trim().refine((v) => v === '' || /^\d{4,8}$/.test(v), 'SAC code is 4 to 8 digits'),
 });
 
 export default function ServiceFormModal({ service, onClose }) {
   const { user } = useAuth();
   const saveService = useSaveService();
   const setStatus = useSetServiceStatus();
+  const billing = useBillingSettings();
 
   const {
     register,
@@ -39,6 +44,8 @@ export default function ServiceFormModal({ service, onClose }) {
       durationMinutes: service?.durationMinutes ? String(service.durationMinutes) : '',
       price: service ? String(service.price / 100) : '',
       branchIds: service?.branchIds ?? [],
+      taxRateBps: service?.taxRateBps == null ? '' : String(service.taxRateBps),
+      sacCode: service?.sacCode ?? '',
     },
   });
 
@@ -49,6 +56,7 @@ export default function ServiceFormModal({ service, onClose }) {
         ...values,
         durationMinutes: values.durationMinutes.trim() === '' ? null : Number(values.durationMinutes),
         price: toPaise(values.price), // the server stores money as paise
+        taxRateBps: values.taxRateBps === '' ? null : Number(values.taxRateBps),
       },
       {
         onSuccess: () => {
@@ -110,6 +118,13 @@ export default function ServiceFormModal({ service, onClose }) {
           error={errors.durationMinutes?.message}
           {...register('durationMinutes')}
         />
+        <Select
+          label="GST rate"
+          options={[{ value: '', label: `Salon default${billing.data ? ` (${percentLabel(billing.data.defaultServiceTaxBps)})` : ''}` }, ...GST_RATE_OPTIONS]}
+          hint={billing.data && !billing.data.gstRegistered ? 'Only used once the salon is GST registered (Billing settings)' : undefined}
+          {...register('taxRateBps')}
+        />
+        <Input label="SAC code (optional)" inputMode="numeric" placeholder={billing.data?.defaultSacCode || 'e.g. 999721'} error={errors.sacCode?.message} {...register('sacCode')} />
         <div className="sm:col-span-2">
           <Controller
             name="branchIds"

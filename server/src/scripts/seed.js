@@ -24,6 +24,8 @@ import { reportProblem } from '../modules/inventory/approvals/approvals.service.
 import { createOrder, moveOrder, receiveOrder, submitOrder } from '../modules/inventory/purchasing/purchasing.service.js';
 import { markSetupStep } from '../modules/inventory/setup/setup.service.js';
 import { addImages } from '../modules/inventory/images/images.service.js';
+import { migrateBilling } from './migrate-billing-v2.js';
+import { gstinCheckChar } from '../config/billing.js';
 import sharp from 'sharp';
 import { DESERT_ROSE_CUSTOMERS, DESERT_ROSE_SERVICES, GLAMOUR_CUSTOMERS, GLAMOUR_SERVICES, LEADS } from './seed-data.js';
 
@@ -282,9 +284,26 @@ for (const { appointment, method, discountPercent = 0, split = false } of toBePa
 }
 
 await Appointment.insertMany(appointments);
-await Invoice.insertMany(invoices);
-// So the next real checkout continues the numbering (e.g. GP-AND-000049)
+// Written the way bills were saved before Billing Phase 1, then moved onto the new bill records by the same
+// migration real salons get (so old bills keep numbers like GP-AND-000049 and new ones start at AND/26-27/00001)
+await Invoice.collection.insertMany(invoices);
 await Counter.insertMany(Object.entries(counters).map(([name, seq]) => ({ _id: `invoice:${branch[name]._id}`, seq })));
+await migrateBilling({ log: () => {} });
+
+// Billing settings: Glamour Studio is GST registered in Maharashtra (prices include GST); Desert Rose isn't
+const demoGstin = (first14) => first14 + gstinCheckChar(first14);
+await models.BillingSettings.create({
+  orgId: glamour._id,
+  legalName: 'Glamour Studio Private Limited',
+  gstRegistered: true,
+  pricesIncludeTax: true,
+  defaultServiceTaxBps: 1800,
+  defaultSacCode: '999721',
+  branches: [
+    { branchId: branch.Andheri._id, gstin: demoGstin('27AAKCG4821M1Z'), stateCode: '27', invoicePrefix: 'AND' },
+    { branchId: branch.Bandra._id, gstin: demoGstin('27AAKCG4821M2Z'), stateCode: '27', invoicePrefix: 'BAN' },
+  ],
+});
 
 // ===========================================================================
 // 4. Leads (every status and source; one follow-up overdue)

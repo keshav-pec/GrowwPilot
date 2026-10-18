@@ -2,11 +2,11 @@ import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
 import { Appointment, Branch, CommissionEntry, CommissionRule, Invoice, PayPlan } from '../../models/index.js';
 import { scoped } from '../../utils/scoped.js';
-import { commissionAmount, pickRate, splitByPrice } from './commission.rules.js';
+import { commissionAmount, pickRate } from './commission.rules.js';
 
-// Commission is earned when a service is completed AND paid, i.e. at checkout (the app only lets
-// completed appointments be paid, and always in full). It's worked out on what the customer actually
-// paid: the bill total after discount, shared across its services. The app has no GST, so nothing to take out.
+// Commission is earned when a service is completed AND its bill is fully paid (a part-paid bill earns
+// nothing yet). It's worked out on what the customer actually paid for each service: the bill line's
+// taxable amount, i.e. after every discount and without GST (see billing/tax.rules.js).
 
 // The pay setup of each person on one day: { staffId: plan }
 async function plansOnDay(orgId, staffIds, day, session) {
@@ -21,17 +21,24 @@ async function plansOnDay(orgId, staffIds, day, session) {
   return Object.fromEntries(plans.map((p) => [String(p.staffId), p]));
 }
 
-// Writes the commission lines for one paid bill. Lines that already exist are skipped,
-// so calling it again for the same bill never pays commission twice.
+// Writes the commission lines for one fully paid bill, one per service line, on the day it became fully paid.
+// Lines that already exist are skipped, so calling it again for the same bill never pays commission twice.
 export async function recordInvoiceCommissions({ invoice, appointment, timezone }, session) {
   const day = DateTime.fromJSDate(invoice.paidAt, { zone: timezone }).toISODate();
-  const items = appointment.items;
-  const shares = splitByPrice(items.map((i) => i.price), invoice.total);
+  // Who did each service comes from the bill line (the appointment as a fallback)
+  const lines = invoice.lines
+    .filter((l) => l.kind === 'SERVICE' && l.itemId)
+    .map((l) => {
+      const item = appointment?.items.find((i) => String(i._id) === String(l.itemId));
+      return { itemId: l.itemId, staffId: l.staffId ?? item?.staffId, serviceId: l.serviceId ?? item?.serviceId, serviceName: l.name, saleAmount: l.taxableAmount };
+    })
+    .filter((l) => l.staffId);
+  if (lines.length === 0) return [];
 
-  const staffIds = [...new Set(items.map((i) => String(i.staffId)))];
+  const staffIds = [...new Set(lines.map((l) => String(l.staffId)))];
   const [plans, rules, existing] = await Promise.all([
     plansOnDay(invoice.orgId, staffIds, day, session),
-    CommissionRule.find({ orgId: invoice.orgId, staffId: { $in: staffIds }, serviceId: { $in: items.map((i) => i.serviceId) } })
+    CommissionRule.find({ orgId: invoice.orgId, staffId: { $in: staffIds }, serviceId: { $in: lines.map((l) => l.serviceId) } })
       .session(session ?? null)
       .lean(),
     CommissionEntry.find({ invoiceId: invoice._id, type: 'earned' }).select('itemId').session(session ?? null).lean(),
@@ -39,38 +46,41 @@ export async function recordInvoiceCommissions({ invoice, appointment, timezone 
   const done = new Set(existing.map((e) => String(e.itemId)));
 
   const entries = [];
-  items.forEach((item, index) => {
-    if (done.has(String(item._id))) return;
-    const rule = rules.find((r) => String(r.staffId) === String(item.staffId) && String(r.serviceId) === String(item.serviceId));
-    const rate = pickRate(plans[String(item.staffId)], rule);
-    if (!rate || rate.rateBps === 0) return;
+  for (const line of lines) {
+    if (done.has(String(line.itemId))) continue;
+    const rule = rules.find((r) => String(r.staffId) === String(line.staffId) && String(r.serviceId) === String(line.serviceId));
+    const rate = pickRate(plans[String(line.staffId)], rule);
+    if (!rate || rate.rateBps === 0) continue;
     entries.push({
       orgId: invoice.orgId,
       branchId: invoice.branchId,
-      staffId: item.staffId,
+      staffId: line.staffId,
       invoiceId: invoice._id,
       invoiceNumber: invoice.invoiceNumber,
-      appointmentId: appointment._id,
-      itemId: item._id,
-      serviceId: item.serviceId,
-      serviceName: item.serviceName,
+      appointmentId: invoice.appointmentId,
+      itemId: line.itemId,
+      serviceId: line.serviceId,
+      serviceName: line.serviceName,
       day,
-      saleAmount: shares[index],
+      saleAmount: line.saleAmount,
       ...rate,
-      amount: commissionAmount(shares[index], rate.rateBps),
+      amount: commissionAmount(line.saleAmount, rate.rateBps),
     });
-  });
+  }
 
   if (entries.length > 0) await CommissionEntry.insertMany(entries, { session });
   return entries;
 }
 
-// Bills paid between two branch-local days (inclusive), each with its appointment, branch timezone and paid day.
-// staffId: only bills where that person did a service.
+// Bills that became fully paid between two branch-local days (inclusive), each with its appointment,
+// branch timezone and paid day. staffId: only bills where that person did a service.
 export async function paidBillsBetween(orgId, { from, to, staffId }) {
   // A day either side covers every timezone; the exact branch day is checked below
   const invoices = await Invoice.find({
     orgId,
+    status: 'ISSUED',
+    settlementStatus: 'PAID',
+    appointmentId: { $type: 'objectId' },
     paidAt: { $gte: DateTime.fromISO(from).minus({ days: 1 }).toJSDate(), $lt: DateTime.fromISO(to).plus({ days: 2 }).toJSDate() },
   }).lean();
   if (invoices.length === 0) return [];

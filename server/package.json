@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "seed": "node src/scripts/seed.js",
     "test": "vitest run",
-    "smoke:isolation": "node src/scripts/isolation-smoke-test.js"
+    "smoke:isolation": "node src/scripts/isolation-smoke-test.js",
+    "migrate:billing": "node src/scripts/migrate-billing-v2.js"
   },
   "author": "",
   "license": "ISC",

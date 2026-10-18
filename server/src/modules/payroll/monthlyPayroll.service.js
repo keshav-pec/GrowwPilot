@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
-import { Appointment, Attendance, Branch, CommissionEntry, EmployeeAdvance, PayPlan, PayrollAdjustment, PayrollItem, PayrollPayment, PayrollRun, Staff } from '../../models/index.js';
+import { Appointment, Attendance, Branch, CommissionEntry, EmployeeAdvance, Invoice, PayPlan, PayrollAdjustment, PayrollItem, PayrollPayment, PayrollRun, Staff } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { formatAmount } from '../../utils/money.js';
@@ -32,6 +32,14 @@ export async function recordPayrollAction(ctx, { action, branchId, staffId, summ
   await notify(ctx, await businessOwnerIds(ctx), { message: `${ctx.userName} (${actorRole(ctx)}): ${summary}`, link: MONTH_LINK(after?.month ?? before?.month) }, session);
 }
 
+// Completed visits in a period whose bill isn't fully paid yet (or that have no bill at all)
+async function unpaidVisits(ctx, branchId, startAt) {
+  const visits = await Appointment.find(scoped(ctx, { branchId, status: 'COMPLETED', startAt })).select('items.staffId invoiceId').lean();
+  const billIds = visits.map((a) => a.invoiceId).filter(Boolean);
+  const paid = new Set((await Invoice.find(scoped(ctx, { _id: { $in: billIds }, settlementStatus: 'PAID' })).select('_id').lean()).map((i) => String(i._id)));
+  return visits.filter((a) => !a.invoiceId || !paid.has(String(a.invoiceId)));
+}
+
 // Everything the calculation needs for one branch and month, read in one go
 async function gatherMonth(ctx, branch, month) {
   const { start, end } = monthBounds(month);
@@ -52,8 +60,8 @@ async function gatherMonth(ctx, branch, month) {
     Attendance.find(scoped(ctx, { staffId: { $in: staffIds }, date: { $gte: start, $lte: end } })).lean(),
     CommissionEntry.find(scoped(ctx, { staffId: { $in: staffIds }, day: { $gte: start, $lte: end } })).select('staffId amount saleAmount').lean(),
     paidBillsBetween(ctx.orgId, { from: start, to: end }),
-    // Finished but not checked out: no commission or per-service pay until they're paid
-    Appointment.find(scoped(ctx, { branchId: branch._id, status: 'COMPLETED', invoiceId: null, startAt: monthUTC })).select('items.staffId').lean(),
+    // Finished but not fully paid (not billed, or a bill with something still due): no commission or per-service pay yet
+    unpaidVisits(ctx, branch._id, monthUTC),
     PayrollAdjustment.find(scoped(ctx, { branchId: branch._id, month })).sort('createdAt').lean(),
     EmployeeAdvance.find(scoped(ctx, { staffId: { $in: staffIds }, firstMonth: { $lte: month } })).lean(),
   ]);

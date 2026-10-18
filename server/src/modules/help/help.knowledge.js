@@ -179,10 +179,10 @@ export const KNOWLEDGE = [
     id: 'checkout',
     title: 'Checkout and split payments',
     audiences: EVERYONE,
-    keywords: ['*checkout', 'split payment', 'take payment', 'collect money', 'card and cash', 'upi', 'part payment', 'pay bill'],
+    keywords: ['*checkout', 'split payment', 'take payment', 'collect money', 'card and cash', 'upi', 'part payment', 'pay bill', 'pay later', '*due', 'record payment'],
     answer:
-      'When a service is **Completed**, click **Checkout** on its block. Add a payment row for each method with **+ Add payment method** (for example ₹1,000 card + ₹500 UPI + ₹30 cash); the **Rest** button fills in what’s left. The **Pay** button only works when *Remaining* is exactly ₹0.',
-    link: { label: 'Day board', to: '/app/today' },
+      'When a service is **Completed**, click **Checkout** on its block. This opens a draft bill. Add a payment row for each method with **+ Add payment method** (for example ₹1,000 card + ₹500 UPI + ₹30 cash); the **Rest** button fills in what’s left. Click **Issue & pay**: the bill gets its number and is locked. Paying less is fine: the rest shows as *due*, and **Record payment** on the bill takes it later. Bills with money due are listed under **Bills** (filter *Money still due*) and on the dashboard.',
+    link: { label: 'Bills', to: '/app/bills' },
   },
   {
     id: 'discount',
@@ -190,7 +190,7 @@ export const KNOWLEDGE = [
     audiences: EVERYONE,
     keywords: ['*discount', 'percent off', 'reduce price', 'lower price', '*offer'],
     answer:
-      'On the checkout page, choose **₹** or **%** next to *Discount* and type the amount. The total updates straight away. A discount can’t be more than the bill, so the total never goes below ₹0.',
+      'On the checkout page, choose **₹** or **%** and type the amount, either next to one service or as a *Bill discount* for everything. The total (and GST, if your salon is registered) updates straight away. The front desk can give up to the salon’s limit (10% unless an owner changed it in **Billing settings**); above that, click **Ask owner to approve**, and the bill can be issued once an owner approves it. Only owners can change a price, and they give a reason.',
   },
   {
     id: 'invoice',
@@ -198,7 +198,7 @@ export const KNOWLEDGE = [
     audiences: EVERYONE,
     keywords: ['*invoice', 'print bill', 'reprint', '*receipt', 'save pdf invoice'],
     answer:
-      'After paying you land on the invoice. Click **Print / save as PDF**. To find it later, click the **Paid ✓** badge on the Day board, or open the appointment and click **View invoice**. An appointment can only be paid once.',
+      'After issuing you land on the bill. Click **Print / save as PDF**. To find it later, open **Bills** and search by bill number, customer name or phone, or click the **Paid ✓** / **Due** badge on the Day board. An appointment is only ever billed once.',
   },
 
   // ---------------------------------------------------------------- attendance
@@ -293,7 +293,7 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['*revenue', 'how revenue', 'service value', 'total sales', '*earnings', '*income'],
     answer:
-      '**Revenue** is the total of invoices paid in the period, so cancelled or unpaid bookings never count. **Service value** in Analytics is the list price of completed services, before discounts and combo prices. That’s why the two can differ.',
+      '**Revenue** is the total of bills issued in the period (including any part still due), so cancelled bookings and unbilled visits never count. **Service value** in Analytics is the list price of completed services, before discounts and combo prices. That’s why the two can differ.',
     denied: 'Revenue figures are only shown to owners.',
   },
 

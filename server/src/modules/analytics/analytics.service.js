@@ -2,7 +2,7 @@
 // Everything is a MongoDB aggregation over the chosen date range and branches.
 import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
-import { Appointment, Attendance, Branch, Invoice, Lead, Organization, Staff } from '../../models/index.js';
+import { Appointment, Attendance, Branch, Invoice, Lead, Organization, Payment, Staff } from '../../models/index.js';
 import { LEAD_SOURCES, PAYMENT_METHODS } from '../../config/constants.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
@@ -35,14 +35,15 @@ export async function getAnalytics(ctx, { from, to, branchId }) {
   const branches = await loadBranches(ctx, branchId);
   const orgId = new mongoose.Types.ObjectId(ctx.orgId); // aggregate() doesn't convert ids for us
   const bookingsMatch = { orgId, status: { $ne: 'CANCELLED' }, ...dateRangeFilter(branches, 'startAt', from, to) };
-  const invoicesMatch = { orgId, ...dateRangeFilter(branches, 'paidAt', from, to) };
+  const invoicesMatch = { orgId, status: 'ISSUED', ...dateRangeFilter(branches, 'issuedAt', from, to) };
+  const paymentsMatch = { orgId, status: 'VALID', ...dateRangeFilter(branches, 'receivedAt', from, to) };
   const leadsMatch = { orgId, ...dateRangeFilter(branches, 'createdAt', from, to) };
   const days = Math.round(DateTime.fromISO(to).diff(DateTime.fromISO(from), 'days').days) + 1;
 
   const [bookingsByBranch, revenueByBranch, byStylist, byService, bySource, byMethod, slotGroups] = await Promise.all([
-    // Branch demand: bookings (not cancelled) and revenue (invoices) per branch
+    // Branch demand: bookings (not cancelled) and revenue (issued bills) per branch
     Appointment.aggregate([{ $match: bookingsMatch }, { $group: { _id: '$branchId', bookings: { $sum: 1 } } }]),
-    Invoice.aggregate([{ $match: invoicesMatch }, { $group: { _id: '$branchId', revenue: { $sum: '$total' }, invoices: { $sum: 1 } } }]),
+    Invoice.aggregate([{ $match: invoicesMatch }, { $group: { _id: '$branchId', revenue: { $sum: '$grandTotal' }, invoices: { $sum: 1 } } }]),
 
     // Stylist demand: one row per stylist. "Service value" = list price of their completed services.
     Appointment.aggregate([
@@ -82,12 +83,8 @@ export async function getAnalytics(ctx, { from, to, branchId }) {
       { $group: { _id: '$source', leads: { $sum: 1 }, converted: { $sum: { $cond: [{ $eq: ['$status', 'APPOINTMENT_BOOKED'] }, 1, 0] } } } },
     ]),
 
-    // Payment mix: split payments are unwound so ₹1,000 card + ₹500 UPI count in each method
-    Invoice.aggregate([
-      { $match: invoicesMatch },
-      { $unwind: '$payments' },
-      { $group: { _id: '$payments.method', amount: { $sum: '$payments.amount' }, payments: { $sum: 1 } } },
-    ]),
+    // Payment mix: money received in the period by method (₹1,000 card + ₹500 UPI count in each method)
+    Payment.aggregate([{ $match: paymentsMatch }, { $group: { _id: '$method', amount: { $sum: '$amount' }, payments: { $sum: 1 } } }]),
 
     // Slot demand: bookings by weekday x hour, in each branch's LOCAL time (one aggregation per branch)
     Promise.all(
