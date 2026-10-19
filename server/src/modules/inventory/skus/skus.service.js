@@ -28,7 +28,7 @@ const HISTORY_PAGE_SIZE = 25;
 const productLink = (id) => `/app/inventory?tab=products&product=${id}`;
 
 // The fields that describe the product itself (the same at every branch)
-const PRODUCT_FIELDS = ['name', 'category', 'brand', 'barcodes', 'type', 'stockUnit', 'wayOfUse', 'baseUnit', 'unitsPerStockUnit'];
+const PRODUCT_FIELDS = ['name', 'category', 'brand', 'barcodes', 'type', 'stockUnit', 'wayOfUse', 'baseUnit', 'unitsPerStockUnit', 'sellPrice', 'taxRateBps', 'hsnCode'];
 const BRANCH_FIELDS = ['reorderPoint', 'reorderQty', 'leadTimeDays', 'preferredSupplierId'];
 
 // What I may do here, with the selected branch's settings

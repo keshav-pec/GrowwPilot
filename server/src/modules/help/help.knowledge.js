@@ -201,6 +201,32 @@ export const KNOWLEDGE = [
       'After issuing you land on the bill. Click **Print / save as PDF**. To find it later, open **Bills** and search by bill number, customer name or phone, or click the **Paid ✓** / **Due** badge on the Day board. An appointment is only ever billed once.',
   },
 
+  {
+    id: 'product-sale',
+    title: 'Selling products',
+    audiences: EVERYONE,
+    keywords: ['*sell product', 'retail', 'new sale', 'add product to bill', 'product sale', 'sell shampoo', 'barcode bill'],
+    answer:
+      'With the Inventory add-on, click **Add product** on the checkout page, or **New sale** on the **Bills** page for products only. Search or scan the barcode; the list shows how many are in the store, and a bill can’t be issued with more than there is. The stock goes down when the bill is issued. Only retail products with a selling price (set by an owner in Inventory) can be sold.',
+    link: { label: 'Bills', to: '/app/bills' },
+  },
+  {
+    id: 'refund',
+    title: 'Refunds and returns',
+    audiences: EVERYONE,
+    keywords: ['*refund', '*return product', 'money back', 'credit note', 'customer returned', 'give money back', 'void bill', 'cancel bill', 'reverse payment'],
+    answer:
+      'Open the bill and click **Refund / return**. Tick what comes back, say how many and (for products) whether they can be sold again, and give a reason. The front desk’s request goes to an owner, who approves or turns it down. Approving gives the money back, makes a credit note on GST bills, puts sellable products back in the store and takes back the stylist’s commission. Owners can also **Void** a bill with no money on it, or **Reverse** a payment that was recorded by mistake.',
+  },
+  {
+    id: 'advance',
+    title: 'Customer advances',
+    audiences: EVERYONE,
+    keywords: ['*advance', 'deposit', 'paid in advance', 'pay ahead', 'use advance', 'extra money'],
+    answer:
+      'On the customer’s profile, click **Take advance** for money paid ahead (for example a bridal deposit). At checkout, the advance shows in the payment box: type how much to use. If a customer pays more than the bill, tick **Keep the extra as an advance**. Advances can be used at any branch.',
+  },
+
   // ---------------------------------------------------------------- attendance
   {
     id: 'attendance',

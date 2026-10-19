@@ -448,6 +448,9 @@ const sku = {
   developer: await product({ name: 'Developer 6% (1 L)', category: 'Colour', stockUnit: 'bottle', wayOfUse: 'SERVICE_MEASURED', baseUnit: 'ml', unitsPerStockUnit: 1000, openingQty: 3400, openingUnitCost: rupees(550), reorderPoint: 1000, reorderQty: 3000, preferredSupplierId: String(lakme._id) }),
   colour: await product({ name: 'Majirel colour tube 50 g', category: 'Colour', stockUnit: 'tube', wayOfUse: 'SERVICE_MEASURED', baseUnit: 'g', unitsPerStockUnit: 50, openingQty: 600, openingUnitCost: rupees(420), reorderPoint: 150, reorderQty: 500, preferredSupplierId: String(lakme._id) }),
   gloves: await product({ name: 'Disposable gloves', category: 'Supplies', stockUnit: 'box', wayOfUse: 'MANUAL', openingQty: 6, openingUnitCost: rupees(250) }),
+  // Retail products the front desk can sell on bills (selling price includes GST)
+  serum: await product({ name: 'Argan hair serum 100 ml', category: 'Retail', brand: 'Moroccanoil', type: 'RETAIL', stockUnit: 'bottle', wayOfUse: 'MANUAL', sellPrice: rupees(1180), hsnCode: '3305', openingQty: 12, openingUnitCost: rupees(620), reorderPoint: 3, reorderQty: 12, barcodes: ['8904099412001'] }),
+  mask: await product({ name: 'Repair hair mask 250 g', category: 'Retail', brand: 'Loreal', type: 'RETAIL', stockUnit: 'jar', wayOfUse: 'MANUAL', sellPrice: rupees(950), hsnCode: '3305', openingQty: 4, openingUnitCost: rupees(480) }),
 };
 
 // What services use: a facial takes one kit; hair colour takes colour and developer; shampoo is linked to haircuts (for reports)
@@ -491,7 +494,7 @@ await markSetupStep(owner, 'done', key());
 console.log(`\nSeeded: 2 salons, 3 branches, ${Object.keys(staff).length} staff, ${GLAMOUR_SERVICES.length + DESERT_ROSE_SERVICES.length} services, 2 combos,`);
 console.log(`        ${glamourCustomers.length + desertCustomers.length} customers, ${LEADS.length} leads, ${appointments.length} appointments, ${invoices.length} invoices, ${attendance.length} attendance records`);
 console.log(`        8 pay setups (2 front desk), 1 pay change request waiting for approval, 1 locked payroll month with payments, 1 advance, ${await models.CommissionEntry.countDocuments()} commission lines`);
-console.log(`        Inventory (Glamour Andheri): ${Object.keys(sku).length} products, 3 recipes, 4 hand-outs, 2 purchase orders, 1 write-off waiting for approval, 1 problem report, 4 product photos`);
+console.log(`        Inventory (Glamour Andheri): ${Object.keys(sku).length} products (2 for sale on bills), 3 recipes, 4 hand-outs, 2 purchase orders, 1 write-off waiting for approval, 1 problem report, 4 product photos`);
 console.log(`Today is centred on ${A.toFormat('h:mm a')} at Andheri (${A.zoneName}).`);
 console.log('\nEvery account uses the password:', DEMO_PASSWORD);
 console.table([

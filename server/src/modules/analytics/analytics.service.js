@@ -36,7 +36,7 @@ export async function getAnalytics(ctx, { from, to, branchId }) {
   const orgId = new mongoose.Types.ObjectId(ctx.orgId); // aggregate() doesn't convert ids for us
   const bookingsMatch = { orgId, status: { $ne: 'CANCELLED' }, ...dateRangeFilter(branches, 'startAt', from, to) };
   const invoicesMatch = { orgId, status: 'ISSUED', ...dateRangeFilter(branches, 'issuedAt', from, to) };
-  const paymentsMatch = { orgId, status: 'VALID', ...dateRangeFilter(branches, 'receivedAt', from, to) };
+  const paymentsMatch = { orgId, kind: { $ne: 'REFUND' }, status: 'VALID', ...dateRangeFilter(branches, 'receivedAt', from, to) };
   const leadsMatch = { orgId, ...dateRangeFilter(branches, 'createdAt', from, to) };
   const days = Math.round(DateTime.fromISO(to).diff(DateTime.fromISO(from), 'days').days) + 1;
 

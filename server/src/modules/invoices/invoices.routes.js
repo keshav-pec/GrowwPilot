@@ -13,12 +13,20 @@ router.use(requireAuth, tenantContext, requireRole('OWNER', 'FRONT_DESK'));
 
 router.get('/', validate({ query: schemas.listSchema }), controller.list);
 router.post('/', validate({ body: schemas.openDraftSchema }), controller.openDraft); // safe to repeat: one bill per appointment
+router.post('/sale', validate({ body: schemas.saleSchema }), controller.createSale);
+router.get('/products', validate({ query: schemas.productSearchSchema }), controller.products); // what can be sold here
 router.get('/:id', controller.getOne);
-router.patch('/:id', validate({ body: schemas.saveDraftSchema }), controller.save); // stale edits refused by version
+
+// Drafts (stale edits are refused by version)
+router.patch('/:id', validate({ body: schemas.saveDraftSchema }), controller.save);
+router.delete('/:id', validate({ query: schemas.versionQuerySchema }), controller.discard);
 router.post('/:id/quote', validate({ body: schemas.quoteSchema }), controller.quote); // preview only, saves nothing
+router.post('/:id/products', validate({ body: schemas.addProductSchema }), controller.addProduct);
+router.delete('/:id/lines/:lineId', validate({ query: schemas.versionQuerySchema }), controller.removeLine);
 
 // Money changes: an Idempotency-Key makes a double click or retry harmless
 router.post('/:id/issue', requireIdempotencyKey, validate({ body: schemas.issueSchema }), controller.issue);
+router.post('/:id/void', requireIdempotencyKey, validate({ body: schemas.voidSchema }), controller.voidBill);
 router.post('/:id/request-approval', requireIdempotencyKey, validate({ body: schemas.requestApprovalSchema }), controller.requestApproval);
 router.post('/:id/approve', requireIdempotencyKey, validate({ body: schemas.approveSchema }), controller.approve);
 router.post('/:id/reject', requireIdempotencyKey, validate({ body: schemas.rejectSchema }), controller.reject);

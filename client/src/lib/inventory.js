@@ -40,6 +40,8 @@ export const MOVEMENT_LABEL = {
   COUNT_CORRECTION: 'Stock count',
   CORRECTION: 'Correction',
   RETURN_TO_SUPPLIER: 'Returned to supplier',
+  SALE: 'Sold on a bill',
+  SALE_RETURN: 'Brought back by a customer',
 };
 
 // Why stock was used or written off by hand

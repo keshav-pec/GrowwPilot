@@ -3,8 +3,8 @@ import { DateTime } from 'luxon';
 
 export const INVOICE_STATUSES = ['DRAFT', 'ISSUED', 'VOID'];
 export const SETTLEMENT_STATUSES = ['UNPAID', 'PARTIALLY_PAID', 'PAID'];
-export const REFUND_STATUSES = ['NONE', 'PARTIAL', 'FULL']; // used from Phase 2
-export const LINE_KINDS = ['SERVICE', 'PRODUCT']; // PRODUCT lines come in Phase 2
+export const REFUND_STATUSES = ['NONE', 'PARTIAL', 'FULL']; // how much of a bill has been refunded
+export const LINE_KINDS = ['SERVICE', 'PRODUCT'];
 export const APPROVAL_STATUSES = ['NONE', 'PENDING', 'APPROVED', 'REJECTED'];
 export const DISCOUNT_TYPES = ['flat', 'percent'];
 
@@ -83,4 +83,14 @@ export function financialYear(date, zone) {
 // ("AND", "26-27", 1) -> "AND/26-27/00001"
 export function formatInvoiceNumber(prefix, fy, seq) {
   return `${prefix}/${fy}/${String(seq).padStart(5, '0')}`;
+}
+
+// A refund request: waiting for an owner, turned down, or done (money back, credit note, stock)
+export const REFUND_REQUEST_STATUSES = ['REQUESTED', 'REJECTED', 'DONE'];
+// What happens to a returned product: back on the shelf, or written off as damaged
+export const RESTOCK_OPTIONS = ['SELLABLE', 'DAMAGED'];
+
+// ("AND", "26-27", 1) -> "CN-AND/26-27/001". Kept to 16 characters (a GST rule): a 4-letter prefix drops the dash.
+export function formatCreditNoteNumber(prefix, fy, seq) {
+  return `CN${prefix.length > 3 ? '' : '-'}${prefix}/${fy}/${String(seq).padStart(3, '0')}`;
 }

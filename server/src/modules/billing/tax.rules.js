@@ -121,3 +121,24 @@ export function settlementStatus(amountPaid, grandTotal) {
   if (amountPaid >= grandTotal) return 'PAID';
   return amountPaid > 0 ? 'PARTIALLY_PAID' : 'UNPAID';
 }
+
+// Where a bill stands after payments and refunds:
+//   worth now = grand total - what refunds took off it;  paid now = money put on it - money handed back
+//   still due = worth now - paid now (never below 0)
+export function moneyState(invoice) {
+  const netValue = invoice.grandTotal - (invoice.creditedTotal ?? 0);
+  const netPaid = invoice.amountPaid - (invoice.refundedTotal ?? 0);
+  return { netValue, netPaid, balanceDue: Math.max(netValue - netPaid, 0), settlementStatus: settlementStatus(netPaid, netValue) };
+}
+
+// The part of one bill line that `qty` units take back (a refund): taxable value, CGST, SGST and total.
+// The last units take whatever is left, so all the refunds of a line always add up to exactly the line.
+export function creditForLine(line, qty) {
+  const left = line.qty - (line.refundedQty ?? 0);
+  if (qty < 1 || qty > left) throw new AppError(400, 'VALIDATION_ERROR', `Only ${left} of ${line.name} can still be refunded`);
+  const part = (field, credited) => (qty === left ? line[field] - (line[credited] ?? 0) : roundHalfUp(line[field] * qty, line.qty));
+  const taxableAmount = part('taxableAmount', 'creditedTaxable');
+  const cgst = part('cgst', 'creditedCgst');
+  const sgst = part('sgst', 'creditedSgst');
+  return { taxableAmount, cgst, sgst, amount: taxableAmount + cgst + sgst, taxRateBps: line.taxRateBps };
+}

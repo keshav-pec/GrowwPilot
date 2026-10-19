@@ -10,6 +10,7 @@ import { Button, Card, EmptyState, PageHeader, Spinner, Table, Tabs } from '../.
 import AppointmentStatusBadge from '../../components/AppointmentStatusBadge';
 import AppointmentDrawer from '../appointments/AppointmentDrawer';
 import CustomerFormModal from './CustomerFormModal';
+import AdvancesCard from './AdvancesCard';
 
 function Detail({ label, children }) {
   return (
@@ -94,8 +95,8 @@ export default function CustomerProfilePage() {
       />
 
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
-        <Card title="Details" className="lg:col-span-2">
-          <dl className="grid gap-4 sm:grid-cols-2">
+        <Card title="Details">
+          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             <Detail label="Email">{customer.email}</Detail>
             {/* dob is saved as midnight UTC, so show it in UTC to avoid slipping a day */}
             <Detail label="Date of birth">{customer.dob && formatDate(customer.dob, 'UTC')}</Detail>
@@ -116,6 +117,8 @@ export default function CustomerProfilePage() {
             </div>
           </div>
         </Card>
+
+        <AdvancesCard customer={customer} />
       </div>
 
       <Tabs

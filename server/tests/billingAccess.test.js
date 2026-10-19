@@ -108,6 +108,30 @@ describe('Front desk', () => {
   });
 });
 
+describe('Phase 2 actions', () => {
+  it('front desk: can take advances and ask for refunds, but not void, reverse or approve', async () => {
+    const appt = await completedAt(f.andheri, f.rahul);
+    const draft = (await call('desk', 'POST', '/invoices', { body: { appointmentId: String(appt._id) }, key: false })).json.invoice;
+    const bill = (await call('desk', 'POST', `/invoices/${draft._id}/issue`, { body: { version: 0, payments: [{ method: 'CASH', amount: 50000 }] } })).json.invoice;
+
+    expect((await call('desk', 'POST', `/invoices/${bill._id}/void`, { body: { reason: 'Mistake' } })).status).toBe(403);
+    expect((await call('desk', 'POST', `/payments/${bill.payments[0]._id}/reverse`, { body: { reason: 'Mistake' } })).status).toBe(403);
+    const asked = await call('desk', 'POST', '/refunds', { body: { invoiceId: bill._id, lines: [{ lineId: bill.lines[0]._id, qty: 1 }], reason: 'Unhappy' } });
+    expect(asked.status).toBe(201);
+    expect(asked.json.refund.status).toBe('REQUESTED');
+    expect((await call('desk', 'POST', `/refunds/${asked.json.refund._id}/approve`, { body: {} })).status).toBe(403);
+    expect((await call('business', 'POST', `/refunds/${asked.json.refund._id}/approve`, { body: {} })).json.refund.status).toBe('DONE');
+
+    const advance = await call('desk', 'POST', '/advances', { body: { customerId: String(f.priya._id), method: 'UPI', amount: 20000 } });
+    expect(advance.status).toBe(201);
+    expect((await call('desk', 'GET', `/advances?customerId=${f.priya._id}`, { key: false })).json.balance).toBe(20000);
+  });
+
+  it('a refund request without a request key is refused', async () => {
+    expect((await call('desk', 'POST', '/refunds', { body: {}, key: false })).status).toBe(400);
+  });
+});
+
 describe('Owners', () => {
   it('the business owner changes billing settings; a branch owner only sees them', async () => {
     const saved = await call('business', 'PATCH', '/billing/settings', { body: { frontDeskDiscountLimitBps: 1500 } });
@@ -122,7 +146,7 @@ describe('Owners', () => {
 
 describe('Inventory login', () => {
   it('has no billing at all', async () => {
-    for (const [method, path] of [['GET', '/invoices'], ['POST', '/invoices'], ['POST', '/payments'], ['GET', '/billing/settings']]) {
+    for (const [method, path] of [['GET', '/invoices'], ['POST', '/invoices'], ['POST', '/payments'], ['GET', '/billing/settings'], ['POST', '/refunds'], ['GET', '/advances'], ['POST', '/invoices/sale']]) {
       expect((await call('stock', method, path, { body: method === 'GET' ? undefined : {} })).status).toBe(403);
     }
   });

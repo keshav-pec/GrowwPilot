@@ -12,7 +12,9 @@ function useBillMutation(mutationFn) {
     mutationFn,
     onSuccess: (invoice) => {
       if (invoice?._id) queryClient.setQueryData(['invoice', invoice._id], invoice);
-      for (const key of ['invoices', 'appointments', 'appointment', 'customers', 'dashboard', 'notifications']) queryClient.invalidateQueries({ queryKey: [key] });
+      for (const key of ['invoices', 'invoice', 'appointments', 'appointment', 'customers', 'advances', 'dashboard', 'notifications', 'inventory', 'sellable-products']) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
     },
   });
 }
@@ -51,12 +53,42 @@ export function useQuote(id, edits, enabled) {
 
 // { _id, version, billDiscount?, lines? }
 export const useSaveDraft = () => useBillMutation(({ _id, ...body }) => send('patch', `/invoices/${_id}`, null, body));
-// { _id, key, version, payments, billDiscount?, lines? }
+// "New sale" (products only): { customerId } (null = Guest)
+export const useCreateSale = () => useBillMutation(({ customerId }) => send('post', '/invoices/sale', null, { customerId }));
+
+// Products that can be sold at the selected branch: { rows, exactMatchId }
+export function useSellableProducts(search, enabled = true) {
+  return useQuery({
+    queryKey: ['sellable-products', search],
+    queryFn: () => api.get('/invoices/products', { params: { search: search || undefined } }).then((res) => res.data),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+// { _id, version, skuId, qty }
+export const useAddProduct = () => useBillMutation(({ _id, ...body }) => send('post', `/invoices/${_id}/products`, null, body));
+// { _id, version, lineId }
+export const useRemoveLine = () => useBillMutation(({ _id, lineId, version }) => send('delete', `/invoices/${_id}/lines/${lineId}?version=${version}`));
+// { _id, version }
+export function useDiscardDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ _id, version }) => api.delete(`/invoices/${_id}`, { params: { version } }).then((res) => res.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+  });
+}
+// { _id, key, reason }
+export const useVoidInvoice = () => useBillMutation(({ _id, key, reason }) => send('post', `/invoices/${_id}/void`, key, { reason }));
+// { paymentId, key, reason } -> the bill (or null for an advance)
+export const useReversePayment = () =>
+  useBillMutation(({ paymentId, key, reason }) => api.post(`/payments/${paymentId}/reverse`, { reason }, { headers: { 'Idempotency-Key': key } }).then((res) => res.data.invoice));
+
+// { _id, key, version, payments, useAdvance?, keepExtraAsAdvance?, billDiscount?, lines? }
 export const useIssueInvoice = () => useBillMutation(({ _id, key, ...body }) => send('post', `/invoices/${_id}/issue`, key, body));
 // { _id, key, version, note, billDiscount?, lines? }
 export const useRequestApproval = () => useBillMutation(({ _id, key, ...body }) => send('post', `/invoices/${_id}/request-approval`, key, body));
 // { _id, key, version, note? }
 export const useApproveDiscount = () => useBillMutation(({ _id, key, ...body }) => send('post', `/invoices/${_id}/approve`, key, body));
 export const useRejectDiscount = () => useBillMutation(({ _id, key, ...body }) => send('post', `/invoices/${_id}/reject`, key, body));
-// { key, invoiceId, payments }
+// { key, invoiceId, payments, useAdvance?, keepExtraAsAdvance? }
 export const useRecordPayment = () => useBillMutation(({ key, ...body }) => send('post', '/payments', key, body));

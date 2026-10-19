@@ -38,6 +38,20 @@ export function resolvePrefixes(branches, saved) {
   return result;
 }
 
+// What this user may do with bills (at branches they can use). The business owner may do everything;
+// branch owners approve refunds and void bills unless the business owner switched that off.
+export function billingPermissions(ctx, settings) {
+  const owner = ctx.role === 'OWNER';
+  const delegated = settings.branchOwners ?? {};
+  return {
+    changePrice: owner,
+    approveDiscounts: owner,
+    approveRefunds: owner && (ctx.isPrimaryOwner || delegated.approveRefunds !== false),
+    voidBills: owner && (ctx.isPrimaryOwner || delegated.voidBills !== false),
+    reversePayments: owner,
+  };
+}
+
 // One branch's GST details and bill prefix, as bills need them
 export async function branchBilling(ctx, branchId, settings, session = null) {
   const branches = await Branch.find(scoped(ctx)).select('name createdAt').sort({ createdAt: 1, _id: 1 }).session(session).lean();
@@ -48,8 +62,8 @@ export async function branchBilling(ctx, branchId, settings, session = null) {
 }
 
 // ---------------------------------------------------------------------------
-// Billing settings screen. Owners see it; only the business owner changes it
-// (branch owners may be allowed to in Phase 2).
+// Billing settings screen. Owners see it; the business owner changes it. If the business owner allows it,
+// branch owners may change their own branches' GSTIN, state and bill prefix (never the salon-wide rules).
 // ---------------------------------------------------------------------------
 export async function getSettingsForScreen(ctx) {
   const [settings, branches, org] = await Promise.all([
@@ -66,13 +80,16 @@ export async function getSettingsForScreen(ctx) {
     pricesIncludeTax: settings.pricesIncludeTax,
     defaultServiceTaxBps: settings.defaultServiceTaxBps,
     defaultSacCode: settings.defaultSacCode,
+    defaultProductTaxBps: settings.defaultProductTaxBps ?? 1800,
     frontDeskDiscountLimitBps: settings.frontDeskDiscountLimitBps,
     guestProductSales: settings.guestProductSales,
+    branchOwners: { approveRefunds: settings.branchOwners?.approveRefunds !== false, voidBills: settings.branchOwners?.voidBills !== false, editSettings: Boolean(settings.branchOwners?.editSettings) },
     branches: visible.map((b) => {
       const saved = settings.branches?.find((x) => String(x.branchId) === String(b._id));
       return { branchId: b._id, name: b.name, status: b.status, gstin: saved?.gstin ?? '', stateCode: saved?.stateCode ?? '', invoicePrefix: prefixes[String(b._id)], prefixIsSaved: Boolean(saved?.invoicePrefix) };
     }),
     canEdit: ctx.isPrimaryOwner,
+    canEditBranches: ctx.isPrimaryOwner || Boolean(settings.branchOwners?.editSettings),
     updatedAt: settings.updatedAt ?? null,
   };
 }
@@ -83,19 +100,27 @@ const WORDS = {
   pricesIncludeTax: 'prices include GST',
   defaultServiceTaxBps: 'default service GST',
   defaultSacCode: 'default SAC code',
+  defaultProductTaxBps: 'default product GST',
   frontDeskDiscountLimitBps: 'front desk discount limit',
   guestProductSales: 'guest product sales',
 };
+const DELEGATION_WORDS = { approveRefunds: 'branch owners approve refunds', voidBills: 'branch owners void bills', editSettings: 'branch owners edit their branches’ GST details' };
 function describe(field, value) {
   if (typeof value === 'boolean') return `${WORDS[field]}: ${value ? 'on' : 'off'}`;
   if (field.endsWith('Bps')) return `${WORDS[field]}: ${value / 100}%`;
   return `${WORDS[field]}: ${value || '(empty)'}`;
 }
 
-// input: any of the salon fields, plus branches: [{ branchId, gstin, stateCode, invoicePrefix }]
+// input: any of the salon fields, branchOwners: { approveRefunds, voidBills, editSettings },
+// plus branches: [{ branchId, gstin, stateCode, invoicePrefix }]
 export async function updateSettings(ctx, input, key) {
-  if (!ctx.isPrimaryOwner) throw new AppError(403, 'FORBIDDEN', 'Only the business owner can change billing settings');
   const before = await getBillingSettings(ctx);
+  if (!ctx.isPrimaryOwner) {
+    if (ctx.role !== 'OWNER' || !before.branchOwners?.editSettings) throw new AppError(403, 'FORBIDDEN', 'Only the business owner can change billing settings');
+    const salonWide = [...Object.keys(WORDS), 'branchOwners'].filter((field) => input[field] !== undefined);
+    if (salonWide.length > 0) throw new AppError(403, 'FORBIDDEN', 'Only the business owner changes the salon-wide billing rules');
+    if ((input.branches ?? []).some((b) => !ctx.allowedBranchIds.includes(b.branchId))) throw new AppError(404, 'NOT_FOUND', 'Branch not found');
+  }
   const branches = await Branch.find(scoped(ctx)).select('name createdAt').sort({ createdAt: 1, _id: 1 }).lean();
 
   // Branch rows: start from what's saved, apply what was sent
@@ -132,6 +157,11 @@ export async function updateSettings(ctx, input, key) {
 
   const set = {};
   for (const field of Object.keys(WORDS)) if (input[field] !== undefined) set[field] = input[field];
+  const delegationWords = [];
+  for (const [field, value] of Object.entries(input.branchOwners ?? {})) {
+    set[`branchOwners.${field}`] = value;
+    if (value !== Boolean(before.branchOwners?.[field] ?? field !== 'editSettings')) delegationWords.push(`${DELEGATION_WORDS[field]}: ${value ? 'on' : 'off'}`);
+  }
   if ((set.gstRegistered ?? before.gstRegistered) && !(set.legalName ?? before.legalName)) {
     throw new AppError(400, 'LEGAL_NAME_REQUIRED', 'Enter the legal name printed on GST bills');
   }
@@ -139,8 +169,9 @@ export async function updateSettings(ctx, input, key) {
 
   const words = [
     ...Object.entries(set)
-      .filter(([field, value]) => field !== 'branches' && value !== before[field])
+      .filter(([field, value]) => WORDS[field] && value !== before[field])
       .map(([field, value]) => describe(field, value)),
+    ...delegationWords,
     ...branchWords,
   ];
 

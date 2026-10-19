@@ -7,6 +7,8 @@ import { APPROVAL_STATUSES, DISCOUNT_TYPES, INVOICE_STATUSES, LINE_KINDS, REFUND
 const lineSchema = new mongoose.Schema({
   kind: { type: String, enum: LINE_KINDS, default: 'SERVICE' },
   itemId: { type: mongoose.Schema.Types.ObjectId, default: null }, // the service inside the appointment
+  skuId: ref('InventorySku', { default: null }), // a product sold (Inventory add-on)
+  hsnCode: String, // products: GST goods code
   serviceId: ref('Service', { default: null }),
   staffId: ref('Staff', { default: null }),
   staffName: String,
@@ -27,6 +29,12 @@ const lineSchema = new mongoose.Schema({
   cgst: money({ default: 0 }),
   sgst: money({ default: 0 }),
   lineTotal: money({ default: 0 }), // what the customer pays for this line
+  // Refunds so far (credit notes): how many units, and how much of each amount was taken back
+  refundedQty: { type: Number, min: 0, default: 0 },
+  creditedTaxable: money({ default: 0 }),
+  creditedCgst: money({ default: 0 }),
+  creditedSgst: money({ default: 0 }),
+  creditedAmount: money({ default: 0 }),
 });
 
 const taxRowSchema = new mongoose.Schema(
@@ -61,6 +69,7 @@ const invoiceSchema = new mongoose.Schema(
     // Set while the bill counts for this appointment. A voided bill (Phase 2) moves it to voidedAppointmentId,
     // so the appointment can be billed again; the partial unique index below needs this.
     appointmentId: ref('Appointment', { default: undefined }),
+    voidedAppointmentId: ref('Appointment', { default: undefined }),
     customerId: ref('Customer', { default: null }), // empty only for guest product sales (Phase 2)
 
     status: { type: String, enum: INVOICE_STATUSES, default: 'DRAFT' },
@@ -86,7 +95,10 @@ const invoiceSchema = new mongoose.Schema(
     sgstTotal: money({ default: 0 }),
     taxTotal: money({ default: 0 }),
     grandTotal: money({ default: 0 }),
-    amountPaid: money({ default: 0 }),
+    amountPaid: money({ default: 0 }), // money put on this bill (payments and advances), less reversed payments
+    creditedTotal: money({ default: 0 }), // value taken off the bill by refunds (credit notes)
+    refundedTotal: money({ default: 0 }), // money handed back to the customer
+    // still owed = (grandTotal - creditedTotal) - (amountPaid - refundedTotal), never below 0
     balanceDue: money({ default: 0 }),
     taxSummary: [taxRowSchema],
 
@@ -108,6 +120,9 @@ const invoiceSchema = new mongoose.Schema(
     issuedAt: Date,
     issuedBy: ref('User'),
     paidAt: Date, // when it became fully paid (commission is earned then)
+    voidedAt: Date,
+    voidedBy: ref('User'),
+    voidReason: String,
     createdBy: ref('User'),
     version: { type: Number, default: 0 }, // goes up on every change; a stale edit is refused
   },

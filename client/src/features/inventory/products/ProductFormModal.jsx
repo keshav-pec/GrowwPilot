@@ -8,6 +8,7 @@ import { useSaveSku } from '../../../api/inventory/skus';
 import { useSuppliers } from '../../../api/inventory/suppliers';
 import { BASE_UNITS, SKU_TYPES, STOCK_UNITS, WAYS_OF_USE, isMeasured, newRequestKey } from '../../../lib/inventory';
 import { isValidRupees, toPaise } from '../../../lib/money';
+import { GST_RATE_OPTIONS } from '../../../lib/billing';
 import { Button, Input, Modal, Select } from '../../../components/ui';
 
 const whole = z.string().trim().refine((v) => v === '' || /^\d+$/.test(v), 'Use a whole number');
@@ -31,6 +32,10 @@ const schema = z
     reorderQty: whole,
     preferredSupplierId: z.string(),
     unitCost: z.string().refine((v) => v.trim() === '' || isValidRupees(v), 'Enter an amount like 450 or 450.50'),
+    // Selling to customers (retail products)
+    sellPrice: z.string().refine((v) => v.trim() === '' || isValidRupees(v), 'Enter a price like 450 or 450.50'),
+    taxRateBps: z.string(),
+    hsnCode: z.string().trim().refine((v) => v === '' || /^\d{4,8}$/.test(v), 'HSN code is 4 to 8 digits'),
   })
   .superRefine((v, ctx) => {
     if (v.wayOfUse !== 'SERVICE_MEASURED') return;
@@ -79,6 +84,9 @@ export default function ProductFormModal({ product, categories = [], canSeeCosts
       reorderQty: levelText(product?.branch.reorderQty),
       preferredSupplierId: product?.branch.preferredSupplierId ?? '',
       unitCost: '',
+      sellPrice: sku?.sellPrice != null ? String(sku.sellPrice / 100) : '',
+      taxRateBps: sku?.taxRateBps != null ? String(sku.taxRateBps) : '',
+      hsnCode: sku?.hsnCode ?? '',
     },
   });
 
@@ -86,6 +94,7 @@ export default function ProductFormModal({ product, categories = [], canSeeCosts
   const stockUnit = watch('stockUnit') || 'unit';
   const baseUnit = watch('baseUnit');
   const measured = wayOfUse === 'SERVICE_MEASURED';
+  const retail = watch('type') === 'RETAIL';
   const hint = WAYS_OF_USE.find((w) => w.value === wayOfUse)?.hint;
 
   function onSubmit(v) {
@@ -106,6 +115,9 @@ export default function ProductFormModal({ product, categories = [], canSeeCosts
         brand: v.brand,
         barcodes: v.barcodes.split(',').map((b) => b.trim()).filter(Boolean),
         type: v.type,
+        sellPrice: v.sellPrice.trim() ? toPaise(v.sellPrice) : null,
+        taxRateBps: v.taxRateBps === '' ? null : Number(v.taxRateBps),
+        hsnCode: v.hsnCode,
         ...reorder,
       };
       if (sku) {
@@ -226,6 +238,20 @@ export default function ProductFormModal({ product, categories = [], canSeeCosts
                 <Select label="Type" options={SKU_TYPES} {...register('type')} />
                 <Input label="Barcodes (optional)" hint="Scan or type; separate several with commas" {...register('barcodes')} />
                 {!sku && <Input label="Own code (optional)" placeholder="Made automatically" error={errors.code?.message} {...register('code')} />}
+                {retail && (
+                  <>
+                    <Input
+                      label={`Selling price per ${stockUnit} (₹)`}
+                      inputMode="decimal"
+                      placeholder="Not for sale"
+                      hint={measured ? 'Products measured in ml or g can’t be sold on bills' : 'Lets the front desk add it to bills'}
+                      error={errors.sellPrice?.message}
+                      {...register('sellPrice')}
+                    />
+                    <Select label="GST rate" options={[{ value: '', label: 'Salon default for products' }, ...GST_RATE_OPTIONS]} {...register('taxRateBps')} />
+                    <Input label="HSN code (optional)" inputMode="numeric" placeholder="e.g. 3305" error={errors.hsnCode?.message} {...register('hsnCode')} />
+                  </>
+                )}
               </>
             )}
             <Input

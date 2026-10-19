@@ -10,7 +10,7 @@ import { escapeRegex } from '../../utils/regex.js';
 // We never store counters on the customer, so the numbers can't drift out of sync.
 //   visits     = number of Completed appointments
 //   last visit = start time of the latest Completed appointment
-//   spend      = sum of issued bill totals (cancelled bookings and drafts never count)
+//   spend      = sum of issued bill totals, less refunds (cancelled bookings, drafts and voided bills never count)
 // ---------------------------------------------------------------------------
 export async function getCustomerStats(ctx, customerIds) {
   // aggregate() doesn't convert strings to ObjectIds for us, so we do it here
@@ -24,7 +24,7 @@ export async function getCustomerStats(ctx, customerIds) {
     ]),
     Invoice.aggregate([
       { $match: { orgId, customerId: { $in: ids }, status: 'ISSUED' } },
-      { $group: { _id: '$customerId', totalSpend: { $sum: '$grandTotal' } } },
+      { $group: { _id: '$customerId', totalSpend: { $sum: { $subtract: ['$grandTotal', { $ifNull: ['$creditedTotal', 0] }] } } } },
     ]),
   ]);
 

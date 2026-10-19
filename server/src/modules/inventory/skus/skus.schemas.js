@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BASE_UNITS, SKU_TYPES, WAYS_OF_USE } from '../../../config/inventory.js';
 import { objectId, paise } from '../../../utils/schemas.js';
+import { GST_RATES_BPS } from '../../../config/billing.js';
 
 const wholeNumber = z.number().int('Use a whole number').min(0, 'Can’t be below zero');
 // Optional text: an empty box is the same as leaving it out
@@ -20,6 +21,10 @@ const productFields = {
   // Measured products only (hair colour, developer): e.g. 'ml' and 1000 for a 1000 ml bottle
   baseUnit: z.enum(BASE_UNITS).nullable(),
   unitsPerStockUnit: z.number().int('Use a whole number').min(1, 'At least 1'),
+  // Selling it to customers (retail products): price per stock unit, GST rate (null = salon default), HSN code
+  sellPrice: paise.nullable(),
+  taxRateBps: z.number().int().refine((v) => GST_RATES_BPS.includes(v), 'Choose a GST rate from the list').nullable(),
+  hsnCode: z.string().trim().regex(/^(\d{4,8})?$/, 'HSN code is 4 to 8 digits'),
 };
 
 // Reorder levels for the selected branch (counted like the stock: ml for measured products)
@@ -45,6 +50,9 @@ export const createSkuSchema = z
     baseUnit: productFields.baseUnit.optional(),
     unitsPerStockUnit: productFields.unitsPerStockUnit.optional(),
     brand: productFields.brand,
+    sellPrice: productFields.sellPrice.optional(),
+    taxRateBps: productFields.taxRateBps.optional(),
+    hsnCode: productFields.hsnCode.optional(),
     // Own code instead of the automatic SKU-000123
     code: z
       .string()

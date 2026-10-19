@@ -32,10 +32,13 @@ export const MOVEMENT_TYPES = [
   'COUNT_CORRECTION', // difference found in a stock count
   'CORRECTION', // fixes an earlier movement (points at it)
   'RETURN_TO_SUPPLIER',
+  'SALE', // sold to a customer on a bill (Billing)
+  'SALE_RETURN', // a customer brought it back (refund) or the bill was voided
 ];
 
 // What each movement line means for reports. MOVED = from one place to another, the branch total is unchanged.
-export const LEDGER_BUCKETS = ['OPENING', 'RECEIVED', 'MOVED', 'CONSUMED', 'WASTED', 'ADJUSTED', 'RETURNED'];
+// SOLD = sold on a bill (minus) or brought back by a customer (plus), so adding it up gives what was really sold.
+export const LEDGER_BUCKETS = ['OPENING', 'RECEIVED', 'MOVED', 'CONSUMED', 'WASTED', 'ADJUSTED', 'RETURNED', 'SOLD'];
 
 // Who has a hand-out: the salon floor, a station, or a stylist
 export const RECIPIENT_KINDS = ['FLOOR', 'STATION', 'STAFF'];

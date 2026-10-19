@@ -7,7 +7,7 @@
 //   node src/scripts/migrate-billing-v2.js
 import mongoose from 'mongoose';
 import { pathToFileURL } from 'node:url';
-import { Appointment, Branch, Customer, Invoice, Organization, Payment, PaymentAllocation } from '../models/index.js';
+import { Appointment, Branch, CommissionEntry, Customer, Invoice, Organization, Payment, PaymentAllocation } from '../models/index.js';
 import { financialYear } from '../config/billing.js';
 import { computeBill } from '../modules/billing/tax.rules.js';
 import { splitByPrice } from '../modules/payroll/commission.rules.js';
@@ -90,8 +90,10 @@ export function convertOldBill(doc, { appointment, customer, branch, org }) {
 }
 
 export async function migrateBilling({ log = console.log } = {}) {
-  // Indexes first: drops the old ones that didn't allow drafts, and makes the new ones
+  // Indexes first: drops the old ones that didn't allow drafts (bills) or a second commission event per
+  // service (Phase 2: refunds and reversed payments), and makes the new ones
   await Invoice.syncIndexes();
+  await CommissionEntry.syncIndexes();
 
   const old = await Invoice.collection.find({ status: { $exists: false } }).toArray();
   if (old.length === 0) return { migrated: 0, skipped: 0 };

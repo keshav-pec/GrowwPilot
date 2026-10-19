@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Receipt, Settings } from 'lucide-react';
+import { Receipt, Settings, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useBills } from '../../api/invoices';
 import { formatMoney } from '../../lib/money';
 import { formatDateTime } from '../../lib/time';
 import { useDebounce } from '../../lib/useDebounce';
 import { billBadge } from '../../lib/billing';
+import { hasAddon } from '../../lib/constants';
 import { Badge, Button, EmptyState, Input, PageHeader, Pagination, Select, Table } from '../../components/ui';
+import NewSaleModal from './NewSaleModal';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All bills' },
@@ -15,7 +17,9 @@ const STATUS_OPTIONS = [
   { value: 'UNPAID', label: 'Unpaid' },
   { value: 'PARTIALLY_PAID', label: 'Part paid' },
   { value: 'PAID', label: 'Paid' },
+  { value: 'REFUNDED', label: 'Refunded' },
   { value: 'DRAFT', label: 'Drafts' },
+  { value: 'VOID', label: 'Void' },
 ];
 
 // Every bill at my branches: search by number, customer name or phone; filter by dates, status and branch
@@ -28,6 +32,7 @@ export default function BillsListPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
+  const [newSale, setNewSale] = useState(false);
 
   const debouncedSearch = useDebounce(search.trim());
   const branchId = branchChoice ?? activeBranch._id;
@@ -57,6 +62,7 @@ export default function BillsListPage() {
           <span className="flex gap-1">
             <Badge tone={badge.tone}>{badge.label}</Badge>
             {b.approval?.status === 'PENDING' && <Badge tone="yellow">Waiting for approval</Badge>}
+            {b.refundStatus && b.refundStatus !== 'NONE' && <Badge tone="orange">{b.refundStatus === 'FULL' ? 'Refunded' : 'Part refunded'}</Badge>}
           </span>
         );
       },
@@ -70,11 +76,18 @@ export default function BillsListPage() {
         title="Bills"
         subtitle="Every bill, with what has been paid and what is still due"
         actions={
-          isOwner && (
-            <Button variant="secondary" onClick={() => navigate('/app/settings/billing')}>
-              <Settings size={16} /> Billing settings
-            </Button>
-          )
+          <>
+            {isOwner && (
+              <Button variant="secondary" onClick={() => navigate('/app/settings/billing')}>
+                <Settings size={16} /> Billing settings
+              </Button>
+            )}
+            {hasAddon(user, 'inventory') && (
+              <Button onClick={() => setNewSale(true)}>
+                <ShoppingBag size={16} /> New sale
+              </Button>
+            )}
+          </>
         }
       />
 
@@ -100,11 +113,12 @@ export default function BillsListPage() {
         columns={columns}
         rows={bills.data?.rows}
         loading={bills.isPending}
-        onRowClick={(b) => navigate(b.status === 'DRAFT' && b.appointmentId ? `/app/checkout/${b.appointmentId}` : `/app/invoices/${b._id}`)}
+        onRowClick={(b) => navigate(b.status !== 'DRAFT' ? `/app/invoices/${b._id}` : b.appointmentId ? `/app/checkout/${b.appointmentId}` : `/app/bills/${b._id}/edit`)}
         empty={<EmptyState icon={Receipt} title="No bills found" message={search || status || from || to ? 'Try other filters.' : 'Bills appear here when an appointment is checked out.'} />}
       />
       {bills.isError && <p className="mt-2 text-sm text-danger">{bills.error.message}</p>}
       <Pagination page={page} pages={bills.data?.pages ?? 1} onChange={setPage} />
+      {newSale && <NewSaleModal onClose={() => setNewSale(false)} />}
     </>
   );
 }

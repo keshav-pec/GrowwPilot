@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
-import { ref } from '../fields.js';
+import { money, ref } from '../fields.js';
 import { BASE_UNITS, SKU_TYPES, WAYS_OF_USE } from '../../config/inventory.js';
+import { GST_RATES_BPS } from '../../config/billing.js';
 import { wholeNumber } from './wholeNumber.js';
 
 // A product, for the whole salon. Which branches use it, and their reorder levels and cost,
@@ -34,6 +35,11 @@ const inventorySkuSchema = new mongoose.Schema(
         uploadedAt: { type: Date, default: Date.now },
       },
     ],
+    // Selling to customers (Billing): retail products with a selling price, counted in whole stock units
+    sellPrice: money({ default: null }), // per stock unit; empty = not for sale
+    taxRateBps: { type: Number, enum: [...GST_RATES_BPS, null], default: null }, // GST rate; empty = the salon's default for products
+    hsnCode: { type: String, trim: true, default: '' }, // GST goods code, e.g. 3305
+
     status: { type: String, enum: ['active', 'inactive'], default: 'active' }, // inactive keeps all its history (and photos)
     version: { type: Number, default: 1 }, // goes up on every edit; a stale edit is refused (STALE_VERSION)
     createdBy: ref('User'),

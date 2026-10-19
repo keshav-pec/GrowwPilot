@@ -40,9 +40,13 @@ function SettingsForm({ saved }) {
     defaultSacCode: saved.defaultSacCode,
     discountLimit: String(saved.frontDeskDiscountLimitBps / 100),
     guestProductSales: saved.guestProductSales,
+    defaultProductTaxBps: String(saved.defaultProductTaxBps),
+    branchOwners: saved.branchOwners,
   });
   const [branches, setBranches] = useState(saved.branches.map((b) => ({ ...b, invoicePrefix: b.prefixIsSaved ? b.invoicePrefix : '', autoPrefix: b.invoicePrefix })));
-  const canEdit = saved.canEdit;
+  const canEdit = saved.canEdit; // salon-wide rules: the business owner
+  const canEditBranches = saved.canEditBranches; // branch GSTIN and prefix: also branch owners, if allowed
+  const setDelegation = (field) => (e) => setValues((v) => ({ ...v, branchOwners: { ...v.branchOwners, [field]: e.target.checked } }));
   const set = (field) => (e) => setValues((v) => ({ ...v, [field]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
   const setBranch = (index, change) => setBranches((rows) => rows.map((row, i) => (i === index ? { ...row, ...change } : row)));
 
@@ -57,8 +61,9 @@ function SettingsForm({ saved }) {
 
   function submit(e) {
     e.preventDefault();
+    const branchRows = branches.map((b) => ({ branchId: b.branchId, gstin: b.gstin, stateCode: b.stateCode, invoicePrefix: b.invoicePrefix }));
     save.mutate(
-      {
+      canEdit ? {
         key,
         legalName: values.legalName.trim(),
         gstRegistered: values.gstRegistered,
@@ -67,8 +72,10 @@ function SettingsForm({ saved }) {
         defaultSacCode: values.defaultSacCode.trim(),
         frontDeskDiscountLimitBps: Math.round(limit * 100),
         guestProductSales: values.guestProductSales,
-        branches: branches.map((b) => ({ branchId: b.branchId, gstin: b.gstin, stateCode: b.stateCode, invoicePrefix: b.invoicePrefix })),
-      },
+        defaultProductTaxBps: Number(values.defaultProductTaxBps),
+        branchOwners: values.branchOwners,
+        branches: branchRows,
+      } : { key, branches: branchRows },
       {
         onSuccess: () => {
           setKey(newRequestKey());
@@ -86,15 +93,20 @@ function SettingsForm({ saved }) {
         title="Billing settings"
         subtitle={<Link to="/app/bills" className="hover:underline">← Bills</Link>}
         actions={
-          canEdit && (
+          canEditBranches && (
             <Button type="submit" disabled={hasErrors} loading={save.isPending}>
               Save settings
             </Button>
           )
         }
       />
-      {!canEdit && <p className="mb-4 rounded-lg bg-surface p-3 text-sm text-muted">Only the business owner can change billing settings.</p>}
+      {!canEdit && (
+        <p className="mb-4 rounded-lg bg-surface p-3 text-sm text-muted">
+          {canEditBranches ? 'You can change your branches’ GSTIN and bill prefix. The other settings are the business owner’s.' : 'Only the business owner can change billing settings.'}
+        </p>
+      )}
 
+      <div className="flex flex-col gap-4">
       <fieldset disabled={!canEdit} className="flex flex-col gap-4">
         <Card title="GST">
           <div className="flex flex-col gap-4 text-sm">
@@ -128,6 +140,7 @@ function SettingsForm({ saved }) {
                   onChange={(e) => setValues((v) => ({ ...v, pricesIncludeTax: e.target.value === 'yes' }))}
                 />
                 <Select label="GST rate for services" hint="Used when a service has no rate of its own (set in Services & combos)" options={GST_RATE_OPTIONS} value={values.defaultServiceTaxBps} onChange={set('defaultServiceTaxBps')} />
+                <Select label="GST rate for products" hint="Used when a product has no rate of its own (set in Inventory)" options={GST_RATE_OPTIONS} value={values.defaultProductTaxBps} onChange={set('defaultProductTaxBps')} />
                 <Input label="SAC code for services (optional)" hint="e.g. 999721 for hair, 999722 for beauty treatments" inputMode="numeric" value={values.defaultSacCode} onChange={set('defaultSacCode')} error={values.defaultSacCode && !/^\d{4,8}$/.test(values.defaultSacCode) ? '4 to 8 digits' : null} />
               </div>
             )}
@@ -158,6 +171,26 @@ function SettingsForm({ saved }) {
           </div>
         </Card>
 
+        <Card title="What branch owners may do">
+          <div className="flex flex-col gap-2 text-sm">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" className="accent-gold" checked={values.branchOwners.approveRefunds} onChange={setDelegation('approveRefunds')} />
+              Approve refunds at their branches
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" className="accent-gold" checked={values.branchOwners.voidBills} onChange={setDelegation('voidBills')} />
+              Void bills at their branches
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" className="accent-gold" checked={values.branchOwners.editSettings} onChange={setDelegation('editSettings')} />
+              Change their branches’ GSTIN and bill prefix
+            </label>
+            <p className="text-xs text-muted">The front desk can only ask for refunds; an owner approves them.</p>
+          </div>
+        </Card>
+      </fieldset>
+
+      <fieldset disabled={!canEditBranches} className="flex flex-col gap-4">
         <Card title="Branches">
           <div className="flex flex-col divide-y divide-border">
             {branches.map((b, i) => {
@@ -195,6 +228,7 @@ function SettingsForm({ saved }) {
           <p className="mt-2 text-xs text-muted">Bill numbers start again from 00001 every financial year (1 April). Bills made before now keep their old numbers.</p>
         </Card>
       </fieldset>
+      </div>
     </form>
   );
 }

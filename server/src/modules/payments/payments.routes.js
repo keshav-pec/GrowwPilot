@@ -5,18 +5,20 @@ import { tenantContext } from '../../middleware/tenantContext.js';
 import { requireRole } from '../../middleware/requireRole.js';
 import { validate } from '../../middleware/validate.js';
 import { requireIdempotencyKey } from '../../middleware/idempotency.js';
-import { objectId } from '../../utils/schemas.js';
-import { paymentsSchema } from '../invoices/invoices.schemas.js';
-import { recordPayments } from './payments.service.js';
+import { recordPaymentSchema } from '../invoices/invoices.schemas.js';
+import { recordPayments, reversePayment } from './payments.service.js';
 
-// /api/payments — money taken on a bill after it was issued (owners and front desk)
+// /api/payments — money taken on a bill after it was issued, and reversing a wrong one (owners)
 const router = Router();
 router.use(requireAuth, tenantContext, requireRole('OWNER', 'FRONT_DESK'));
 
-const recordSchema = z.object({ invoiceId: objectId, payments: paymentsSchema.min(1, 'Add at least one payment') });
+const reverseSchema = z.object({ reason: z.string().trim().min(3, 'Say why the payment is reversed').max(300) });
 
-router.post('/', requireIdempotencyKey, validate({ body: recordSchema }), async (req, res) => {
+router.post('/', requireIdempotencyKey, validate({ body: recordPaymentSchema }), async (req, res) => {
   res.status(201).json({ invoice: await recordPayments(req.ctx, req.valid.body, req.idempotencyKey) });
+});
+router.post('/:id/reverse', requireIdempotencyKey, validate({ body: reverseSchema }), async (req, res) => {
+  res.json(await reversePayment(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
 });
 
 export default router;

@@ -22,12 +22,14 @@ async function plansOnDay(orgId, staffIds, day, session) {
 }
 
 // Writes the commission lines for one fully paid bill, one per service line, on the day it became fully paid.
-// Lines that already exist are skipped, so calling it again for the same bill never pays commission twice.
+// A service that has earned (and not been reversed since) is skipped, so calling it again never pays twice.
+// After a wrong payment was reversed and the bill is paid again, it earns again ("paid:2").
+// Refunded services never earn again.
 export async function recordInvoiceCommissions({ invoice, appointment, timezone }, session) {
   const day = DateTime.fromJSDate(invoice.paidAt, { zone: timezone }).toISODate();
   // Who did each service comes from the bill line (the appointment as a fallback)
   const lines = invoice.lines
-    .filter((l) => l.kind === 'SERVICE' && l.itemId)
+    .filter((l) => l.kind === 'SERVICE' && l.itemId && !(l.refundedQty >= l.qty))
     .map((l) => {
       const item = appointment?.items.find((i) => String(i._id) === String(l.itemId));
       return { itemId: l.itemId, staffId: l.staffId ?? item?.staffId, serviceId: l.serviceId ?? item?.serviceId, serviceName: l.name, saleAmount: l.taxableAmount };
@@ -41,13 +43,14 @@ export async function recordInvoiceCommissions({ invoice, appointment, timezone 
     CommissionRule.find({ orgId: invoice.orgId, staffId: { $in: staffIds }, serviceId: { $in: lines.map((l) => l.serviceId) } })
       .session(session ?? null)
       .lean(),
-    CommissionEntry.find({ invoiceId: invoice._id, type: 'earned' }).select('itemId').session(session ?? null).lean(),
+    CommissionEntry.find({ invoiceId: invoice._id }).select('itemId type').session(session ?? null).lean(),
   ]);
-  const done = new Set(existing.map((e) => String(e.itemId)));
+  const count = (line, type) => existing.filter((e) => String(e.itemId) === String(line.itemId) && e.type === type).length;
 
   const entries = [];
   for (const line of lines) {
-    if (done.has(String(line.itemId))) continue;
+    const earned = count(line, 'earned');
+    if (earned > count(line, 'reversal')) continue; // already earning
     const rule = rules.find((r) => String(r.staffId) === String(line.staffId) && String(r.serviceId) === String(line.serviceId));
     const rate = pickRate(plans[String(line.staffId)], rule);
     if (!rate || rate.rateBps === 0) continue;
@@ -65,11 +68,52 @@ export async function recordInvoiceCommissions({ invoice, appointment, timezone 
       saleAmount: line.saleAmount,
       ...rate,
       amount: commissionAmount(line.saleAmount, rate.rateBps),
+      eventKey: `paid:${earned + 1}`,
     });
   }
 
   if (entries.length > 0) await CommissionEntry.insertMany(entries, { session });
   return entries;
+}
+
+// Takes back the commission still standing on some services of a bill (all of them if itemIds is left out):
+// a refund, a payment that turned out to be wrong, or a voided bill. Adds 'reversal' rows with minus amounts
+// on `day`; earned rows are never changed. eventKey says why, e.g. "refund:<id>" (one row per service per event).
+export async function reverseCommissions({ invoice, itemIds, eventKey, day }, session) {
+  const rows = await CommissionEntry.find({ invoiceId: invoice._id, ...(itemIds ? { itemId: { $in: itemIds } } : {}) }).session(session ?? null).lean();
+  const byItem = new Map();
+  for (const row of rows) {
+    const key = String(row.itemId);
+    const net = byItem.get(key) ?? { sale: 0, amount: 0, earned: 0, reversed: 0, last: row };
+    net.sale += row.saleAmount;
+    net.amount += row.amount;
+    net[row.type === 'earned' ? 'earned' : 'reversed'] += 1;
+    if (row.type === 'earned') net.last = row;
+    byItem.set(key, net);
+  }
+  const reversals = [...byItem.values()]
+    .filter((net) => net.earned > net.reversed) // still earning
+    .map(({ sale, amount, last }) => ({
+      orgId: last.orgId,
+      branchId: last.branchId,
+      staffId: last.staffId,
+      invoiceId: last.invoiceId,
+      invoiceNumber: invoice.invoiceNumber ?? last.invoiceNumber,
+      appointmentId: last.appointmentId,
+      itemId: last.itemId,
+      serviceId: last.serviceId,
+      serviceName: last.serviceName,
+      day,
+      saleAmount: -sale,
+      rateBps: last.rateBps,
+      rateSource: last.rateSource,
+      ruleId: last.ruleId,
+      amount: -amount,
+      type: 'reversal',
+      eventKey,
+    }));
+  if (reversals.length > 0) await CommissionEntry.insertMany(reversals, { session });
+  return reversals;
 }
 
 // Bills that became fully paid between two branch-local days (inclusive), each with its appointment,

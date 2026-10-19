@@ -218,6 +218,32 @@ Billing Phase 1: GST-ready bills with drafts, per-line and bill discounts with a
 Billing Phase 2: retail product sales with stock deduction, refunds and returns with approval, credit notes, voids, customer advances, payment reversals, commission reversals
 ```
 
+**Phase 2 status: built (19 Oct 2026), waiting for the user's check.**
+- **How it was built (where it differs from the text above):**
+  - **Refund money:** a refund takes the returned lines' value (with their GST) off the bill. Money goes back only for what was paid beyond the bill's new value; the rest just comes off what the customer still owes. So a part-paid bill first loses its due amount.
+  - **Refund statuses:** REQUESTED, REJECTED and DONE. Approving does everything in one transaction, so there is no separate APPROVED step. Only one refund can wait for approval per bill at a time.
+  - **Credit notes:** only GST bills get one. The number looks like `CN-AND/26-27/001` (3-digit count, 16 characters at most; a 4-letter prefix drops the dash). Non-GST bills get a refund receipt.
+  - **Products:**
+    - Sold from the branch's main store, in whole stock units.
+    - Products measured in ml or g can't be sold.
+    - A damaged return comes back into stock and is then written off as DAMAGE.
+    - Voiding a bill puts its products back.
+  - **Advances:**
+    - Using an advance is recorded as an allocation from the advance, not as a new payment, so collections don't count the money twice.
+    - A reversed advance payment keeps its record, marked "reversed".
+  - **Commission:**
+    - Rows now have an `eventKey` (`paid:1`, `refund:<id>`, `payment_reversed:<id>`, `void:<id>`).
+    - A bill whose wrong payment was reversed earns commission again when it is paid again (`paid:2`). A refunded service never earns again.
+    - The old unique index is swapped automatically at server start.
+  - **Discard a draft:** added for sales the customer walked away from. Drafts have no number, so nothing is lost.
+  - **Default GST rate for products** (18%) added to Billing settings.
+  - **Demo data:** two retail products with selling prices at Andheri.
+- **Defaults picked for Phase 2 (to confirm):**
+  - Branch owners approve refunds and void bills (on). Branch owners changing their own branches' GSTIN and prefix (off).
+  - Money goes back by the bill's first payment method unless changed.
+  - Both business and branch owners can reverse payments.
+  - A bill can be voided only with no money on it and no refunds.
+
 ---
 
 ### Phase 3: Cash closing, dues, reports, permissions (PRD P2)

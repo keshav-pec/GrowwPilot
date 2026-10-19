@@ -9,7 +9,7 @@ import { objectId } from '../../utils/schemas.js';
 import { GST_RATES_BPS, PREFIX_REGEX } from '../../config/billing.js';
 import { getSettingsForScreen, updateSettings } from './settings.service.js';
 
-// /api/billing — billing settings (owners see them; only the business owner changes them)
+// /api/billing — billing settings (owners see them; the business owner changes them, see settings.service.js)
 const router = Router();
 router.use(requireAuth, tenantContext, requireRole('OWNER'));
 
@@ -21,6 +21,8 @@ const settingsSchema = z.object({
   defaultSacCode: z.string().trim().regex(/^(\d{4,8})?$/, 'SAC code is 4 to 8 digits').optional(),
   frontDeskDiscountLimitBps: z.number().int().min(0).max(10000).optional(),
   guestProductSales: z.boolean().optional(),
+  defaultProductTaxBps: z.number().int().refine((v) => GST_RATES_BPS.includes(v), 'Choose a GST rate from the list').optional(),
+  branchOwners: z.object({ approveRefunds: z.boolean(), voidBills: z.boolean(), editSettings: z.boolean() }).partial().optional(),
   branches: z
     .array(
       z.object({

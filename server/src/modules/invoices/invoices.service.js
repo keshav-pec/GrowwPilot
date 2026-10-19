@@ -1,41 +1,51 @@
 import mongoose from 'mongoose';
-import { Appointment, Branch, Counter, Customer, Invoice, Organization, Payment, PaymentAllocation, Service } from '../../models/index.js';
+import {
+  Appointment, Branch, Counter, Customer, InventoryLocation, InventorySku, InventorySkuBranch, Invoice, Organization, Payment, PaymentAllocation, Refund, Service,
+} from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { formatMoney } from '../../utils/money.js';
 import { escapeRegex } from '../../utils/regex.js';
-import { dayRangeUTC } from '../../utils/time.js';
+import { dayRangeUTC, todayInZone } from '../../utils/time.js';
 import { runOnce } from '../../middleware/idempotency.js';
 import { financialYear, formatInvoiceNumber } from '../../config/billing.js';
+import { isMeasured } from '../../config/inventory.js';
 import { splitByPrice } from '../payroll/commission.rules.js';
+import { reverseCommissions } from '../payroll/commission.service.js';
 import { markPayrollStale } from '../payroll/payrollStale.js';
 import { logActivity } from '../activity/activity.service.js';
 import { branchApproverIds, notify } from '../notifications/notifications.service.js';
 import { computeBill, discountLimit } from '../billing/tax.rules.js';
-import { branchBilling, getBillingSettings } from '../billing/settings.service.js';
-import { applyPayments } from '../payments/allocations.js';
+import { billingPermissions, branchBilling, getBillingSettings } from '../billing/settings.service.js';
+import { advancesOf, applyPayments } from '../payments/allocations.js';
+import { postMovement } from '../inventory/stock/stock.engine.js';
+import { branchStock } from '../inventory/stock/stock.queries.js';
 
 export { branchCode } from '../billing/settings.service.js';
 
 // ---------------------------------------------------------------------------
-// Bills (BILLING_PLAN.md, Phase 1). One checkout for everything:
+// Bills (BILLING_PLAN.md). One checkout for everything:
 //   1. Opening checkout for a finished appointment makes a DRAFT bill (no number yet, can be changed).
-//   2. While it's a draft: discounts per line or on the whole bill, and owners may change a price (with a reason).
-//      The server always works out prices and GST; the screen only shows what the server says.
-//   3. "Issue & Pay" gives it its number and locks it, in one transaction with any payments taken.
-//      Paying less than the total is fine: the rest stays due, and "Record payment" takes it later.
+//      "New sale" makes an empty draft for selling products only (to a customer, or a guest if allowed).
+//   2. While it's a draft: products can be added (Inventory add-on), discounts given per line or on the whole bill,
+//      and owners may change a price (with a reason). The server always works out prices and GST.
+//   3. "Issue & Pay" gives it its number and locks it, in one transaction with the payments, any advance used
+//      and the products leaving the stock. Paying less is fine: the rest stays due.
 // A front desk discount above the salon's limit waits for an owner to approve it first.
+// Refunds are in refunds/, later payments and reversals in payments/.
 // ---------------------------------------------------------------------------
 
 const LINK = (invoice) => `/app/invoices/${invoice._id}`;
 const isOwner = (ctx) => ctx.role === 'OWNER';
+const hasInventory = (ctx) => Boolean(ctx.addons?.includes('inventory'));
+const MAX_QTY = 999;
 
 function stale() {
   return new AppError(409, 'STALE_VERSION', 'This bill was just changed by someone else. Please reload it.');
 }
 
 // A bill in this salon, at a branch this user may use
-async function loadInvoice(ctx, id, session = null) {
+export async function loadInvoice(ctx, id, session = null) {
   const invoice = await Invoice.findOne(scoped(ctx, { _id: id })).session(session).lean();
   if (!invoice || !ctx.allowedBranchIds.includes(String(invoice.branchId))) throw new AppError(404, 'NOT_FOUND', 'Bill not found');
   return invoice;
@@ -45,16 +55,30 @@ function assertDraft(invoice) {
   if (invoice.status !== 'DRAFT') throw new AppError(409, 'ALREADY_ISSUED', `This bill has already been issued (${invoice.invoiceNumber})`);
 }
 
+function assertVersion(invoice, version) {
+  if (invoice.version !== version) throw stale();
+}
+
+// The branch's main store, where products are sold from and returned to
+async function mainStoreOf(ctx, branchId, session) {
+  const store = await InventoryLocation.findOne(scoped(ctx, { branchId, isMain: true })).session(session).lean();
+  if (!store) throw new AppError(409, 'NO_STORE', 'This branch has no stock set up yet');
+  return store;
+}
+
 // ---------------------------------------------------------------------------
 // Working out a draft: applies the requested changes, looks up today's GST rates and runs the bill maths.
 // Returns the fields to save, and where the bill stands with the front desk discount limit.
-// edits: { billDiscount?: { type, value }, lines?: [{ lineId, discount?: { type, value } | null, unitPrice?, priceChangeReason? }] }
+// edits: { billDiscount?: { type, value }, lines?: [{ lineId, discount?: { type, value } | null, qty? (products), unitPrice?, priceChangeReason? }] }
 // ---------------------------------------------------------------------------
 async function priceDraft(ctx, invoice, edits = {}, { session = null, settings } = {}) {
   settings ??= await getBillingSettings(ctx, session);
+  // One after the other: reads in a transaction must not race to start it
   const serviceIds = invoice.lines.map((l) => l.serviceId).filter(Boolean);
   const services = await Service.find(scoped(ctx, { _id: { $in: serviceIds } })).select('taxRateBps sacCode').session(session).lean();
-  const serviceOf = (id) => services.find((s) => String(s._id) === String(id));
+  const skuIds = invoice.lines.map((l) => l.skuId).filter(Boolean);
+  const skus = skuIds.length ? await InventorySku.find(scoped(ctx, { _id: { $in: skuIds } })).select('taxRateBps hsnCode').session(session).lean() : [];
+  const find = (list, id) => list.find((x) => String(x._id) === String(id));
 
   const priceChanges = [];
   for (const change of edits.lines ?? []) {
@@ -67,6 +91,10 @@ async function priceDraft(ctx, invoice, edits = {}, { session = null, settings }
       next.discountType = change.discount?.type ?? 'flat';
       next.discountValue = change.discount?.value ?? 0;
     }
+    if (change?.qty !== undefined && change.qty !== line.qty) {
+      if (line.kind !== 'PRODUCT') throw new AppError(400, 'VALIDATION_ERROR', 'Only products are sold in quantities');
+      next.qty = change.qty;
+    }
     if (change?.unitPrice !== undefined && change.unitPrice !== line.unitPrice) {
       if (!isOwner(ctx)) throw new AppError(403, 'FORBIDDEN', 'Only an owner can change a price');
       const backToList = change.unitPrice === line.listUnitPrice;
@@ -78,9 +106,13 @@ async function priceDraft(ctx, invoice, edits = {}, { session = null, settings }
     // A combo's lower price only applies at the list price; a price an owner set is the price
     next.comboDiscount = next.unitPrice === next.listUnitPrice ? (next.listComboDiscount ?? 0) : 0;
     if (next.kind === 'SERVICE') {
-      const service = serviceOf(next.serviceId);
+      const service = find(services, next.serviceId);
       next.taxRateBps = settings.gstRegistered ? (service?.taxRateBps ?? settings.defaultServiceTaxBps) : 0;
       next.sacCode = service?.sacCode || settings.defaultSacCode || undefined;
+    } else {
+      const sku = find(skus, next.skuId);
+      next.taxRateBps = settings.gstRegistered ? (sku?.taxRateBps ?? settings.defaultProductTaxBps ?? 1800) : 0;
+      next.hsnCode = sku?.hsnCode || undefined;
     }
     return next;
   });
@@ -133,21 +165,34 @@ function limitInfo(ctx, invoice, settings) {
   return { limitBps: settings.frontDeskDiscountLimitBps, limitAmount, overLimit, needsApproval: overLimit && !isOwner(ctx) && !approved };
 }
 
-// Payments on a bill, newest last: [{ method, amount, reference, receivedAt, source, recordedByName }]
+// Money put on a bill, oldest first: payments taken (also reversed ones, struck through on screen) and advances used
 async function paymentsOf(invoiceId, session = null) {
-  const allocations = await PaymentAllocation.find({ invoiceId, status: 'VALID' }).sort({ createdAt: 1 }).session(session).lean();
+  const allocations = await PaymentAllocation.find({ invoiceId }).sort({ createdAt: 1 }).session(session).lean();
   if (allocations.length === 0) return [];
-  const payments = await Payment.find({ _id: { $in: allocations.map((a) => a.paymentId) } })
+  const payments = await Payment.find({ _id: { $in: allocations.map((a) => a.paymentId).filter(Boolean) } })
     .populate('recordedBy', 'name')
     .session(session)
     .lean();
   return allocations.map((a) => {
+    if (a.advanceId) return { _id: a._id, kind: 'ADVANCE', method: 'ADVANCE', amount: a.amount, receivedAt: a.createdAt, source: 'ADVANCE', status: a.status };
     const p = payments.find((x) => String(x._id) === String(a.paymentId));
-    return { _id: p._id, method: p.method, amount: a.amount, reference: p.reference, receivedAt: p.receivedAt, source: p.source, recordedByName: p.recordedBy?.name };
+    return {
+      _id: p._id,
+      kind: 'PAYMENT',
+      method: p.method,
+      amount: a.amount,
+      reference: p.reference,
+      receivedAt: p.receivedAt,
+      source: p.source,
+      recordedByName: p.recordedBy?.name,
+      status: a.status,
+      reversal: p.status === 'REVERSED' ? p.reversal : undefined,
+    };
   });
 }
 
-// What the screens get: the bill, its payments, and (for drafts) the discount limit and what this user may do.
+// What the screens get: the bill, its payments, its refunds, the customer's advance, and what this user may do.
+// Drafts also get the discount limit and the stock of each product.
 // preview: `invoice` holds worked-out numbers that are not saved (a quote), shown over the saved draft.
 export async function present(ctx, invoice, { session = null, settings, limits, preview = false } = {}) {
   const full = await Invoice.findOne({ _id: invoice._id })
@@ -157,13 +202,31 @@ export async function present(ctx, invoice, { session = null, settings, limits, 
     .session(session)
     .lean();
   const shown = preview ? { ...full, ...pickComputed(invoice) } : full;
-  const result = { ...shown, payments: await paymentsOf(invoice._id, session) };
+  settings ??= await getBillingSettings(ctx, session);
+  const can = billingPermissions(ctx, settings);
+  const customerId = shown.customerId?._id ?? shown.customerId;
+  const result = {
+    ...shown,
+    payments: await paymentsOf(invoice._id, session),
+    advanceBalance: customerId ? (await advancesOf(ctx, customerId, session)).balance : 0,
+  };
+
   if (shown.status === 'DRAFT') {
-    settings ??= await getBillingSettings(ctx, session);
     result.limits = limits ?? limitInfo(ctx, shown, settings);
+    result.permissions = { changePrice: can.changePrice, approve: can.approveDiscounts && shown.approval?.status === 'PENDING', addProducts: hasInventory(ctx) };
+    // Products: how many are in the main store right now (issuing is refused if there aren't enough)
+    const skuIds = shown.lines.filter((l) => l.kind === 'PRODUCT').map((l) => l.skuId);
+    if (skuIds.length > 0) {
+      const stock = await branchStock(ctx, shown.branchId._id, skuIds, session);
+      result.stock = Object.fromEntries(Object.entries(stock).map(([skuId, s]) => [skuId, s.inStore]));
+    }
+  } else {
+    result.refunds = await Refund.find({ invoiceId: invoice._id }).sort({ createdAt: 1 }).session(session).lean();
     result.permissions = {
-      changePrice: isOwner(ctx),
-      approve: isOwner(ctx) && shown.approval?.status === 'PENDING',
+      refund: shown.status === 'ISSUED' ? (can.approveRefunds ? 'approve' : 'request') : null,
+      approveRefunds: can.approveRefunds,
+      void: can.voidBills && shown.status === 'ISSUED' && shown.amountPaid === 0 && (shown.refundStatus ?? 'NONE') === 'NONE',
+      reversePayments: can.reversePayments && shown.status === 'ISSUED',
     };
   }
   return result;
@@ -191,18 +254,11 @@ export async function openDraft(ctx, { appointmentId }) {
   const prices = appointment.items.map((i) => i.price);
   const itemsTotal = prices.reduce((a, b) => a + b, 0);
   const shares = appointment.totalPrice < itemsTotal ? splitByPrice(prices, appointment.totalPrice) : prices;
-  const draft = {
-    _id: new mongoose.Types.ObjectId(),
-    orgId: ctx.orgId,
+  const draft = newDraft(ctx, {
     branchId: appointment.branchId,
     appointmentId: appointment._id,
     customerId: appointment.customerId,
     customerSnapshot: { name: appointment.customerSnapshot.name, phone: appointment.customerSnapshot.phone },
-    status: 'DRAFT',
-    billDiscountType: 'flat',
-    billDiscountValue: 0,
-    approval: { status: 'NONE' },
-    createdBy: ctx.userId,
     lines: appointment.items.map((item, i) => ({
       _id: new mongoose.Types.ObjectId(),
       kind: 'SERVICE',
@@ -218,7 +274,7 @@ export async function openDraft(ctx, { appointmentId }) {
       discountType: 'flat',
       discountValue: 0,
     })),
-  };
+  });
   const { fields } = await priceDraft(ctx, draft);
 
   try {
@@ -229,6 +285,39 @@ export async function openDraft(ctx, { appointmentId }) {
     if (err.code === 11000) return present(ctx, await Invoice.findOne(scoped(ctx, { appointmentId: appointment._id })).lean());
     throw err;
   }
+}
+
+function newDraft(ctx, fields) {
+  return {
+    _id: new mongoose.Types.ObjectId(),
+    orgId: ctx.orgId,
+    status: 'DRAFT',
+    billDiscountType: 'flat',
+    billDiscountValue: 0,
+    approval: { status: 'NONE' },
+    createdBy: ctx.userId,
+    lines: [],
+    ...fields,
+  };
+}
+
+// "New sale" on the Bills page: an empty draft at the selected branch for selling products (Inventory add-on).
+// customerId: null sells to "Guest", only if the salon allows it in Billing settings.
+export async function createSaleDraft(ctx, { customerId }) {
+  if (!hasInventory(ctx)) throw new AppError(403, 'ADDON_DISABLED', 'Selling products needs the Inventory add-on');
+  const settings = await getBillingSettings(ctx);
+  let customerSnapshot = { name: 'Guest' };
+  if (customerId) {
+    const customer = await Customer.findOne(scoped(ctx, { _id: customerId })).select('name phone').lean();
+    if (!customer) throw new AppError(404, 'NOT_FOUND', 'Customer not found');
+    customerSnapshot = { name: customer.name, phone: customer.phone };
+  } else if (!settings.guestProductSales) {
+    throw new AppError(400, 'CUSTOMER_REQUIRED', 'Choose a customer. Sales to guests are switched off in Billing settings.');
+  }
+  const draft = newDraft(ctx, { branchId: ctx.activeBranchId, customerId: customerId ?? null, customerSnapshot });
+  const { fields } = await priceDraft(ctx, draft, {}, { settings });
+  const [created] = await Invoice.create([{ ...draft, ...fields }]);
+  return present(ctx, created.toObject(), { settings });
 }
 
 // One bill (draft or issued) with its payments
@@ -265,23 +354,98 @@ async function saveChanges(ctx, invoice, fields, priceChanges, session, extra = 
 export async function saveDraft(ctx, id, { version, ...edits }) {
   const invoice = await loadInvoice(ctx, id);
   assertDraft(invoice);
-  if (invoice.version !== version) throw stale();
+  assertVersion(invoice, version);
   const { fields, priceChanges, settings } = await priceDraft(ctx, invoice, edits);
   const updated = await mongoose.connection.transaction((session) => saveChanges(ctx, invoice, fields, priceChanges, session));
   return present(ctx, updated, { settings });
 }
 
+// A draft nobody needs (e.g. a sale the customer walked away from). It has no number, so nothing is lost.
+export async function discardDraft(ctx, id, { version }) {
+  const invoice = await loadInvoice(ctx, id);
+  assertDraft(invoice);
+  const removed = await Invoice.deleteOne(scoped(ctx, { _id: invoice._id, status: 'DRAFT', version }));
+  if (removed.deletedCount !== 1) throw stale();
+  return { discarded: true };
+}
+
 // ---------------------------------------------------------------------------
-// Issue the bill: number, lock, and take any payments, all in one transaction.
-// input: { version, payments: [{ method, amount, reference }], ...the same changes as saveDraft }
+// Products on a draft (Inventory add-on): retail products with a selling price, sold in whole stock units
 // ---------------------------------------------------------------------------
-export async function issueInvoice(ctx, id, { version, payments = [], ...edits }, key) {
+async function findSellable(ctx, skuId, branchId) {
+  const sku = await InventorySku.findOne(scoped(ctx, { _id: skuId })).lean();
+  if (!sku) throw new AppError(404, 'NOT_FOUND', 'Product not found');
+  if (sku.type !== 'RETAIL' || sku.sellPrice == null || isMeasured(sku) || sku.status !== 'active') {
+    throw new AppError(400, 'NOT_FOR_SALE', `${sku.name} isn’t for sale. An owner can set it up as a retail product with a selling price.`);
+  }
+  if (!(await InventorySkuBranch.exists(scoped(ctx, { skuId: sku._id, branchId, active: true })))) throw new AppError(400, 'NOT_FOR_SALE', `${sku.name} isn’t stocked at this branch`);
+  return sku;
+}
+
+// Search what can be sold at the selected branch (name, brand, code, or a scanned barcode), with the stock in the store
+export async function listSellableProducts(ctx, { search }) {
+  if (!hasInventory(ctx)) throw new AppError(403, 'ADDON_DISABLED', 'Selling products needs the Inventory add-on');
+  const branchId = ctx.activeBranchId;
+  const here = await InventorySkuBranch.find(scoped(ctx, { branchId, active: true })).distinct('skuId');
+  const filter = scoped(ctx, { _id: { $in: here }, type: 'RETAIL', status: 'active', sellPrice: { $ne: null }, wayOfUse: { $ne: 'SERVICE_MEASURED' } });
+  if (search) {
+    const pattern = new RegExp(escapeRegex(search), 'i');
+    filter.$or = [{ name: pattern }, { brand: pattern }, { code: new RegExp(`^${escapeRegex(search)}`, 'i') }, { barcodes: search }];
+  }
+  const skus = await InventorySku.find(filter).select('name brand code barcodes sellPrice taxRateBps hsnCode stockUnit images').sort({ name: 1 }).limit(30).lean();
+  const stock = await branchStock(ctx, branchId, skus.map((s) => s._id));
+  const rows = skus.map((s) => ({ _id: s._id, name: s.name, brand: s.brand, code: s.code, sellPrice: s.sellPrice, stockUnit: s.stockUnit, inStore: stock[String(s._id)]?.inStore ?? 0, hasImage: s.images?.length > 0 }));
+  const exact = search ? skus.filter((s) => s.barcodes?.includes(search) || s.code === search.toUpperCase()) : [];
+  return { rows, exactMatchId: exact.length === 1 ? exact[0]._id : null };
+}
+
+// Adds a product to the draft (one more of it, if it's already there). Saved straight away.
+export async function addProduct(ctx, id, { version, skuId, qty }) {
+  if (!hasInventory(ctx)) throw new AppError(403, 'ADDON_DISABLED', 'Selling products needs the Inventory add-on');
+  const invoice = await loadInvoice(ctx, id);
+  assertDraft(invoice);
+  assertVersion(invoice, version);
+  const sku = await findSellable(ctx, skuId, invoice.branchId);
+
+  const same = invoice.lines.find((l) => l.kind === 'PRODUCT' && String(l.skuId) === String(sku._id));
+  const lines = same
+    ? invoice.lines.map((l) => (l === same ? { ...l, qty: Math.min(l.qty + qty, MAX_QTY) } : l))
+    : [
+        ...invoice.lines,
+        { _id: new mongoose.Types.ObjectId(), kind: 'PRODUCT', skuId: sku._id, name: sku.name, qty, listUnitPrice: sku.sellPrice, unitPrice: sku.sellPrice, listComboDiscount: 0, discountType: 'flat', discountValue: 0 },
+      ];
+  const { fields, settings } = await priceDraft(ctx, { ...invoice, lines });
+  const updated = await mongoose.connection.transaction((session) => saveChanges(ctx, invoice, fields, [], session));
+  return present(ctx, updated, { settings });
+}
+
+// Takes a product off the draft (services come from the appointment and stay)
+export async function removeLine(ctx, id, lineId, { version }) {
+  const invoice = await loadInvoice(ctx, id);
+  assertDraft(invoice);
+  assertVersion(invoice, version);
+  const line = invoice.lines.find((l) => String(l._id) === lineId);
+  if (!line) throw new AppError(404, 'NOT_FOUND', 'That line is not on this bill');
+  if (line.kind !== 'PRODUCT') throw new AppError(400, 'VALIDATION_ERROR', 'Services done in the appointment stay on the bill. Give a discount instead.');
+  const { fields, settings } = await priceDraft(ctx, { ...invoice, lines: invoice.lines.filter((l) => l !== line) });
+  const updated = await mongoose.connection.transaction((session) => saveChanges(ctx, invoice, fields, [], session));
+  return present(ctx, updated, { settings });
+}
+
+// ---------------------------------------------------------------------------
+// Issue the bill: number, lock, payments, advance used and products out of stock, all in one transaction.
+// input: { version, payments: [{ method, amount, reference }], useAdvance (paise), keepExtraAsAdvance, ...the same changes as saveDraft }
+// ---------------------------------------------------------------------------
+export async function issueInvoice(ctx, id, { version, payments = [], useAdvance = 0, keepExtraAsAdvance = false, ...edits }, key) {
   const first = await loadInvoice(ctx, id); // 404 before anything else
 
   const result = await runOnce(ctx, { key, operation: 'billing.invoice.issue' }, async (session) => {
     const invoice = await loadInvoice(ctx, id, session);
     assertDraft(invoice);
-    if (invoice.version !== version) throw stale();
+    assertVersion(invoice, version);
+    if (invoice.lines.length === 0) throw new AppError(400, 'EMPTY_BILL', 'Add something to the bill first');
+    const products = invoice.lines.some((l) => l.kind === 'PRODUCT');
+    if (products && !hasInventory(ctx)) throw new AppError(403, 'ADDON_DISABLED', 'Selling products needs the Inventory add-on');
 
     const { fields, priceChanges, settings, limits } = await priceDraft(ctx, invoice, edits, { session });
     if (limits.needsApproval) {
@@ -295,10 +459,6 @@ export async function issueInvoice(ctx, id, { version, payments = [], ...edits }
     if (settings.gstRegistered && !billing.gstin) {
       throw new AppError(409, 'GSTIN_MISSING', `${branch.name} has no GSTIN yet. An owner needs to add it in Billing settings before GST bills can be issued.`);
     }
-    const paying = payments.reduce((sum, p) => sum + p.amount, 0);
-    if (paying > fields.grandTotal) {
-      throw new AppError(400, 'OVERPAID', `Payments are ${formatMoney(paying - fields.grandTotal)} more than the bill (${formatMoney(fields.grandTotal)})`);
-    }
 
     // The appointment is billed now, only if nobody billed it in the meantime
     if (invoice.appointmentId) {
@@ -310,10 +470,8 @@ export async function issueInvoice(ctx, id, { version, payments = [], ...edits }
     const now = new Date();
     const fy = financialYear(now, branch.timezone);
     const counter = await Counter.findOneAndUpdate({ _id: `invoice:${branch._id}:${fy}` }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after', session });
-    const [customer, org] = await Promise.all([
-      invoice.customerId ? Customer.findOne(scoped(ctx, { _id: invoice.customerId })).select('name phone').session(session).lean() : null,
-      Organization.findById(ctx.orgId).select('name').session(session).lean(),
-    ]);
+    const customer = invoice.customerId ? await Customer.findOne(scoped(ctx, { _id: invoice.customerId })).select('name phone').session(session).lean() : null;
+    const org = await Organization.findById(ctx.orgId).select('name').session(session).lean();
 
     const issued = await saveChanges(ctx, invoice, fields, priceChanges, session, {
       status: 'ISSUED',
@@ -336,20 +494,95 @@ export async function issueInvoice(ctx, id, { version, payments = [], ...edits }
       settlementStatus: 'UNPAID',
     });
 
-    // Takes the payments; a bill that ends up fully paid (or costs nothing) earns the stylists' commission
-    const final = await applyPayments(ctx, issued, payments, { session, source: 'CHECKOUT', timezone: branch.timezone });
+    // Products leave the main store now, exactly once: this is the same transaction as the issue
+    if (products) {
+      const store = await mainStoreOf(ctx, invoice.branchId, session);
+      for (const line of issued.lines.filter((l) => l.kind === 'PRODUCT')) {
+        try {
+          await postMovement(
+            ctx,
+            { branchId: invoice.branchId, type: 'SALE', note: `Bill ${issued.invoiceNumber}`, reference: { kind: 'invoice', id: issued._id }, requestKey: `sale:${issued._id}:${line._id}`, lines: [{ skuId: line.skuId, locationId: store._id, qty: -line.qty, bucket: 'SOLD' }] },
+            session
+          );
+        } catch (err) {
+          if (err.code === 'INSUFFICIENT_AVAILABLE_STOCK') throw new AppError(409, 'NOT_ENOUGH_STOCK', `Not enough ${line.name} in stock: ${err.details.available} left in ${store.name}`, err.details);
+          throw err;
+        }
+      }
+    }
+
+    // Payments and advance; a bill that ends up fully paid (or costs nothing) earns the stylists' commission
+    const { invoice: final, advanceKept } = await applyPayments(ctx, issued, payments, { session, source: 'CHECKOUT', timezone: branch.timezone, advance: useAdvance, keepExtraAsAdvance });
 
     const paid = final.amountPaid;
     const money = paid >= final.grandTotal ? 'paid in full' : paid > 0 ? `paid ${formatMoney(paid)}, ${formatMoney(final.balanceDue)} due` : 'nothing paid yet';
+    const extras = [useAdvance > 0 && `${formatMoney(useAdvance)} from advance`, advanceKept > 0 && `${formatMoney(advanceKept)} kept as advance`].filter(Boolean);
     await logActivity(
       ctx,
-      { action: 'billing.bill_issued', branchId: invoice.branchId, summary: `Issued bill ${final.invoiceNumber} for ${final.customerSnapshot?.name}: ${formatMoney(final.grandTotal)} (${money})`, after: { invoiceNumber: final.invoiceNumber, grandTotal: final.grandTotal, amountPaid: paid, manualDiscount: final.manualDiscount } },
+      {
+        action: 'billing.bill_issued',
+        branchId: invoice.branchId,
+        summary: `Issued bill ${final.invoiceNumber} for ${final.customerSnapshot?.name}: ${formatMoney(final.grandTotal)} (${money}${extras.length ? `; ${extras.join(', ')}` : ''})`,
+        after: { invoiceNumber: final.invoiceNumber, grandTotal: final.grandTotal, amountPaid: paid, manualDiscount: final.manualDiscount, advanceUsed: useAdvance, advanceKept },
+      },
       session
     );
     return present(ctx, final, { session, settings });
   });
 
   await markPayrollStale(ctx.orgId, first.branchId); // commission and per-service pay may have changed
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Void: an owner cancels an issued bill that has no money on it and no refunds (e.g. made by mistake).
+// The number stays used (the bill shows as Void), products go back to the store and the appointment
+// can be checked out again.
+// ---------------------------------------------------------------------------
+export async function voidInvoice(ctx, id, { reason }, key) {
+  const first = await loadInvoice(ctx, id);
+  const settings = await getBillingSettings(ctx);
+  if (!billingPermissions(ctx, settings).voidBills) throw new AppError(403, 'FORBIDDEN', 'Only an owner can void a bill');
+  if (!reason?.trim()) throw new AppError(400, 'REASON_REQUIRED', 'Say why the bill is voided');
+
+  const result = await runOnce(ctx, { key, operation: 'billing.invoice.void' }, async (session) => {
+    const invoice = await loadInvoice(ctx, id, session);
+    if (invoice.status !== 'ISSUED') throw new AppError(409, 'NOT_ISSUED', invoice.status === 'VOID' ? 'This bill is already void' : 'Only issued bills can be voided');
+    if (invoice.amountPaid > 0) throw new AppError(409, 'HAS_PAYMENTS', `${formatMoney(invoice.amountPaid)} has been paid on this bill. Reverse the payments (or refund) first.`);
+    if ((invoice.refundStatus ?? 'NONE') !== 'NONE' || (await Refund.exists({ invoiceId: invoice._id, status: 'REQUESTED' }).session(session))) {
+      throw new AppError(409, 'HAS_REFUNDS', 'This bill has refunds, so it can’t be voided');
+    }
+
+    const updated = await Invoice.findOneAndUpdate(
+      { _id: invoice._id, status: 'ISSUED', version: invoice.version },
+      {
+        $set: { status: 'VOID', voidedAt: new Date(), voidedBy: ctx.userId, voidReason: reason.trim(), balanceDue: 0, voidedAppointmentId: invoice.appointmentId },
+        $unset: { appointmentId: '' },
+        $inc: { version: 1 },
+      },
+      { returnDocument: 'after', session }
+    ).lean();
+    if (!updated) throw stale();
+    if (invoice.appointmentId) await Appointment.updateOne({ _id: invoice.appointmentId, invoiceId: invoice._id }, { $set: { invoiceId: null } }, { session });
+
+    const productLines = invoice.lines.filter((l) => l.kind === 'PRODUCT');
+    if (productLines.length > 0) {
+      const store = await mainStoreOf(ctx, invoice.branchId, session);
+      for (const line of productLines) {
+        await postMovement(
+          ctx,
+          { branchId: invoice.branchId, type: 'SALE_RETURN', note: `Bill ${invoice.invoiceNumber} voided`, reference: { kind: 'invoice', id: invoice._id }, requestKey: `void:${invoice._id}:${line._id}`, lines: [{ skuId: line.skuId, locationId: store._id, qty: line.qty, bucket: 'SOLD' }] },
+          session
+        );
+      }
+    }
+    const branch = await Branch.findById(invoice.branchId).select('timezone').session(session).lean();
+    await reverseCommissions({ invoice, eventKey: `void:${invoice._id}`, day: todayInZone(branch.timezone) }, session);
+
+    await logActivity(ctx, { action: 'billing.bill_voided', branchId: invoice.branchId, summary: `Voided bill ${invoice.invoiceNumber} for ${invoice.customerSnapshot?.name} (${formatMoney(invoice.grandTotal)}): ${reason.trim()}`, before: { status: 'ISSUED' }, after: { status: 'VOID', reason: reason.trim() } }, session);
+    return present(ctx, updated, { session, settings });
+  });
+  await markPayrollStale(ctx.orgId, first.branchId);
   return result;
 }
 
@@ -361,7 +594,7 @@ export async function requestApproval(ctx, id, { version, note, ...edits }, key)
   return runOnce(ctx, { key, operation: 'billing.discount.request' }, async (session) => {
     const invoice = await loadInvoice(ctx, id, session);
     assertDraft(invoice);
-    if (invoice.version !== version) throw stale();
+    assertVersion(invoice, version);
     const { fields, priceChanges, settings, limits } = await priceDraft(ctx, invoice, edits, { session });
     if (!limits.needsApproval) throw new AppError(400, 'NO_APPROVAL_NEEDED', 'This discount doesn’t need an owner’s approval. You can issue the bill.');
     if (fields.approval.status === 'PENDING') throw new AppError(409, 'APPROVAL_PENDING', 'This discount is already waiting for an owner to approve it');
@@ -382,7 +615,7 @@ async function decide(ctx, id, { version, note }, key, approve) {
   return runOnce(ctx, { key, operation: approve ? 'billing.discount.approve' : 'billing.discount.reject' }, async (session) => {
     const invoice = await loadInvoice(ctx, id, session);
     assertDraft(invoice);
-    if (invoice.version !== version) throw stale();
+    assertVersion(invoice, version);
     if (invoice.approval?.status !== 'PENDING') throw new AppError(409, 'NOT_PENDING', 'There is no discount waiting for approval on this bill');
 
     const approval = {
@@ -407,7 +640,8 @@ export const rejectDiscount = (ctx, id, input, key) => decide(ctx, id, input, ke
 
 // ---------------------------------------------------------------------------
 // Bills list: search by number, customer name or phone; filter by dates, status and branch.
-// status: DRAFT | UNPAID | PARTIALLY_PAID | PAID | DUE (anything still owed). Dates are in each branch's own time.
+// status: DRAFT | UNPAID | PARTIALLY_PAID | PAID | DUE (anything still owed) | REFUNDED | VOID.
+// Dates are in each branch's own time.
 // ---------------------------------------------------------------------------
 const PAGE_SIZE = 25;
 
@@ -418,10 +652,11 @@ export async function listInvoices(ctx, { search, status, branchId, from, to, pa
 
   // aggregate() doesn't turn text ids into ObjectIds like find() does, so the salon id is converted here
   const and = [{ orgId: new mongoose.Types.ObjectId(ctx.orgId), branchId: { $in: branches.map((b) => b._id) } }];
-  if (status === 'DRAFT') and.push({ status: 'DRAFT' });
+  if (status === 'DRAFT' || status === 'VOID') and.push({ status });
   else if (status === 'DUE') and.push({ status: 'ISSUED', balanceDue: { $gt: 0 } });
+  else if (status === 'REFUNDED') and.push({ status: 'ISSUED', refundStatus: { $in: ['PARTIAL', 'FULL'] } });
   else if (status) and.push({ status: 'ISSUED', settlementStatus: status });
-  else and.push({ status: { $in: ['DRAFT', 'ISSUED'] } });
+  else and.push({ status: { $in: ['DRAFT', 'ISSUED', 'VOID'] } });
 
   if (from || to) {
     // An issued bill counts on the day it was issued; a draft on the day it was opened
@@ -445,7 +680,7 @@ export async function listInvoices(ctx, { search, status, branchId, from, to, pa
 
   const [rows, total, sums] = await Promise.all([
     Invoice.find(filter)
-      .select('invoiceNumber status settlementStatus customerSnapshot grandTotal amountPaid balanceDue issuedAt createdAt branchId appointmentId approval.status')
+      .select('invoiceNumber status settlementStatus refundStatus customerSnapshot grandTotal creditedTotal amountPaid refundedTotal balanceDue issuedAt createdAt branchId appointmentId approval.status')
       .populate('branchId', 'name timezone')
       .sort({ createdAt: -1 })
       .skip((page - 1) * PAGE_SIZE)
@@ -454,7 +689,15 @@ export async function listInvoices(ctx, { search, status, branchId, from, to, pa
     Invoice.countDocuments(filter),
     Invoice.aggregate([
       { $match: { $and: [...and, { status: 'ISSUED' }] } },
-      { $group: { _id: null, billed: { $sum: '$grandTotal' }, paid: { $sum: '$amountPaid' }, due: { $sum: '$balanceDue' }, count: { $sum: 1 } } },
+      {
+        $group: {
+          _id: null,
+          billed: { $sum: { $subtract: ['$grandTotal', { $ifNull: ['$creditedTotal', 0] }] } },
+          paid: { $sum: { $subtract: ['$amountPaid', { $ifNull: ['$refundedTotal', 0] }] } },
+          due: { $sum: '$balanceDue' },
+          count: { $sum: 1 },
+        },
+      },
     ]),
   ]);
   const totals = sums[0] ?? { billed: 0, paid: 0, due: 0, count: 0 };

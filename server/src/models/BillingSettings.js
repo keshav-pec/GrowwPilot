@@ -23,8 +23,15 @@ const billingSettingsSchema = new mongoose.Schema(
     pricesIncludeTax: { type: Boolean, default: true }, // true: ₹1,180 on the menu is what the customer pays
     defaultServiceTaxBps: { type: Number, enum: GST_RATES_BPS, default: 1800 }, // services without their own rate
     defaultSacCode: { type: String, trim: true, default: '' }, // services without their own SAC code
+    defaultProductTaxBps: { type: Number, enum: GST_RATES_BPS, default: 1800 }, // products without their own rate
     frontDeskDiscountLimitBps: { type: Number, min: 0, max: 10000, default: 1000 }, // 10% of the bill
-    guestProductSales: { type: Boolean, default: false }, // product-only bills without a customer (Phase 2)
+    guestProductSales: { type: Boolean, default: false }, // product-only bills without a customer ("Guest")
+    // What branch owners may do at their branches (the business owner always may)
+    branchOwners: {
+      approveRefunds: { type: Boolean, default: true },
+      voidBills: { type: Boolean, default: true },
+      editSettings: { type: Boolean, default: false }, // only their own branches' GSTIN and prefix
+    },
     branches: [branchBillingSchema],
   },
   { timestamps: true, collection: 'billing_settings' }

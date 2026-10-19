@@ -32,6 +32,7 @@ const edits = {
       z.object({
         lineId: objectId,
         discount: discount.nullable().optional(),
+        qty: z.number().int().min(1, 'At least 1').max(999).optional(), // products only
         unitPrice: paise.optional(), // owners only
         priceChangeReason: z.string().trim().max(200).optional(),
       })
@@ -44,14 +45,22 @@ const version = z.number().int().min(0);
 export const openDraftSchema = z.object({ appointmentId: objectId });
 export const quoteSchema = z.object(edits);
 export const saveDraftSchema = z.object({ version, ...edits });
-export const issueSchema = z.object({ version, ...edits, payments: paymentsSchema.default([]) });
+// Money: payments taken now, how much of the customer's advance to use, and whether extra money is kept as an advance
+const money = { payments: paymentsSchema.default([]), useAdvance: paise.default(0), keepExtraAsAdvance: z.boolean().default(false) };
+export const issueSchema = z.object({ version, ...edits, ...money });
+export const recordPaymentSchema = z.object({ invoiceId: objectId, ...money });
+export const saleSchema = z.object({ customerId: objectId.nullable() }); // null = Guest
+export const addProductSchema = z.object({ version, skuId: objectId, qty: z.number().int().min(1).max(999).default(1) });
+export const versionQuerySchema = z.object({ version: z.coerce.number().int().min(0) });
+export const productSearchSchema = z.object({ search: z.string().trim().max(100).optional() });
+export const voidSchema = z.object({ reason: z.string().trim().min(3, 'Say why the bill is voided').max(300) });
 export const requestApprovalSchema = z.object({ version, ...edits, note: z.string().trim().max(300).optional() });
 export const approveSchema = z.object({ version, note: z.string().trim().max(300).optional() });
 export const rejectSchema = z.object({ version, note: z.string().trim().min(2, 'Say why the discount is turned down').max(300) });
 
 export const listSchema = z.object({
   search: z.string().trim().max(100).optional(),
-  status: z.enum(['DRAFT', 'UNPAID', 'PARTIALLY_PAID', 'PAID', 'DUE']).optional(),
+  status: z.enum(['DRAFT', 'UNPAID', 'PARTIALLY_PAID', 'PAID', 'DUE', 'REFUNDED', 'VOID']).optional(),
   branchId: z.union([z.literal('all'), objectId]).optional(),
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
