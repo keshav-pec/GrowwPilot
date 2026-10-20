@@ -106,7 +106,7 @@ export default function DashboardPage() {
       <SalonPulse pulse={pulse} />
 
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatTile label="Today's revenue" value={formatMoney(kpis.todayRevenue)} />
+        <StatTile label="Net sales today" value={formatMoney(kpis.todayRevenue)} note={`Collected ${formatMoney(kpis.todayCollected ?? 0)} · without GST`} />
         <StatTile label="Appointments today" value={kpis.todayAppointments} />
         <StatTile label="Customers served" value={kpis.customersServed} note="Completed today" />
         <StatTile label="Open leads" value={kpis.openLeads} />

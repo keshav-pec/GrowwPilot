@@ -12,9 +12,9 @@ export function actorRole(ctx) {
 
 // Adds one row to the activity log. Pass the transaction's session so the row is saved
 // together with the change it describes (or not at all).
-export async function logActivity(ctx, { action, branchId, staffId, summary, before, after }, session) {
+export async function logActivity(ctx, { action, branchId, staffId, invoiceId, summary, before, after }, session) {
   await ActivityLog.create(
-    [{ orgId: ctx.orgId, branchId, staffId, actorId: ctx.userId, actorName: ctx.userName, actorRole: actorRole(ctx), action, summary, before, after }],
+    [{ orgId: ctx.orgId, branchId, staffId, invoiceId, actorId: ctx.userId, actorName: ctx.userName, actorRole: actorRole(ctx), action, summary, before, after }],
     { session }
   );
 }

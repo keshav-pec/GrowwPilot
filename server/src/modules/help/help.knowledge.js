@@ -227,6 +227,34 @@ export const KNOWLEDGE = [
       'On the customer’s profile, click **Take advance** for money paid ahead (for example a bridal deposit). At checkout, the advance shows in the payment box: type how much to use. If a customer pays more than the bill, tick **Keep the extra as an advance**. Advances can be used at any branch.',
   },
 
+  {
+    id: 'cash-drawer',
+    title: 'Cash drawer (daily cash closing)',
+    audiences: EVERYONE,
+    keywords: ['*cash drawer', 'cash closing', 'close the day', 'close cash', 'float', 'petty cash', 'count cash', 'cash short', 'day end'],
+    answer:
+      'Open **Cash drawer** in the menu. In the morning, count the drawer and click **Open cash day** with that float. Cash payments and cash refunds are added by themselves; add **petty cash** in or out with what it was for. At closing, type the cash you counted: the screen shows if the drawer is short or over (say why), then click **Close cash day**. A closed day can’t be changed; an owner can add an adjustment with a reason.',
+    link: { label: 'Cash drawer', to: '/app/cash' },
+  },
+  {
+    id: 'dues',
+    title: 'Dues (money customers owe)',
+    audiences: EVERYONE,
+    keywords: ['*dues', 'owed', 'outstanding', 'pending payment', 'who owes', 'unpaid bills', 'ageing'],
+    answer:
+      'Open **Bills** and click **Dues**. It shows every bill with money still owed, grouped by age (0–30, 31–60, 61–90 and over 90 days), and per customer. Click a bill to take the payment with **Record payment**. A customer’s profile also has a **Bills & payments** tab with what they owe.',
+    link: { label: 'Dues', to: '/app/dues' },
+  },
+  {
+    id: 'billing-reports',
+    title: 'Billing reports and bill PDFs',
+    audiences: EVERYONE,
+    keywords: ['billing report', 'gst report', 'collections', 'sales report', 'csv', 'download report', 'send bill', 'whatsapp bill', 'bill pdf', 'share bill'],
+    answer:
+      'Owners: open **Bills → Reports** for sales by day, GST collected, discounts, collections, dues, advances, retail, cash closing and sales by staff, each downloadable as CSV. The front desk sees today’s collections. On any bill, **PDF** downloads it and **Send to customer** makes a link (valid 30 days) you can copy or send on WhatsApp.',
+    link: { label: 'Bills', to: '/app/bills' },
+  },
+
   // ---------------------------------------------------------------- attendance
   {
     id: 'attendance',
@@ -319,7 +347,7 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['*revenue', 'how revenue', 'service value', 'total sales', '*earnings', '*income'],
     answer:
-      '**Revenue** is the total of bills issued in the period (including any part still due), so cancelled bookings and unbilled visits never count. **Service value** in Analytics is the list price of completed services, before discounts and combo prices. That’s why the two can differ.',
+      '**Net sales** (shown as revenue) is what bills issued in the period were worth after discounts and refunds, without GST, so cancelled bookings, unbilled visits and voided bills never count. Money actually collected is shown separately. **Service value** in Analytics is the list price of completed services, before discounts and combo prices. That’s why the two can differ.',
     denied: 'Revenue figures are only shown to owners.',
   },
 

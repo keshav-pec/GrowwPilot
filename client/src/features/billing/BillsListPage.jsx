@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Receipt, Settings, ShoppingBag } from 'lucide-react';
+import { BarChart3, Clock, Receipt, Settings, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useBills } from '../../api/invoices';
 import { formatMoney } from '../../lib/money';
@@ -77,6 +77,12 @@ export default function BillsListPage() {
         subtitle="Every bill, with what has been paid and what is still due"
         actions={
           <>
+            <Button variant="secondary" onClick={() => navigate('/app/dues')}>
+              <Clock size={16} /> Dues
+            </Button>
+            <Button variant="secondary" onClick={() => navigate('/app/billing/reports')}>
+              <BarChart3 size={16} /> {isOwner ? 'Reports' : 'Today’s collections'}
+            </Button>
             {isOwner && (
               <Button variant="secondary" onClick={() => navigate('/app/settings/billing')}>
                 <Settings size={16} /> Billing settings

@@ -42,6 +42,7 @@ function SettingsForm({ saved }) {
     guestProductSales: saved.guestProductSales,
     defaultProductTaxBps: String(saved.defaultProductTaxBps),
     branchOwners: saved.branchOwners,
+    frontDesk: saved.frontDesk ?? { closeCash: true },
   });
   const [branches, setBranches] = useState(saved.branches.map((b) => ({ ...b, invoicePrefix: b.prefixIsSaved ? b.invoicePrefix : '', autoPrefix: b.invoicePrefix })));
   const canEdit = saved.canEdit; // salon-wide rules: the business owner
@@ -74,6 +75,7 @@ function SettingsForm({ saved }) {
         guestProductSales: values.guestProductSales,
         defaultProductTaxBps: Number(values.defaultProductTaxBps),
         branchOwners: values.branchOwners,
+        frontDesk: values.frontDesk,
         branches: branchRows,
       } : { key, branches: branchRows },
       {
@@ -171,7 +173,7 @@ function SettingsForm({ saved }) {
           </div>
         </Card>
 
-        <Card title="What branch owners may do">
+        <Card title="What branch owners and the front desk may do">
           <div className="flex flex-col gap-2 text-sm">
             <label className="flex items-center gap-2">
               <input type="checkbox" className="accent-gold" checked={values.branchOwners.approveRefunds} onChange={setDelegation('approveRefunds')} />
@@ -184,6 +186,10 @@ function SettingsForm({ saved }) {
             <label className="flex items-center gap-2">
               <input type="checkbox" className="accent-gold" checked={values.branchOwners.editSettings} onChange={setDelegation('editSettings')} />
               Change their branches’ GSTIN and bill prefix
+            </label>
+            <label className="mt-2 flex items-center gap-2">
+              <input type="checkbox" className="accent-gold" checked={values.frontDesk.closeCash} onChange={(e) => setValues((v) => ({ ...v, frontDesk: { closeCash: e.target.checked } }))} />
+              The front desk counts the drawer and closes the cash day
             </label>
             <p className="text-xs text-muted">The front desk can only ask for refunds; an owner approves them.</p>
           </div>

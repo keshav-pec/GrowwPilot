@@ -17,6 +17,8 @@ export { default as PaymentAllocation } from './PaymentAllocation.js';
 export { default as CustomerAdvance } from './CustomerAdvance.js';
 export { default as Refund } from './Refund.js';
 export { default as CreditNote } from './CreditNote.js';
+export { default as CashSession } from './CashSession.js';
+export { default as CashMovement } from './CashMovement.js';
 export { default as PayPlan } from './PayPlan.js';
 export { default as PayChangeRequest } from './PayChangeRequest.js';
 export { default as ActivityLog } from './ActivityLog.js';

@@ -32,6 +32,10 @@ const billingSettingsSchema = new mongoose.Schema(
       voidBills: { type: Boolean, default: true },
       editSettings: { type: Boolean, default: false }, // only their own branches' GSTIN and prefix
     },
+    // What the front desk may do besides billing and taking payments
+    frontDesk: {
+      closeCash: { type: Boolean, default: true }, // count the drawer and close the cash day
+    },
     branches: [branchBillingSchema],
   },
   { timestamps: true, collection: 'billing_settings' }

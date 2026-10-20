@@ -8,10 +8,13 @@ import { requireIdempotencyKey } from '../../middleware/idempotency.js';
 import { objectId } from '../../utils/schemas.js';
 import { GST_RATES_BPS, PREFIX_REGEX } from '../../config/billing.js';
 import { getSettingsForScreen, updateSettings } from './settings.service.js';
+import { REPORTS, duesOverview, runReport } from './reports.service.js';
+import { toCsv } from '../../utils/csv.js';
 
-// /api/billing — billing settings (owners see them; the business owner changes them, see settings.service.js)
+// /api/billing — billing settings (owners), reports (owners; the front desk only today's collections) and dues
 const router = Router();
-router.use(requireAuth, tenantContext, requireRole('OWNER'));
+router.use(requireAuth, tenantContext, requireRole('OWNER', 'FRONT_DESK'));
+const ownersOnly = requireRole('OWNER');
 
 const settingsSchema = z.object({
   legalName: z.string().trim().max(120).optional(),
@@ -23,6 +26,7 @@ const settingsSchema = z.object({
   guestProductSales: z.boolean().optional(),
   defaultProductTaxBps: z.number().int().refine((v) => GST_RATES_BPS.includes(v), 'Choose a GST rate from the list').optional(),
   branchOwners: z.object({ approveRefunds: z.boolean(), voidBills: z.boolean(), editSettings: z.boolean() }).partial().optional(),
+  frontDesk: z.object({ closeCash: z.boolean() }).partial().optional(),
   branches: z
     .array(
       z.object({
@@ -36,12 +40,34 @@ const settingsSchema = z.object({
     .optional(),
 });
 
-router.get('/settings', async (req, res) => {
+router.get('/settings', ownersOnly, async (req, res) => {
   res.json(await getSettingsForScreen(req.ctx));
 });
-router.patch('/settings', requireIdempotencyKey, validate({ body: settingsSchema }), async (req, res) => {
+router.patch('/settings', ownersOnly, requireIdempotencyKey, validate({ body: settingsSchema }), async (req, res) => {
   await updateSettings(req.ctx, req.valid.body, req.idempotencyKey);
   res.json(await getSettingsForScreen(req.ctx));
 });
 
 export default router;
+
+// GET /api/billing/reports — the list; /api/billing/reports/sales?from=2026-10-01&to=2026-10-31&branches=current|all&format=csv
+const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
+const reportQuery = z.object({ from: date.optional(), to: date.optional(), branches: z.enum(['current', 'all']).default('current'), format: z.enum(['json', 'csv']).default('json') });
+
+router.get('/reports', (req, res) => {
+  res.json({ reports: Object.entries(REPORTS).map(([name, r]) => ({ name, label: r.label })) });
+});
+router.get('/reports/:name', validate({ query: reportQuery }), async (req, res) => {
+  const report = await runReport(req.ctx, req.params.name, req.valid.query);
+  if (req.valid.query.format === 'csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${report.name}-${report.from}-to-${report.to}.csv"`);
+    return res.send(`\uFEFF${toCsv(report)}`);
+  }
+  res.json(report);
+});
+
+// The Dues page: bills with money owed, with their age, per age group and per customer
+router.get('/dues', validate({ query: z.object({ branches: z.enum(['current', 'all']).default('current'), search: z.string().trim().max(100).optional() }) }), async (req, res) => {
+  res.json(await duesOverview(req.ctx, req.valid.query));
+});

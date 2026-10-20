@@ -1,4 +1,5 @@
 import * as invoicesService from './invoices.service.js';
+import { invoicePdfName, writeInvoicePdf } from './invoice.pdf.js';
 
 export async function list(req, res) {
   res.json(await invoicesService.listInvoices(req.ctx, req.valid.query));
@@ -60,4 +61,20 @@ export async function approve(req, res) {
 
 export async function reject(req, res) {
   res.json({ invoice: await invoicesService.rejectDiscount(req.ctx, req.params.id, req.valid.body, req.idempotencyKey) });
+}
+
+// The bill as a PDF download
+export async function pdf(req, res) {
+  const invoice = await invoicesService.getInvoice(req.ctx, req.params.id);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${invoicePdfName(invoice)}"`);
+  writeInvoicePdf(res, invoice);
+}
+
+export async function history(req, res) {
+  res.json(await invoicesService.invoiceHistory(req.ctx, req.params.id));
+}
+
+export async function share(req, res) {
+  res.json(await invoicesService.shareInvoice(req.ctx, req.params.id));
 }

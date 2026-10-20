@@ -365,13 +365,4 @@ export async function runReport(ctx, name, { from, to, branches }) {
 }
 
 // The same report as CSV: quantities as plain numbers (with the unit column), money in rupees
-export function toCsv(report) {
-  const cell = (value) => {
-    if (value == null) return '';
-    const text = String(value);
-    return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-  };
-  const header = report.columns.map((c) => cell(c.label)).join(',');
-  const lines = report.rows.map((row) => report.columns.map((c) => cell(c.money && row[c.key] != null ? (row[c.key] / 100).toFixed(2) : row[c.key])).join(','));
-  return [header, ...lines].join('\n');
-}
+export { toCsv } from '../../../utils/csv.js';

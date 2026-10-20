@@ -22,6 +22,8 @@ import paymentRoutes from './modules/payments/payments.routes.js';
 import billingRoutes from './modules/billing/billing.routes.js';
 import advanceRoutes from './modules/payments/advances.routes.js';
 import refundRoutes from './modules/refunds/refunds.routes.js';
+import publicRoutes from './modules/invoices/public.routes.js';
+import cashRoutes from './modules/cash/cash.routes.js';
 import attendanceRoutes from './modules/attendance/attendance.routes.js';
 import dashboardRoutes from './modules/dashboard/dashboard.routes.js';
 import analyticsRoutes from './modules/analytics/analytics.routes.js';
@@ -67,6 +69,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/advances', advanceRoutes);
 app.use('/api/refunds', refundRoutes);
+app.use('/api/cash-sessions', cashRoutes);
+app.use('/api/public', publicRoutes); // no login: shared bill links
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/analytics', analyticsRoutes);

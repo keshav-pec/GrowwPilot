@@ -113,7 +113,7 @@ export async function createRefund(ctx, { invoiceId, lines, reason, method = 'CA
       await carryOut(ctx, refund.toObject(), { session, settings });
     } else {
       const summary = `Asked to refund ${plan.lines.map((l) => `${l.qty} × ${l.name}`).join(', ')} on bill ${invoice.invoiceNumber} for ${invoice.customerSnapshot?.name} (${formatMoney(plan.creditTotal)}): ${reason.trim()}`;
-      await logActivity(ctx, { action: 'billing.refund_requested', branchId: invoice.branchId, summary, after: { refundId: refund._id, creditTotal: plan.creditTotal } }, session);
+      await logActivity(ctx, { action: 'billing.refund_requested', branchId: invoice.branchId, invoiceId: invoice._id, summary, after: { refundId: refund._id, creditTotal: plan.creditTotal } }, session);
       await notify(ctx, await approverIds(ctx, invoice.branchId, settings), { message: `${ctx.userName}: ${summary}`, link: LINK(invoice._id) }, session);
     }
     const saved = await Refund.findById(refund._id).session(session).lean();
@@ -153,7 +153,7 @@ export async function rejectRefund(ctx, id, { note }, key) {
       { returnDocument: 'after', session }
     ).lean();
     const summary = `Turned down the refund on bill ${refund.invoiceNumber} for ${refund.customerName}: ${note.trim()}`;
-    await logActivity(ctx, { action: 'billing.refund_rejected', branchId: refund.branchId, summary }, session);
+    await logActivity(ctx, { action: 'billing.refund_rejected', branchId: refund.branchId, invoiceId: refund.invoiceId, summary }, session);
     await notify(ctx, [refund.requestedBy], { message: `${ctx.userName}: ${summary}`, link: LINK(refund.invoiceId) }, session);
     return { refund: saved, invoice: await present(ctx, await Invoice.findById(refund.invoiceId).session(session).lean(), { session, settings }) };
   });
@@ -304,7 +304,7 @@ async function carryOut(ctx, refund, { session, settings }) {
   const owed = plan.dueReduced > 0 ? `, ${formatMoney(plan.dueReduced)} off what was owed` : '';
   await logActivity(
     ctx,
-    { action: 'billing.refund_done', branchId: invoice.branchId, summary: `Refunded ${what} on bill ${invoice.invoiceNumber} for ${invoice.customerSnapshot?.name}: ${formatMoney(plan.creditTotal)} (${MONEY(done)}${owed})${creditNote ? `, credit note ${creditNote.number}` : ''}. Reason: ${refund.reason}`, after: { refundId: refund._id, creditTotal: plan.creditTotal, cashRefund: plan.cashRefund } },
+    { action: 'billing.refund_done', branchId: invoice.branchId, invoiceId: invoice._id, summary: `Refunded ${what} on bill ${invoice.invoiceNumber} for ${invoice.customerSnapshot?.name}: ${formatMoney(plan.creditTotal)} (${MONEY(done)}${owed})${creditNote ? `, credit note ${creditNote.number}` : ''}. Reason: ${refund.reason}`, after: { refundId: refund._id, creditTotal: plan.creditTotal, cashRefund: plan.cashRefund } },
     session
   );
   return done;

@@ -147,6 +147,6 @@ export function writeSalesPdf(stream, { data, salonName, stamp }) {
     data.paymentMix.map((m) => [METHOD[m.method], m.payments, money(m.amount), orDash(m.share, '%')])
   );
 
-  doc.font('Helvetica').fontSize(8).fillColor(MUTED).text('Revenue = bills issued in the period (including any part still due). Service value = list price of completed services (before discounts and combo prices).');
+  doc.font('Helvetica').fontSize(8).fillColor(MUTED).text('Revenue = net sales: bills issued in the period after discounts and refunds, without GST. Service value = list price of completed services (before discounts and combo prices).');
   doc.end();
 }

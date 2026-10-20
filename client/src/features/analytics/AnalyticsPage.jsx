@@ -69,11 +69,12 @@ function DateBox({ label, value, min, max, onPick }) {
   );
 }
 
-function StatTile({ label, value }) {
+function StatTile({ label, value, note }) {
   return (
     <div className="rounded-xl border border-border bg-bg p-4">
       <p className="text-sm text-muted">{label}</p>
       <p className="mt-1 text-2xl font-semibold">{value}</p>
+      {note && <p className="mt-0.5 text-xs text-muted">{note}</p>}
     </div>
   );
 }
@@ -148,7 +149,7 @@ export default function AnalyticsPage() {
         // While new filters load, keep the old charts (dimmed) instead of flashing a spinner
         <div className={`flex flex-col gap-4 transition-opacity ${analyticsQuery.isPlaceholderData ? 'opacity-50' : ''}`}>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatTile label="Revenue" value={rupees(data.totals.revenue)} />
+            <StatTile label="Net sales" value={rupees(data.totals.revenue)} note={`Collected ${rupees(data.totals.collected ?? 0)}`} />
             <StatTile label="Bookings" value={data.totals.bookings} />
             <StatTile label="Invoices" value={data.totals.invoices} />
             <StatTile label="Average ticket" value={rupees(data.totals.avgTicket)} />
@@ -163,7 +164,7 @@ export default function AnalyticsPage() {
                 columns={[
                   { header: 'Branch', render: (b) => b.name },
                   { header: 'Bookings', right: true, render: (b) => b.bookings },
-                  { header: 'Revenue', right: true, render: (b) => rupees(b.revenue) },
+                  { header: 'Net sales', right: true, render: (b) => rupees(b.revenue) },
                   { header: 'Avg ticket', right: true, render: (b) => rupees(b.avgTicket) },
                 ]}
               />
@@ -232,7 +233,7 @@ export default function AnalyticsPage() {
           </div>
 
           <p className="text-xs text-muted">
-            Revenue = bills issued in the period (including any part still due). Service value = list price of completed services (before discounts and combo prices).
+            Net sales = bills issued in the period after discounts and refunds, without GST (collected money is shown separately). Service value = list price of completed services (before discounts and combo prices).
           </p>
         </div>
       )}

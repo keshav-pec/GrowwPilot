@@ -11,6 +11,7 @@ import AppointmentStatusBadge from '../../components/AppointmentStatusBadge';
 import AppointmentDrawer from '../appointments/AppointmentDrawer';
 import CustomerFormModal from './CustomerFormModal';
 import AdvancesCard from './AdvancesCard';
+import CustomerMoneyTab from './CustomerMoneyTab';
 
 function Detail({ label, children }) {
   return (
@@ -36,7 +37,7 @@ export default function CustomerProfilePage() {
   const { activeBranch, activeBranchId } = useAuth();
   const profileQuery = useCustomerProfile(id);
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get('tab') === 'past' ? 'past' : 'upcoming';
+  const tab = ['past', 'money'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'upcoming';
   const [editing, setEditing] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
 
@@ -125,17 +126,22 @@ export default function CustomerProfilePage() {
         tabs={[
           { value: 'upcoming', label: `Upcoming (${upcoming.length})` },
           { value: 'past', label: `Past (${past.length})` },
+          { value: 'money', label: 'Bills & payments' },
         ]}
         value={tab}
         onChange={(value) => setSearchParams({ tab: value }, { replace: true })}
       />
-      <Table
-        columns={columns}
-        rows={rows}
-        // Appointments at the selected branch can be opened; others are shown for history only
-        onRowClick={(a) => a.branchId === activeBranchId && setSelectedId(a._id)}
-        empty={<EmptyState title={tab === 'upcoming' ? 'No upcoming appointments' : 'No past appointments'} action={tab === 'upcoming' && <Button onClick={bookAgain}>Book now</Button>} />}
-      />
+      {tab === 'money' ? (
+        <CustomerMoneyTab customerId={customer._id} zone={activeBranch.timezone} />
+      ) : (
+        <Table
+          columns={columns}
+          rows={rows}
+          // Appointments at the selected branch can be opened; others are shown for history only
+          onRowClick={(a) => a.branchId === activeBranchId && setSelectedId(a._id)}
+          empty={<EmptyState title={tab === 'upcoming' ? 'No upcoming appointments' : 'No past appointments'} action={tab === 'upcoming' && <Button onClick={bookAgain}>Book now</Button>} />}
+        />
+      )}
 
       {editing && <CustomerFormModal customer={customer} onClose={() => setEditing(false)} />}
       {selected && <AppointmentDrawer appointment={selected} onClose={() => setSelectedId(null)} />}

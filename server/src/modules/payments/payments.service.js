@@ -33,7 +33,7 @@ export async function recordPayments(ctx, { invoiceId, payments, useAdvance = 0,
     const kept = advanceKept > 0 ? `; ${formatMoney(advanceKept)} kept as advance` : '';
     await logActivity(
       ctx,
-      { action: 'billing.payment_recorded', branchId: invoice.branchId, summary: `Recorded ${parts} on bill ${invoice.invoiceNumber} for ${invoice.customerSnapshot?.name}; ${left}${kept}`, after: { invoiceNumber: invoice.invoiceNumber, payments, useAdvance, advanceKept, balanceDue: updated.balanceDue } },
+      { action: 'billing.payment_recorded', branchId: invoice.branchId, invoiceId: invoice._id, summary: `Recorded ${parts} on bill ${invoice.invoiceNumber} for ${invoice.customerSnapshot?.name}; ${left}${kept}`, after: { invoiceNumber: invoice.invoiceNumber, payments, useAdvance, advanceKept, balanceDue: updated.balanceDue } },
       session
     );
     return present(ctx, updated, { session });
@@ -92,7 +92,7 @@ export async function reversePayment(ctx, paymentId, { reason }, key) {
     const where = invoice ? `bill ${invoice.invoiceNumber} for ${invoice.customerSnapshot?.name}` : 'an advance';
     await logActivity(
       ctx,
-      { action: 'billing.payment_reversed', branchId: payment.branchId, summary: `Reversed ${formatMoney(payment.amount)} (${METHOD_WORDS[payment.method]}) on ${where}: ${reason.trim()}`, before: { status: 'VALID' }, after: { status: 'REVERSED', reason: reason.trim(), balanceDue: invoice?.balanceDue } },
+      { action: 'billing.payment_reversed', branchId: payment.branchId, invoiceId: invoice?._id, summary: `Reversed ${formatMoney(payment.amount)} (${METHOD_WORDS[payment.method]}) on ${where}: ${reason.trim()}`, before: { status: 'VALID' }, after: { status: 'REVERSED', reason: reason.trim(), balanceDue: invoice?.balanceDue } },
       session
     );
     return invoice ? { invoice: await present(ctx, invoice, { session, settings }) } : { invoice: null };

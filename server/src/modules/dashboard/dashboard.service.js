@@ -1,6 +1,5 @@
 // The owner's dashboard: "Is my salon doing fine, and what needs my attention?"
 // Everything is calculated live from the database for the selected branch. Nothing is stored or hard-coded.
-import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
 import { Appointment, Attendance, Branch, Invoice, Lead, Staff } from '../../models/index.js';
 import { OPEN_APPOINTMENT_STATUSES, SERVICE_STAFF } from '../../config/constants.js';
@@ -8,18 +7,17 @@ import { scoped } from '../../utils/scoped.js';
 import { formatMoney } from '../../utils/money.js';
 import { dayRangeUTC, formatTime } from '../../utils/time.js';
 import { getAppointmentAlert } from '../../utils/appointmentAlerts.js';
+import { moneyByBranch } from '../billing/reports.service.js';
 
 const OPEN_LEAD_STATUSES = ['NEW', 'CONTACTED', 'INTERESTED'];
 const AWAY = ['absent', 'leave'];
 
-// Sum of bills issued between two times (revenue = issued bills, so cancelled bookings and drafts never count)
-async function revenueBetween(ctx, branchId, from, to) {
-  const [row] = await Invoice.aggregate([
-    { $match: { orgId: new mongoose.Types.ObjectId(ctx.orgId), branchId, status: 'ISSUED', issuedAt: { $gte: from, $lt: to } } },
-    { $group: { _id: null, total: { $sum: '$grandTotal' } } },
-  ]);
-  return row?.total ?? 0;
+// Net sales between two times: bills issued (after discounts, without GST) less refunds, so cancelled
+// bookings, drafts and voided bills never count. Also what was collected (money in less money handed back).
+async function moneyBetween(ctx, branchId, from, to) {
+  return (await moneyByBranch(ctx.orgId, [{ branchId, start: from, end: to }]))[String(branchId)];
 }
+const revenueBetween = async (ctx, branchId, from, to) => (await moneyBetween(ctx, branchId, from, to)).netSales;
 
 // "5h 15m"
 function hoursAndMinutes(minutes) {
@@ -35,8 +33,8 @@ async function getKpis(ctx, branch, today, todayAppointments) {
   const since30Days = DateTime.now().minus({ days: 30 }).toJSDate();
   const base = scoped(ctx, { branchId: branch._id });
 
-  const [revenue, openLeads, leads30, converted30] = await Promise.all([
-    revenueBetween(ctx, branch._id, today.start, today.end),
+  const [money, openLeads, leads30, converted30] = await Promise.all([
+    moneyBetween(ctx, branch._id, today.start, today.end),
     Lead.countDocuments({ ...base, status: { $in: OPEN_LEAD_STATUSES } }),
     Lead.countDocuments({ ...base, createdAt: { $gte: since30Days } }),
     Lead.countDocuments({ ...base, createdAt: { $gte: since30Days }, status: 'APPOINTMENT_BOOKED' }),
@@ -46,7 +44,8 @@ async function getKpis(ctx, branch, today, todayAppointments) {
   const served = new Set(todayAppointments.filter((a) => a.status === 'COMPLETED').map((a) => String(a.customerId)));
 
   return {
-    todayRevenue: revenue,
+    todayRevenue: money.netSales, // net sales: after discounts and refunds, without GST
+    todayCollected: money.collected,
     todayAppointments: booked.length,
     customersServed: served.size,
     openLeads,
@@ -156,7 +155,7 @@ async function getPulse(ctx, branch, now, today, todayAppointments, attention) {
   } else {
     const change = Math.round(((todaySoFar - usual) / usual) * 100);
     const status = change >= -10 ? 'good' : change >= -30 ? 'watch' : 'action';
-    revenue = { status, reason: `Revenue is ${Math.abs(change)}% ${change >= 0 ? 'above' : 'below'} a usual ${weekday} by this time (${formatMoney(todaySoFar)} vs ${formatMoney(usual)}).` };
+    revenue = { status, reason: `Net sales are ${Math.abs(change)}% ${change >= 0 ? 'above' : 'below'} a usual ${weekday} by this time (${formatMoney(todaySoFar)} vs ${formatMoney(usual)}).` };
   }
 
   // Signal 2: chairs filled = booked stylist-minutes / available stylist-minutes today

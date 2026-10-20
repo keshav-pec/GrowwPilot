@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Ban, Printer, Undo2, Wallet } from 'lucide-react';
+import { Ban, Download, History, Printer, Share2, Undo2, Wallet } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
-import { useInvoice, useReversePayment, useVoidInvoice } from '../../api/invoices';
+import { downloadInvoicePdf, useInvoice, useInvoiceHistory, useReversePayment, useVoidInvoice } from '../../api/invoices';
 import { useApproveRefund, useRejectRefund } from '../../api/refunds';
 import { formatMoney } from '../../lib/money';
 import { formatDateTime } from '../../lib/time';
@@ -12,6 +12,7 @@ import { Badge, Button, EmptyState, Spinner } from '../../components/ui';
 import RecordPaymentModal from '../billing/RecordPaymentModal';
 import RefundModal from '../billing/RefundModal';
 import ReasonModal from '../billing/ReasonModal';
+import ShareBillModal from '../billing/ShareBillModal';
 
 const REFUND_STATUS = { REQUESTED: { label: 'Waiting for an owner', tone: 'yellow' }, DONE: { label: 'Refunded', tone: 'brown' }, REJECTED: { label: 'Turned down', tone: 'neutral' } };
 
@@ -24,6 +25,9 @@ export default function InvoicePage() {
   const [paying, setPaying] = useState(false);
   const [refunding, setRefunding] = useState(false);
   const [asking, setAsking] = useState(null); // { kind: 'void' | 'reverse' | 'rejectRefund', id }
+  const [sharing, setSharing] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const history = useInvoiceHistory(id, showHistory);
   const voidBill = useVoidInvoice();
   const reverse = useReversePayment();
   const approveRefund = useApproveRefund();
@@ -87,8 +91,16 @@ export default function InvoicePage() {
               <Wallet size={16} /> Record payment
             </Button>
           )}
+          {invoice.status === 'ISSUED' && (
+            <Button variant="secondary" onClick={() => setSharing(true)}>
+              <Share2 size={16} /> Send to customer
+            </Button>
+          )}
+          <Button variant="secondary" onClick={() => downloadInvoicePdf(invoice).catch((err) => toast.error(err.message))}>
+            <Download size={16} /> PDF
+          </Button>
           <Button variant="secondary" onClick={() => window.print()}>
-            <Printer size={16} /> Print / save as PDF
+            <Printer size={16} /> Print
           </Button>
         </div>
       </div>
@@ -270,7 +282,28 @@ export default function InvoicePage() {
         <p className="mt-8 text-center text-xs text-muted">Thank you for visiting {salonName}!</p>
       </div>
 
+      <div className="mx-auto mt-4 max-w-2xl print:hidden">
+        <button type="button" onClick={() => setShowHistory((v) => !v)} className="flex items-center gap-2 text-sm text-muted hover:text-ink">
+          <History size={16} /> {showHistory ? 'Hide' : 'Show'} bill history
+        </button>
+        {showHistory && (
+          <ol className="mt-2 flex flex-col gap-2 border-l border-border pl-4 text-sm">
+            {history.isPending && <Spinner size={16} />}
+            {history.data?.length === 0 && <li className="text-muted">Nothing recorded yet.</li>}
+            {history.data?.map((h) => (
+              <li key={h._id}>
+                <p>{h.summary}</p>
+                <p className="text-xs text-muted">
+                  {h.actorName} ({h.actorRole}) · {formatDateTime(h.createdAt, branch.timezone)}
+                </p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+
       {paying && <RecordPaymentModal invoice={invoice} onClose={() => setPaying(false)} />}
+      {sharing && <ShareBillModal invoice={invoice} salonName={salonName} onClose={() => setSharing(false)} />}
       {refunding && <RefundModal invoice={invoice} mayApprove={permissions.refund === 'approve'} onClose={() => setRefunding(false)} />}
       {asking && (
         <ReasonModal

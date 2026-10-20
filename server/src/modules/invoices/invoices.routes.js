@@ -16,6 +16,9 @@ router.post('/', validate({ body: schemas.openDraftSchema }), controller.openDra
 router.post('/sale', validate({ body: schemas.saleSchema }), controller.createSale);
 router.get('/products', validate({ query: schemas.productSearchSchema }), controller.products); // what can be sold here
 router.get('/:id', controller.getOne);
+router.get('/:id/pdf', controller.pdf);
+router.get('/:id/history', controller.history);
+router.post('/:id/share', controller.share); // a link for the customer (see share.js)
 
 // Drafts (stale edits are refused by version)
 router.patch('/:id', validate({ body: schemas.saveDraftSchema }), controller.save);

@@ -1,4 +1,5 @@
 import {
+  Banknote,
   Building2,
   CalendarClock,
   CalendarDays,
@@ -26,6 +27,7 @@ const APP_NAV = [
   { to: '/app/today', label: 'Day board', icon: CalendarClock, roles: ['OWNER', 'FRONT_DESK'] },
   { to: '/app/appointments', label: 'Appointments', icon: CalendarDays, roles: ['OWNER', 'FRONT_DESK'] },
   { to: '/app/bills', label: 'Bills', icon: Receipt, roles: ['OWNER', 'FRONT_DESK'] },
+  { to: '/app/cash', label: 'Cash drawer', icon: Banknote, roles: ['OWNER', 'FRONT_DESK'] },
   { to: '/app/customers', label: 'Customers', icon: Users, roles: ['OWNER', 'FRONT_DESK'] },
   { to: '/app/leads', label: 'Leads', icon: Target, roles: ['OWNER', 'FRONT_DESK'] },
   { to: '/app/attendance', label: 'Attendance', icon: ClipboardCheck, roles: ['OWNER', 'FRONT_DESK'] },

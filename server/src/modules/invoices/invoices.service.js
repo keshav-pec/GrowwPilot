@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import {
-  Appointment, Branch, Counter, Customer, InventoryLocation, InventorySku, InventorySkuBranch, Invoice, Organization, Payment, PaymentAllocation, Refund, Service,
+  ActivityLog, Appointment, Branch, Counter, Customer, InventoryLocation, InventorySku, InventorySkuBranch, Invoice, Organization, Payment, PaymentAllocation, Refund, Service,
 } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
@@ -20,6 +20,7 @@ import { billingPermissions, branchBilling, getBillingSettings } from '../billin
 import { advancesOf, applyPayments } from '../payments/allocations.js';
 import { postMovement } from '../inventory/stock/stock.engine.js';
 import { branchStock } from '../inventory/stock/stock.queries.js';
+import { makeShareToken, readShareToken, SHARE_DAYS } from './share.js';
 
 export { branchCode } from '../billing/settings.service.js';
 
@@ -344,7 +345,7 @@ async function saveChanges(ctx, invoice, fields, priceChanges, session, extra = 
   for (const c of priceChanges) {
     await logActivity(
       ctx,
-      { action: 'billing.price_changed', branchId: invoice.branchId, summary: `Changed the price of ${c.name} on ${invoice.customerSnapshot?.name}'s bill from ${formatMoney(c.from)} to ${formatMoney(c.to)}${c.reason ? ` (${c.reason})` : ''}`, before: { unitPrice: c.from }, after: { unitPrice: c.to, reason: c.reason } },
+      { action: 'billing.price_changed', branchId: invoice.branchId, invoiceId: invoice._id, summary: `Changed the price of ${c.name} on ${invoice.customerSnapshot?.name}'s bill from ${formatMoney(c.from)} to ${formatMoney(c.to)}${c.reason ? ` (${c.reason})` : ''}`, before: { unitPrice: c.from }, after: { unitPrice: c.to, reason: c.reason } },
       session
     );
   }
@@ -522,6 +523,7 @@ export async function issueInvoice(ctx, id, { version, payments = [], useAdvance
       {
         action: 'billing.bill_issued',
         branchId: invoice.branchId,
+        invoiceId: invoice._id,
         summary: `Issued bill ${final.invoiceNumber} for ${final.customerSnapshot?.name}: ${formatMoney(final.grandTotal)} (${money}${extras.length ? `; ${extras.join(', ')}` : ''})`,
         after: { invoiceNumber: final.invoiceNumber, grandTotal: final.grandTotal, amountPaid: paid, manualDiscount: final.manualDiscount, advanceUsed: useAdvance, advanceKept },
       },
@@ -579,11 +581,42 @@ export async function voidInvoice(ctx, id, { reason }, key) {
     const branch = await Branch.findById(invoice.branchId).select('timezone').session(session).lean();
     await reverseCommissions({ invoice, eventKey: `void:${invoice._id}`, day: todayInZone(branch.timezone) }, session);
 
-    await logActivity(ctx, { action: 'billing.bill_voided', branchId: invoice.branchId, summary: `Voided bill ${invoice.invoiceNumber} for ${invoice.customerSnapshot?.name} (${formatMoney(invoice.grandTotal)}): ${reason.trim()}`, before: { status: 'ISSUED' }, after: { status: 'VOID', reason: reason.trim() } }, session);
+    await logActivity(ctx, { action: 'billing.bill_voided', branchId: invoice.branchId, invoiceId: invoice._id, summary: `Voided bill ${invoice.invoiceNumber} for ${invoice.customerSnapshot?.name} (${formatMoney(invoice.grandTotal)}): ${reason.trim()}`, before: { status: 'ISSUED' }, after: { status: 'VOID', reason: reason.trim() } }, session);
     return present(ctx, updated, { session, settings });
   });
   await markPayrollStale(ctx.orgId, first.branchId);
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Bill history (who did what to it, oldest first) and the customer's link to the PDF
+// ---------------------------------------------------------------------------
+export async function invoiceHistory(ctx, id) {
+  const invoice = await loadInvoice(ctx, id);
+  // Rows saved before bills were linked in the log are found by the bill number in their sentence
+  const older = invoice.invoiceNumber ? [{ invoiceId: null, action: /^billing\./, branchId: invoice.branchId, summary: new RegExp(escapeRegex(invoice.invoiceNumber)) }] : [];
+  const items = await ActivityLog.find(scoped(ctx, { $or: [{ invoiceId: invoice._id }, ...older] }))
+    .sort({ createdAt: 1 })
+    .select('action summary actorName actorRole createdAt')
+    .lean();
+  return { items };
+}
+
+// A link the customer can open without logging in (valid SHARE_DAYS days). Only issued bills.
+export async function shareInvoice(ctx, id) {
+  const invoice = await loadInvoice(ctx, id);
+  if (invoice.status !== 'ISSUED') throw new AppError(409, 'NOT_ISSUED', 'Only issued bills can be shared');
+  await logActivity(ctx, { action: 'billing.bill_shared', branchId: invoice.branchId, invoiceId: invoice._id, summary: `Made a link to send bill ${invoice.invoiceNumber} to ${invoice.customerSnapshot?.name}` });
+  return { token: makeShareToken(invoice), days: SHARE_DAYS, phone: invoice.customerSnapshot?.phone ?? null };
+}
+
+// The bill behind a shared link (no login): only that bill, only while the link is valid
+export async function sharedInvoice(token) {
+  const { invoiceId, orgId } = readShareToken(token);
+  const invoice = await Invoice.findOne({ _id: invoiceId, orgId, status: { $in: ['ISSUED', 'VOID'] } }).lean();
+  if (!invoice) throw new AppError(404, 'NOT_FOUND', 'This bill link is not valid or has expired. Ask the salon for a new one.');
+  const ctx = { orgId, role: 'PUBLIC', allowedBranchIds: [String(invoice.branchId)] };
+  return present(ctx, invoice);
 }
 
 // ---------------------------------------------------------------------------
@@ -602,7 +635,7 @@ export async function requestApproval(ctx, id, { version, note, ...edits }, key)
     const approval = { status: 'PENDING', requestedBy: ctx.userId, requestedByName: ctx.userName, requestedAt: new Date(), requestedDiscount: fields.manualDiscount, note: note?.trim() || undefined };
     const updated = await saveChanges(ctx, invoice, { ...fields, approval }, priceChanges, session);
     const summary = `Asked to approve a ${formatMoney(fields.manualDiscount)} discount on ${invoice.customerSnapshot?.name}'s bill (limit ${formatMoney(limits.limitAmount)})`;
-    await logActivity(ctx, { action: 'billing.discount_requested', branchId: invoice.branchId, summary, after: approval }, session);
+    await logActivity(ctx, { action: 'billing.discount_requested', branchId: invoice.branchId, invoiceId: invoice._id, summary, after: approval }, session);
     await notify(ctx, await branchApproverIds(ctx, invoice.branchId), { message: `${ctx.userName}: ${summary}${approval.note ? ` — “${approval.note}”` : ''}`, link: LINK(invoice) }, session);
     return present(ctx, updated, { session, settings });
   });
@@ -629,7 +662,7 @@ async function decide(ctx, id, { version, note }, key, approve) {
     };
     const updated = await saveChanges(ctx, invoice, { approval }, [], session);
     const summary = `${approve ? 'Approved' : 'Turned down'} the ${formatMoney(invoice.manualDiscount)} discount on ${invoice.customerSnapshot?.name}'s bill${approval.decisionNote ? ` (${approval.decisionNote})` : ''}`;
-    await logActivity(ctx, { action: approve ? 'billing.discount_approved' : 'billing.discount_rejected', branchId: invoice.branchId, summary, after: approval }, session);
+    await logActivity(ctx, { action: approve ? 'billing.discount_approved' : 'billing.discount_rejected', branchId: invoice.branchId, invoiceId: invoice._id, summary, after: approval }, session);
     await notify(ctx, [invoice.approval.requestedBy], { message: `${ctx.userName}: ${summary}`, link: LINK(invoice) }, session);
     return present(ctx, updated, { session });
   });

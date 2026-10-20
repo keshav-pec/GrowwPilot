@@ -275,6 +275,28 @@ Billing Phase 2: retail product sales with stock deduction, refunds and returns 
 Billing Phase 3: daily cash closing, dues with aging, customer money history, billing reports with CSV, PDF bills, role and branch checks
 ```
 
+**Phase 3 status: built (19 Oct 2026), waiting for the user's check.**
+- **How it was built (where it differs from the text above):**
+  - **Cash belongs to the day it was received** (branch time), not to the time the drawer was open. Cash taken before the day was opened still counts. Cash taken after closing shows as a warning on the closed day, for an owner to adjust.
+  - **One open cash day per branch.** Yesterday's must be closed before today's opens. A gap between counted and expected needs a note, and owners get a bell when there is one.
+  - **Adjustments:** owners add them to a closed day as plus or minus amounts, with a reason. The closed figures themselves never change.
+  - **Front desk switch:** "front desk closes the cash day" is a new switch in Billing settings (on by default).
+  - **Reports:** sales by day, GST collected, discounts given, collections, dues, customer advances, retail sales, cash closing, sales by staff. All have CSV.
+    - Refunds count on the day they were done.
+    - Front desk: only today's collections at their branch. They can also see the Dues page for their branch.
+  - **Share link:**
+    - A signed link that opens only that bill's PDF, for 30 days, without logging in. The phone number on it is partly hidden.
+    - It is at `/api/public/bills/<token>.pdf`, with a rate limit.
+    - The "Send to customer" button also opens WhatsApp with a ready message.
+  - **Bill history:** activity rows now carry the bill they belong to. Older rows are found by the bill number.
+  - **Net sales:** the dashboard and analytics "revenue" is now net sales (after discounts and refunds, without GST), with "collected" shown next to it.
+  - **New in-app help:** cash drawer, dues, reports and bill PDFs.
+- **Defaults picked for Phase 3 (to confirm):**
+  - The front desk can see the Dues page for its branch (the plan only mentioned today's collections).
+  - Owners are notified when a closed drawer is short or over.
+  - Shared links last 30 days.
+  - Cash after closing is a warning only, not blocked.
+
 ---
 
 ### Phase 4: Ready for packages and memberships, final checks (PRD P3)

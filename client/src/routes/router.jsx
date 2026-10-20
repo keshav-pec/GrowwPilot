@@ -25,6 +25,9 @@ import BillsListPage from '../features/billing/BillsListPage';
 import BillingSettingsPage from '../features/billing/BillingSettingsPage';
 import SaleEditPage from '../features/billing/SaleEditPage';
 import RefundPage from '../features/billing/RefundPage';
+import CashPage from '../features/billing/CashPage';
+import DuesPage from '../features/billing/DuesPage';
+import BillingReportsPage from '../features/billing/BillingReportsPage';
 import AttendancePage from '../features/attendance/AttendancePage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import PayrollPage from '../features/payroll/PayrollPage';
@@ -100,6 +103,9 @@ export const router = createBrowserRouter([
               { path: 'bills', element: <BillsListPage /> },
               { path: 'bills/:id/edit', element: <SaleEditPage /> }, // a product-only sale while it's a draft
               { path: 'refunds/:id', element: <RefundPage /> }, // credit note or refund receipt
+              { path: 'cash', element: <CashPage /> },
+              { path: 'dues', element: <DuesPage /> },
+              { path: 'billing/reports', element: <BillingReportsPage /> }, // front desk: today's collections only
               { path: 'attendance', element: <AttendancePage /> },
               { path: 'payroll', element: <PayrollPage /> }, // front desk: pay setup + requests only
             ],

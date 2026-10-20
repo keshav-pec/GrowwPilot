@@ -49,6 +49,9 @@ export function billingPermissions(ctx, settings) {
     approveRefunds: owner && (ctx.isPrimaryOwner || delegated.approveRefunds !== false),
     voidBills: owner && (ctx.isPrimaryOwner || delegated.voidBills !== false),
     reversePayments: owner,
+    closeCash: owner || (ctx.role === 'FRONT_DESK' && settings.frontDesk?.closeCash !== false),
+    adjustCash: owner,
+    viewReports: owner,
   };
 }
 
@@ -84,6 +87,7 @@ export async function getSettingsForScreen(ctx) {
     frontDeskDiscountLimitBps: settings.frontDeskDiscountLimitBps,
     guestProductSales: settings.guestProductSales,
     branchOwners: { approveRefunds: settings.branchOwners?.approveRefunds !== false, voidBills: settings.branchOwners?.voidBills !== false, editSettings: Boolean(settings.branchOwners?.editSettings) },
+    frontDesk: { closeCash: settings.frontDesk?.closeCash !== false },
     branches: visible.map((b) => {
       const saved = settings.branches?.find((x) => String(x.branchId) === String(b._id));
       return { branchId: b._id, name: b.name, status: b.status, gstin: saved?.gstin ?? '', stateCode: saved?.stateCode ?? '', invoicePrefix: prefixes[String(b._id)], prefixIsSaved: Boolean(saved?.invoicePrefix) };
@@ -117,7 +121,7 @@ export async function updateSettings(ctx, input, key) {
   const before = await getBillingSettings(ctx);
   if (!ctx.isPrimaryOwner) {
     if (ctx.role !== 'OWNER' || !before.branchOwners?.editSettings) throw new AppError(403, 'FORBIDDEN', 'Only the business owner can change billing settings');
-    const salonWide = [...Object.keys(WORDS), 'branchOwners'].filter((field) => input[field] !== undefined);
+    const salonWide = [...Object.keys(WORDS), 'branchOwners', 'frontDesk'].filter((field) => input[field] !== undefined);
     if (salonWide.length > 0) throw new AppError(403, 'FORBIDDEN', 'Only the business owner changes the salon-wide billing rules');
     if ((input.branches ?? []).some((b) => !ctx.allowedBranchIds.includes(b.branchId))) throw new AppError(404, 'NOT_FOUND', 'Branch not found');
   }
@@ -161,6 +165,10 @@ export async function updateSettings(ctx, input, key) {
   for (const [field, value] of Object.entries(input.branchOwners ?? {})) {
     set[`branchOwners.${field}`] = value;
     if (value !== Boolean(before.branchOwners?.[field] ?? field !== 'editSettings')) delegationWords.push(`${DELEGATION_WORDS[field]}: ${value ? 'on' : 'off'}`);
+  }
+  if (input.frontDesk?.closeCash !== undefined) {
+    set['frontDesk.closeCash'] = input.frontDesk.closeCash;
+    if (input.frontDesk.closeCash !== (before.frontDesk?.closeCash !== false)) delegationWords.push(`front desk closes the cash day: ${input.frontDesk.closeCash ? 'on' : 'off'}`);
   }
   if ((set.gstRegistered ?? before.gstRegistered) && !(set.legalName ?? before.legalName)) {
     throw new AppError(400, 'LEGAL_NAME_REQUIRED', 'Enter the legal name printed on GST bills');

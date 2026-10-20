@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
+import { downloadFile } from './download';
 
 // Money changes are sent with an Idempotency-Key (see newRequestKey in lib/billing.js)
 const send = (method, url, key, body) =>
@@ -92,3 +93,13 @@ export const useApproveDiscount = () => useBillMutation(({ _id, key, ...body }) 
 export const useRejectDiscount = () => useBillMutation(({ _id, key, ...body }) => send('post', `/invoices/${_id}/reject`, key, body));
 // { key, invoiceId, payments, useAdvance?, keepExtraAsAdvance? }
 export const useRecordPayment = () => useBillMutation(({ key, ...body }) => send('post', '/payments', key, body));
+
+// What was done to a bill, oldest first: { items: [{ action, summary, actorName, actorRole, createdAt }] }
+export function useInvoiceHistory(id, enabled) {
+  return useQuery({ queryKey: ['invoice-history', id], queryFn: () => api.get(`/invoices/${id}/history`).then((res) => res.data.items), enabled });
+}
+
+export const downloadInvoicePdf = (invoice) => downloadFile(`/invoices/${invoice._id}/pdf`, {}, 'bill.pdf');
+
+// A link the customer can open without logging in: { token, days, phone }
+export const useShareInvoice = () => useMutation({ mutationFn: (id) => api.post(`/invoices/${id}/share`).then((res) => res.data) });
