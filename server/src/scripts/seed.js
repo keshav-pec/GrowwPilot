@@ -26,6 +26,10 @@ import { markSetupStep } from '../modules/inventory/setup/setup.service.js';
 import { addImages } from '../modules/inventory/images/images.service.js';
 import { migrateBilling } from './migrate-billing-v2.js';
 import { gstinCheckChar } from '../config/billing.js';
+import { addProduct, createSaleDraft, issueInvoice, openDraft } from '../modules/invoices/invoices.service.js';
+import { takeAdvance } from '../modules/payments/payments.service.js';
+import { approveRefund, createRefund } from '../modules/refunds/refunds.service.js';
+import { closeCashDay, currentCashDay } from '../modules/cash/cash.service.js';
 import sharp from 'sharp';
 import { DESERT_ROSE_CUSTOMERS, DESERT_ROSE_SERVICES, GLAMOUR_CUSTOMERS, GLAMOUR_SERVICES, LEADS } from './seed-data.js';
 
@@ -489,12 +493,63 @@ await markSetupStep(owner, 'locations', key());
 await markSetupStep(owner, 'done', key());
 
 // ===========================================================================
+// 8. Billing (BILLING_PLAN.md): made through the real billing code, like a day at the desk.
+//    Glamour Studio is GST registered; Desert Rose is not (plain bills).
+// ===========================================================================
+const fatima = users[4];
+const atMarina = { ...asUser(fatima), allowedBranchIds: [String(branch['Dubai Marina']._id)], activeBranchId: String(branch['Dubai Marina']._id), addons: [] };
+let billKey = 0;
+const bkey = () => `seed-billing-${++billKey}`;
+// A finished visit earlier today, ready for checkout
+const visit = (salon, branchName, customer, [service, stylist]) => {
+  const end = A.minus({ hours: 2 }).toJSDate();
+  const start = new Date(+end - 45 * 60000);
+  return Appointment.create({
+    orgId: salon._id, branchId: branch[branchName]._id, customerId: customer._id, customerSnapshot: { name: customer.name, phone: customer.phone },
+    items: [{ serviceId: service._id, serviceName: service.name, staffId: stylist._id, staffName: stylist.name, startAt: start, endAt: end, durationMinutes: 45, price: service.price }],
+    startAt: start, endAt: end, totalPrice: service.price, status: 'COMPLETED', source: 'walk-in', createdBy: deskOf[branchName]._id,
+  });
+};
+const bill = async (ctx, appointment, payments) => {
+  const draft = await openDraft(ctx, { appointmentId: appointment._id });
+  return issueInvoice(ctx, draft._id, { version: draft.version, payments }, bkey());
+};
+const sale = async (ctx, customer, items, payments) => {
+  let draft = await createSaleDraft(ctx, { customerId: String(customer._id) });
+  for (const [product, qty] of items) draft = await addProduct(ctx, draft._id, { version: draft.version, skuId: String(product._id), qty });
+  return issueInvoice(ctx, draft._id, { version: draft.version, payments: payments(draft.grandTotal) }, bkey());
+};
+
+// Part paid: ₹1,000 now, the rest due. And one billed with nothing paid yet ("pay later").
+await bill(desk, await visit(glamour, 'Andheri', gc['Priya Sharma'], [gs['Hair Colour'], staff.Rahul]), [{ method: 'UPI', amount: rupees(1000), reference: 'UPI 4821' }]);
+await bill(desk, await visit(glamour, 'Andheri', gc['Karan Malhotra'], [gs.Haircut, staff.Kabir]), []);
+// An advance: a bridal package deposit, to be used at checkout later (any branch)
+await takeAdvance(desk, { customerId: String(gc['Sneha Kapoor']._id), method: 'UPI', amount: rupees(2000), reference: 'UPI 7730', note: 'Bridal package deposit' }, bkey());
+// Product sales: one serum returned (approved, with a GST credit note); a mask return waiting for the owner
+const serumSale = await sale(desk, gc['Kavita Joshi'], [[sku.serum, 2]], (total) => [{ method: 'CARD', amount: total, reference: 'Card ••4417' }]);
+const asked = await createRefund(desk, { invoiceId: serumSale._id, lines: [{ lineId: String(serumSale.lines[0]._id), qty: 1, restock: 'SELLABLE' }], reason: 'Bought one too many', method: 'CARD' }, bkey());
+await approveRefund(owner, asked.refund._id, {}, bkey());
+const maskSale = await sale(desk, gc['Isha Patel'], [[sku.mask, 1]], (total) => [{ method: 'CASH', amount: total }]);
+await createRefund(desk, { invoiceId: maskSale._id, lines: [{ lineId: String(maskSale.lines[0]._id), qty: 1, restock: 'DAMAGED' }], reason: 'Jar was cracked when opened at home', method: 'CASH' }, bkey());
+// Desert Rose: a plain bill (not GST registered), paid in cash
+await bill(atMarina, await visit(desertRose, 'Dubai Marina', desertCustomers[0], [ds.Haircut, staff.Omar]), [{ method: 'CASH', amount: ds.Haircut.price }]);
+
+// Yesterday's cash days, counted and closed (Andheri was ₹50 short); today's are left for the desk to open
+const yesterdayAt = (branchName) => at(branchName, -1, '00:00').toISODate();
+for (const [branchName, ctx, float, gap, note] of [['Andheri', desk, rupees(3000), -rupees(50), 'Gave change twice to one customer'], ['Dubai Marina', atMarina, rupees(1500), 0, undefined]]) {
+  await models.CashSession.create({ orgId: branch[branchName].orgId, branchId: branch[branchName]._id, day: yesterdayAt(branchName), openingFloat: float, openedBy: deskOf[branchName]._id, openedByName: deskOf[branchName].name, openedAt: at(branchName, -1, '09:30').toJSDate() });
+  const { session } = await currentCashDay(ctx); // yesterday's day, with what the drawer should hold
+  await closeCashDay(ctx, String(session._id), { countedCash: session.expectedCash + gap, note }, bkey());
+}
+
+// ===========================================================================
 // Done
 // ===========================================================================
 console.log(`\nSeeded: 2 salons, 3 branches, ${Object.keys(staff).length} staff, ${GLAMOUR_SERVICES.length + DESERT_ROSE_SERVICES.length} services, 2 combos,`);
 console.log(`        ${glamourCustomers.length + desertCustomers.length} customers, ${LEADS.length} leads, ${appointments.length} appointments, ${invoices.length} invoices, ${attendance.length} attendance records`);
 console.log(`        8 pay setups (2 front desk), 1 pay change request waiting for approval, 1 locked payroll month with payments, 1 advance, ${await models.CommissionEntry.countDocuments()} commission lines`);
 console.log(`        Inventory (Glamour Andheri): ${Object.keys(sku).length} products (2 for sale on bills), 3 recipes, 4 hand-outs, 2 purchase orders, 1 write-off waiting for approval, 1 problem report, 4 product photos`);
+console.log('        Billing: Glamour GST registered (Desert Rose not); 2 bills with money due, 1 advance, 2 product sales (1 refund done with a credit note, 1 waiting for approval), yesterday\'s cash days closed');
 console.log(`Today is centred on ${A.toFormat('h:mm a')} at Andheri (${A.zoneName}).`);
 console.log('\nEvery account uses the password:', DEMO_PASSWORD);
 console.table([

@@ -44,8 +44,8 @@ GrowwPilot runs many salons on one platform. Each salon (an *organization*) has 
 | Who | Logs in? | Main screens |
 |---|---|---|
 | **Super Admin** (GrowwPilot team) | Yes | Salon list with search and status filter; onboarding (salon + first branch + owner login in one step); activate or deactivate a salon; switch paid add-ons (Inventory) on or off |
-| **Owner** | Yes | **Dashboard** (Salon Pulse, KPIs, Requires attention), **Analytics** (demand charts + sales PDF), **Payroll** (pay setup, commission, monthly payroll, salary payments, payslips, advances, activity log), branches, team (staff, front desk logins, branch owners), services and combos, plus everything the front desk sees |
-| **Front desk** | Yes | **Day board**, booking (multi-service or combo), appointment list, customers, leads (and convert to appointment), checkout with split payments, staff attendance, **Staff pay** (see how each person is paid, request a change). Works in **one branch only**. |
+| **Owner** | Yes | **Dashboard** (Salon Pulse, KPIs, Requires attention), **Analytics** (demand charts + sales PDF), **Billing** (approve discounts and refunds, void bills, reverse wrong payments, billing settings and reports), **Payroll** (pay setup, commission, monthly payroll, salary payments, payslips, advances, activity log), branches, team (staff, front desk logins, branch owners), services and combos, plus everything the front desk sees |
+| **Front desk** | Yes | **Day board**, booking (multi-service or combo), appointment list, customers, leads (and convert to appointment), **checkout and bills** (GST bills, discounts, split and part payments, product sales, advances, refund requests), **cash drawer**, dues, staff attendance, **Staff pay** (see how each person is paid, request a change). Works in **one branch only**. |
 | **Inventory login** (add-on) | Yes | **Inventory only**, for one branch: products, issuing and finishing stock, write-offs (up to a limit), purchase orders (sent for approval), deliveries, stock counts, reports without costs |
 | **Staff** (stylists) | No | A record: booked on appointments, attendance marked by the front desk, paid through payroll |
 | **Front desk member** | Their front desk login, if linked | A team member of type *Front desk*: never booked, attendance marked like stylists, paid a salary, per day or per hour (no commission). Their pay is for owners only. |
@@ -69,6 +69,19 @@ There are **two kinds of owner**: the **primary owner** (shown as **Business own
 - **Monthly payroll** per branch: worked out from pay setups, attendance and commission, with a "things to check" list, bonuses and deductions with a reason, and **Lock month**. A locked month never changes; corrections go into a later month.
 - **Payments** (full or part; cash, UPI, bank) only against locked months, **payslip PDFs**, and **advances** taken back monthly.
 - **Every change is logged** in an activity log that can't be edited, and a **bell** notifies the business owner of changes made by others, branch owners of requests to approve, and the front desk of the answers.
+
+**Billing, POS & Payments** (built from the *Billing, POS & Payments Enhancement PRD v1.0*; full plan and decisions in [`BILLING_PLAN.md`](BILLING_PLAN.md)). The existing checkout grew into a proper till; there is still only one checkout and one set of money records:
+
+- **Bills:** checkout opens a **draft** (can be changed); **Issue & Pay** gives it its number (`AND/26-27/00001`, per branch and financial year) and locks it. Older bills keep their old numbers (`GP-AND-000123`).
+- **GST** (optional per salon): GSTIN per branch, prices with or without GST, a rate per service and product, CGST + SGST worked out per line by the server, a saved copy of every price and tax on the bill. **Not GST registered** salons get plain bills.
+- **Discounts** per line or on the whole bill (₹ or %). The front desk has a limit (10%); above it an owner approves. Only owners change a price, with a reason.
+- **Payments:** split (Cash, UPI, Card, Other), part payments and pay later, **Record payment** for the rest. Never recorded twice, never more than the bill. Owners can reverse a wrong payment.
+- **Products** (with the Inventory add-on): add retail products at checkout or make a **New sale**; stock goes down once, in the same step as the bill.
+- **Refunds and returns:** the front desk asks, an owner approves. Money back, a **credit note** on GST bills, sellable products back on the shelf (damaged ones written off), the stylist's commission taken back. Owners can **void** a bill with no money on it.
+- **Customer advances:** taken on the profile, used at checkout at any branch, and extra money at checkout can be kept as an advance.
+- **Cash drawer:** open with a float, cash in and out filled in by itself, petty cash, count and close; a closed day only takes adjustments.
+- **Dues** by age, a customer's **Bills & payments**, **billing reports** with CSV (sales, GST, discounts, collections, dues, advances, retail, cash, staff), bill **PDFs**, a **share link** for the customer (WhatsApp), and each bill's **history**.
+- Commission is earned when a bill is fully paid, on the amount without GST. The dashboard and analytics show **net sales** (after discounts and refunds, without GST) and money collected.
 
 **Inventory & Procurement** (a paid add-on, built from the *Inventory & Procurement PRD v1*; full plan and decisions in [`INVENTORY_PLAN.md`](INVENTORY_PLAN.md)). The Super Admin switches it on per salon; when it's off, every inventory screen and API is closed and nothing else changes.
 
@@ -212,7 +225,9 @@ erDiagram
 
 Also: `inventory_settings` (front desk switches, approval limits), `inventory_approvals` (write-offs waiting, problem reports), `inventory_exceptions` (automatic uses that couldn't be posted), `inventory_outbox` ("service completed" events), `inventory_imports` (CSV previews, removed after 24 h) and `idempotency_records` (the saved answer for each `Idempotency-Key`, 7 days). Product photos are files in the GridFS bucket `inventory_images` (a 1000 px picture and a 240 px thumbnail each), listed on the product in `images`.
 
-**Important indexes:** `customer (orgId, phone)` unique (no duplicate customers), `invoice.appointmentId` unique (no double checkout), `attendance (staffId, date)` unique, `appointment (orgId, branchId, startAt)` and `appointment (items.staffId, items.startAt)` for the day board and clash checks. Payroll: `payPlan (staffId, effectiveFrom)`, `commissionEntry (invoiceId, itemId, type)`, `payrollRun (branchId, month)`, `payrollItem (runId, staffId)` and `payrollPayment (orgId, idempotencyKey)` are all unique, so nothing is counted or paid twice. Payroll also has pay change requests, special commission rates, bonuses/deductions, the activity log and notifications (not drawn).
+**Billing** (every row has `orgId` and `branchId`): `invoices` (draft → issued → void; lines with their tax snapshot; `version` for stale edits), `payments` (money in or handed back) and `payment_allocations` (which bill each payment, or advance, paid), `customer_advances`, `refunds` and `credit_notes`, `cash_sessions` and `cash_movements` (append-only), and `billing_settings` (one per salon: GST, limits, branch GSTINs and prefixes, what branch owners and the front desk may do). Bill numbers come from `counters` (`invoice:<branch>:<financial year>`).
+
+**Important indexes:** `customer (orgId, phone)` unique (no duplicate customers), `invoice.appointmentId` unique while the bill isn't void (no double checkout), `invoice (orgId, invoiceNumber)` unique (drafts have none yet), one open cash day per branch, one refund waiting per bill, `attendance (staffId, date)` unique, `appointment (orgId, branchId, startAt)` and `appointment (items.staffId, items.startAt)` for the day board and clash checks. Payroll: `payPlan (staffId, effectiveFrom)`, `commissionEntry (invoiceId, itemId, type, eventKey)`, `payrollRun (branchId, month)`, `payrollItem (runId, staffId)` and `payrollPayment (orgId, idempotencyKey)` are all unique, so nothing is counted or paid twice. Payroll also has pay change requests, special commission rates, bonuses/deductions, the activity log and notifications (not drawn).
 
 ---
 
@@ -235,7 +250,7 @@ npm install
 npm run dev
 ```
 
-**Demo data** (`npm run seed`): 2 salons, 3 branches (Mumbai and Dubai timezones), 8 staff, 10 services, 2 combos, 13 customers, 9 leads (every status and source, some overdue), about 100 appointments over 4 weeks (every status, multi-service and combo bookings, split payments, discounts) with 85 invoices, and 2 weeks of attendance. **Today's appointments are placed around the current time**, so the day board and dashboard always show something happening: a customer waiting, a possible no-show, one running late, a bill not collected, and tomorrow's booking with a stylist on leave. **Payroll:** every Glamour stylist has a pay setup (one of each kind), front desk members Kavya (Andheri, ₹15,000/month) and Ritu (Bandra, ₹600/day) are linked to their logins, Rahul has a special 15% rate on Hair Colour, a front desk pay request waits for approval, Andheri's payroll from two months ago is locked and partly paid, last month has a bonus, and Neha has an advance. Desert Rose staff have no pay setup, to show that state. **Inventory:** Glamour Studio has the add-on. Andheri is set up with 7 products (bottles, kits, measured colour and developer), 2 stations, 2 suppliers, recipes for Facial, Hair Colour and Haircut, 4 hand-outs, a part-delivered order and a draft, a write-off waiting for approval and a front desk problem report. 4 products have simple generated photos for the catalogue. Bandra has nothing yet, so Vikram sees the setup guide. Desert Rose doesn't have the add-on. (Seed during opening hours for the best picture: after closing time, today's later bookings are already in the past and show up as possible no-shows.) The seed refuses to run when `NODE_ENV=production` unless you pass `-- --force`.
+**Demo data** (`npm run seed`): 2 salons, 3 branches (Mumbai and Dubai timezones), 8 staff, 10 services, 2 combos, 13 customers, 9 leads (every status and source, some overdue), about 100 appointments over 4 weeks (every status, multi-service and combo bookings, split payments, discounts) with 85 invoices, and 2 weeks of attendance. **Today's appointments are placed around the current time**, so the day board and dashboard always show something happening: a customer waiting, a possible no-show, one running late, a bill not collected, and tomorrow's booking with a stylist on leave. **Payroll:** every Glamour stylist has a pay setup (one of each kind), front desk members Kavya (Andheri, ₹15,000/month) and Ritu (Bandra, ₹600/day) are linked to their logins, Rahul has a special 15% rate on Hair Colour, a front desk pay request waits for approval, Andheri's payroll from two months ago is locked and partly paid, last month has a bonus, and Neha has an advance. Desert Rose staff have no pay setup, to show that state. **Inventory:** Glamour Studio has the add-on. Andheri is set up with 9 products (bottles, kits, measured colour and developer, and 2 retail products for sale on bills), 2 stations, 2 suppliers, recipes for Facial, Hair Colour and Haircut, 4 hand-outs, a part-delivered order and a draft, a write-off waiting for approval and a front desk problem report. 4 products have simple generated photos for the catalogue. Bandra has nothing yet, so Vikram sees the setup guide. Desert Rose doesn't have the add-on. **Billing:** Glamour Studio is GST registered (demo GSTINs for Andheri and Bandra); Desert Rose is not, so its bills are plain. The older bills are moved onto the new bill records by the same migration real salons get. Andheri has a part-paid bill and a "pay later" bill (see **Dues**), a ₹2,000 advance for Sneha Kapoor, two retail products for sale, a serum sale with one bottle refunded (credit note `CN-AND/26-27/001`) and a mask return waiting for the owner, and yesterday's cash day closed ₹50 short. Today's cash day is left for the desk to open. (Seed during opening hours for the best picture: after closing time, today's later bookings are already in the past and show up as possible no-shows.) The seed refuses to run when `NODE_ENV=production` unless you pass `-- --force`.
 
 ---
 
@@ -252,7 +267,7 @@ The tests cover the parts where a bug would cost money or trust:
 - **Booking engine:** the PDF's overlap example (2:00–2:45 vs 2:30), back-to-back bookings allowed, **two and five simultaneous bookings where exactly one wins**, opening hours, inactive/absent/other-branch stylists, another salon's ids, Kolkata vs Dubai time, availability, rescheduling onto its own slot.
 - **State machines:** every allowed and blocked appointment and lead status change.
 - **Lead conversion:** links to an existing customer by phone; a clash rolls back everything (no customer, no booking, lead unchanged).
-- **Checkout:** ₹1,530 = 1,000 + 500 + 30 works; ₹30 short fails; discount larger than the bill fails; paying twice (including two desks at the same moment) fails; invoice numbers never skip.
+- **Billing:** every PRD acceptance test that applies (map below), plus the bill maths (GST in and on top of prices, rounding per line, discounts shared to the paisa, credits that add up exactly), discount approval, guest sales, refunds on part-paid bills, voids, cash closing, reports that reconcile with the bills and payments, the old-bill migration (run twice), and an API test that logs in as each role and tries **every billing action**.
 - **Dashboard warnings:** no-show, waiting and running-late rules.
 - **Payroll:** each way of paying; mid-month pay changes; absences not cutting salary; the PRD's commission example (₹2,500 service, ₹200 off, 10% = ₹230); combos and two stylists on one bill; a rate change never changing past commission; commission and payments never counted twice (including two identical requests at the same moment); locking refused while something must be fixed, and a locked month refusing every change; part payments, overpayment rules, cancelled payments, staff who have left; advances; and that branch owners, the front desk and another salon only reach what they're allowed to. **Front desk pay:** never booked, no commission, moving a stylist to the front desk only once their pay fits, the separate front desk totals, and an API test that logs in as each role and tries every front desk pay action (owners only; front desk logins can't reach any of it).
 - **Inventory:** every PRD acceptance test that applies (map below), plus: stock never going below zero when five people take the last bottles at once, the same request sent twice changing stock once, approval limits for write-offs and orders, CSV import duplicates, recipe versions never overlapping, the add-on switch, photo uploads (type and 2 MB limits, at most 4, another salon's photo not found, the front desk can view but not upload, bulk matching by code), and an API test that logs in as the business owner, a branch owner of another branch, an inventory login and the front desk and tries **every inventory action** (and cost visibility in screens and CSV exports).
@@ -265,7 +280,7 @@ The tests cover the parts where a bug would cost money or trust:
 | AC01 | Opening receipt of 10 bottles: store 10 and a movement | `inventoryProducts.test.js` |
 | AC02–AC09 | Issue, finish, finish & replace, replacement out of stock, duplicate finish, simultaneous finishes, moving a hand-out, returning unused | `inventoryDaily.test.js` |
 | AC10–AC14 | Facial takes one kit, duplicate completion, cancelled visit, finish-mode shampoo never per wash, measured use and corrections posting only the difference | `inventoryRecipes.test.js` |
-| AC15 | Retail sale deducts once; refund doesn't restock | *Not in this release* (checkout is services-only) |
+| AC15 | Retail sale deducts once; refund doesn't restock | `billingPhase2.test.js` (product sales and returns, built with Billing) |
 | AC16–AC18 | Waste kept apart from use, low stock on available-to-issue, front desk can't see costs or write off | `inventoryDaily.test.js`, `inventoryRolesMatrix.test.js` |
 | AC19 | Branch owner can't reach other branches | `inventoryRolesMatrix.test.js`, `inventoryAccess.test.js` |
 | AC20 | Another salon's ids are refused | `inventoryProducts.test.js`, `inventoryDaily.test.js` |
@@ -277,6 +292,36 @@ The tests cover the parts where a bug would cost money or trust:
 | AC28 | A failed event replays without double deduction | `inventoryRecipes.test.js` |
 | AC29 | CSV import previews duplicates before saving | `inventoryImport.test.js` |
 | AC30 | Reorder suggestions count approved orders | `inventoryPurchasing.test.js` |
+
+**Billing acceptance tests (PRD AC01–AC25)** — all in `server/tests/`:
+
+| PRD test | What it checks | File |
+|---|---|---|
+| AC01 | Old checkout still works; old bills moved onto the new records (keeping their numbers), safe to run twice | `invoices.test.js` |
+| AC02 | Service-only and retail-only checkout | `invoices.test.js`, `billingPhase2.test.js` |
+| AC03 | Services and products on one bill | `billingPhase2.test.js` |
+| AC04, AC05 | GST included in or added to prices; mixed rates and rounding | `invoices.test.js` |
+| AC06 | Bills issued at the same moment get unique numbers, none skipped | `invoices.test.js`, `billingPhase4.test.js` |
+| AC07 | Flat and % discounts per line and per bill, shared over the lines with their tax | `invoices.test.js` |
+| AC08 | Front desk can't change a price | `invoices.test.js` |
+| AC09, AC10 | UPI + cash split; part payment and paying the rest later | `invoices.test.js`, `billingAccess.test.js` |
+| AC11 | The same payment request twice is saved once | `invoices.test.js` |
+| AC12 | Paying more than is due is refused (also two desks at once) | `invoices.test.js` |
+| AC13 | Payment provider sending the same webhook twice | *Not applicable:* no payment gateway in this release (PRD: optional later) |
+| AC14 | Advance taken, used, never used twice | `billingPhase2.test.js` |
+| AC15 | Refunding a service doesn't put products back | `billingPhase2.test.js` |
+| AC16 | Returned products: sellable back to the shelf, damaged written off | `billingPhase2.test.js` |
+| AC17 | Refund with credit note and commission taken back | `billingPhase2.test.js` |
+| AC18 | Stock taken exactly once, also on a retried request; a failed bill takes nothing | `billingPhase2.test.js`, `billingPhase4.test.js` |
+| AC19 | Cash closing gap and adjustment | `billingPhase3.test.js` |
+| AC20 | Customer history; reports add up to the bills and payments | `billingPhase3.test.js` |
+| AC21 | Other salons and other branches refused, every route and role | `billingRolesMatrix.test.js`, `billingAccess.test.js`, `invoices.test.js` |
+| AC22 | A stale draft edit is refused | `invoices.test.js` |
+| AC23 | A bill (and its PDF) doesn't change when the catalogue or settings change | `invoices.test.js`, `billingPhase3.test.js` |
+| AC24 | Payment reversal keeps the record; money records can't be edited | `billingPhase2.test.js`, `billingPhase4.test.js` |
+| AC25 | Speed with 20,000 bills on file: opening checkout ~25 ms (target 2 s), a quote ~3 ms (target 500 ms) | `billingSpeed.test.js` |
+
+> **Before going live with GST bills, have a tax professional check the GST rates, SAC/HSN codes and bill and credit note wording.** Salon services moved from 18% to 5% GST (without input tax credit) from 22 Sep 2025; the app's default for services is still 18%, and each salon sets its own rate in Billing settings.
 
 ---
 
@@ -290,7 +335,8 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 4. **Seed production once, on purpose:** in Render's shell run `npm run seed -- --force`.
 5. Log in on the Vercel URL. Optionally run `API_URL=https://<your-vercel-url> npm run smoke:isolation` from your machine.
 6. **Inventory add-on (per salon):** log in as Super Admin, open the salon and click **Switch on** next to Inventory. The owner then creates the first inventory login in **Team → Inventory logins** (one branch each, temporary password shown once). Completed services take stock in a background job inside the API process; it also retries every 3 minutes, so no extra service is needed.
-7. **Product photos** are stored in MongoDB GridFS (`IMAGE_STORAGE=gridfs`, already set in `render.yaml`): up to 4 per product, 2 MB each before resizing, kept as WebP at 1000 px and 240 px (usually 50–150 kB per product). They count towards your Atlas storage (the free tier has 512 MB), so a salon with 1,000 products and photos uses roughly 100 MB. The screens upload one photo per request, so they stay well under proxy size limits.
+7. **Billing:** nothing to switch on. When the API starts, it moves any older bills onto the new bill records and updates two indexes (it does nothing once that's done; `npm run migrate:billing` does the same by hand). Salons start as **Not GST registered**, so bills look as before until the business owner fills in **Bills → Billing settings**. Shared bill links use the web app's own address (`/api/public/bills/...`, forwarded to the API by `vercel.json`).
+8. **Product photos** are stored in MongoDB GridFS (`IMAGE_STORAGE=gridfs`, already set in `render.yaml`): up to 4 per product, 2 MB each before resizing, kept as WebP at 1000 px and 240 px (usually 50–150 kB per product). They count towards your Atlas storage (the free tier has 512 MB), so a salon with 1,000 products and photos uses roughly 100 MB. The screens upload one photo per request, so they stay well under proxy size limits.
 
 ---
 
@@ -380,7 +426,8 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 - No buffer time between appointments and no stylist-specific working hours (the branch's opening hours apply to everyone).
 - The Render free plan sleeps when idle, so the first request after a while can take 30–60 s.
 - Analytics "utilisation" counts every day in the range as a working day (minus marked absences).
-- Inventory: no retail selling at checkout yet (AC15), no moving stock between branches, a completed service can't be reversed (the app has no "un-complete"), no camera barcode scanning (USB/Bluetooth scanners work), photos are stored in the database (GridFS) rather than a CDN, and reports cover one or all of your branches but not a custom set.
+- Billing: no payment gateway or card machine link (payments are recorded by the desk); no IGST (every bill is CGST + SGST, for salons selling where they are); no composition scheme; no rounding to the nearest rupee; no email or SMS sending (the share link is copied or sent on WhatsApp by hand); refunds give money back by any method but not back into an advance; packages, memberships and gift cards aren't built yet (the bill line kinds and payment sources are ready for them, see `billing/lineKinds.js` and `payments/paymentSources.js`); GST rules must be checked by a tax professional before going live.
+- Inventory: no moving stock between branches, a completed service can't be reversed (the app has no "un-complete"), no camera barcode scanning (USB/Bluetooth scanners work), photos are stored in the database (GridFS) rather than a CDN, and reports cover one or all of your branches but not a custom set.
 - Payroll: stylists don't log in, so there's no "My earnings" screen (owners download payslips instead); front desk members can't see their own payslip yet; no PF, ESI, TDS or professional tax (add them as deductions until a payroll expert has reviewed them); one service can't be split between two stylists; notifications are in the app only (no email); monthly pay periods only.
 
 ---
@@ -402,8 +449,11 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 | URL | read or set their stylist's pay, give their stylist an advance, pay their payroll line, download their payslip | 404 ✅ |
 | Header | `X-Branch-Id` = their branch (staff list, dashboard, monthly payroll, inventory overview and reports) | 403 `BRANCH_FORBIDDEN` ✅ |
 | Inventory | Desert Rose (no add-on) opening, editing or finishing Glamour's products, orders and hand-outs | 403 `ADDON_DISABLED` ✅ |
+| Billing (URL) | download their bill PDF, read its history, make a share link, void it, reverse their payment, adjust their cash day, read their customer's money | 404 ✅ |
+| Billing (body/query) | pay their bill, refund it, take an advance for their customer, read their customer's advances | 404 ✅ |
+| Header | `X-Branch-Id` = their branch (billing reports, cash drawer, new sale) | 403 `BRANCH_FORBIDDEN` ✅ |
 
-**All 32 attempts were blocked.** (Two salons that both have Inventory are tested in `server/tests`: another salon's inventory ids are not found, 404.) A front desk user sending another branch of their *own* salon in `X-Branch-Id` is also refused (403).
+**All 46 attempts were blocked.** (Two salons that both have Inventory are tested in `server/tests`: another salon's inventory ids are not found, 404.) A front desk user sending another branch of their *own* salon in `X-Branch-Id` is also refused (403).
 
 ---
 

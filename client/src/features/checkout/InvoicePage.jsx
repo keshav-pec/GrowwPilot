@@ -219,7 +219,7 @@ export default function InvoicePage() {
               {invoice.payments.map((p) => (
                 <li key={p._id} className={`flex justify-between gap-2 py-0.5 ${p.status === 'REVERSED' ? 'text-muted' : ''}`}>
                   <span>
-                    <span className={p.status === 'REVERSED' ? 'line-through' : ''}>{p.kind === 'ADVANCE' ? 'From advance' : METHOD_LABEL[p.method]}</span>
+                    <span className={p.status === 'REVERSED' ? 'line-through' : ''}>{p.kind === 'PAYMENT' ? METHOD_LABEL[p.method] : (p.label ?? p.kind)}</span>
                     {p.reference && <span className="text-muted"> · {p.reference}</span>}
                     <span className="text-xs text-muted"> · {formatDateTime(p.receivedAt, branch.timezone)}</span>
                     {p.status === 'REVERSED' && <span className="block text-xs">Reversed by {p.reversal?.byName}: {p.reversal?.reason}</span>}

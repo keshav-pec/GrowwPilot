@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { PAYMENT_METHODS } from '../../config/constants.js';
 import { objectId, paise } from '../../utils/schemas.js';
+import { PAYMENT_SOURCES } from '../payments/paymentSources.js';
 
 // The client sends WHAT the customer chose (discounts, how they paid).
 // It never sends totals or tax: the server works those out.
@@ -45,8 +46,14 @@ const version = z.number().int().min(0);
 export const openDraftSchema = z.object({ appointmentId: objectId });
 export const quoteSchema = z.object(edits);
 export const saveDraftSchema = z.object({ version, ...edits });
-// Money: payments taken now, how much of the customer's advance to use, and whether extra money is kept as an advance
-const money = { payments: paymentsSchema.default([]), useAdvance: paise.default(0), keepExtraAsAdvance: z.boolean().default(false) };
+// Money: payments taken now, how much of the customer's advance to use (or, in general, of any balance they
+// have with the salon: `sources`, see payments/paymentSources.js), and whether extra money is kept as an advance
+const money = {
+  payments: paymentsSchema.default([]),
+  useAdvance: paise.default(0),
+  sources: z.array(z.object({ type: z.enum(Object.keys(PAYMENT_SOURCES)), amount: paise.min(1) })).max(5).default([]),
+  keepExtraAsAdvance: z.boolean().default(false),
+};
 export const issueSchema = z.object({ version, ...edits, ...money });
 export const recordPaymentSchema = z.object({ invoiceId: objectId, ...money });
 export const saleSchema = z.object({ customerId: objectId.nullable() }); // null = Guest

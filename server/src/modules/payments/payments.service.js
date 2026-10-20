@@ -17,8 +17,8 @@ const describe = (payments) => payments.map((p) => `${formatMoney(p.amount)} ${M
 
 // "Record payment" on an issued bill that still has something due, e.g. the ₹680 left after a part payment.
 // input: { invoiceId, payments: [{ method, amount, reference }], useAdvance (paise), keepExtraAsAdvance }
-export async function recordPayments(ctx, { invoiceId, payments, useAdvance = 0, keepExtraAsAdvance = false }, key) {
-  if (payments.length === 0 && !useAdvance) throw new AppError(400, 'VALIDATION_ERROR', 'Add at least one payment');
+export async function recordPayments(ctx, { invoiceId, payments, useAdvance = 0, sources = [], keepExtraAsAdvance = false }, key) {
+  if (payments.length === 0 && !useAdvance && sources.length === 0) throw new AppError(400, 'VALIDATION_ERROR', 'Add at least one payment');
   const first = await Invoice.findOne(scoped(ctx, { _id: invoiceId })).select('branchId status').lean();
   if (!first || !ctx.allowedBranchIds.includes(String(first.branchId))) throw new AppError(404, 'NOT_FOUND', 'Bill not found');
   if (first.status !== 'ISSUED') throw new AppError(409, 'NOT_ISSUED', 'Only issued bills can take payments');
@@ -26,7 +26,7 @@ export async function recordPayments(ctx, { invoiceId, payments, useAdvance = 0,
   const result = await runOnce(ctx, { key, operation: 'billing.payment.record' }, async (session) => {
     const invoice = await Invoice.findOne(scoped(ctx, { _id: invoiceId })).session(session).lean();
     const branch = await Branch.findById(invoice.branchId).select('timezone').session(session).lean();
-    const { invoice: updated, advanceKept } = await applyPayments(ctx, invoice, payments, { session, source: 'LATER', timezone: branch.timezone, advance: useAdvance, keepExtraAsAdvance });
+    const { invoice: updated, advanceKept } = await applyPayments(ctx, invoice, payments, { session, source: 'LATER', timezone: branch.timezone, advance: useAdvance, sources, keepExtraAsAdvance });
 
     const parts = [payments.length && describe(payments), useAdvance && `${formatMoney(useAdvance)} from advance`].filter(Boolean).join(' + ');
     const left = updated.balanceDue === 0 ? 'now fully paid' : `${formatMoney(updated.balanceDue)} still due`;

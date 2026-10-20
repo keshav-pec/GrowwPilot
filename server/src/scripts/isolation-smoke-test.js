@@ -88,6 +88,27 @@ attempts.push(
   ['Header', "X-Branch-Id = B's branch (inventory reports)", () => call(a, 'GET', '/inventory/reports/stock-summary', { branch: bBranch._id }), 403]
 );
 
+// Billing (bills, payments, refunds, advances, cash days, reports): Glamour aims at Desert Rose's records
+const bBill = (await call(b, 'GET', `/invoices/${bPaid.invoiceId}`)).json.invoice;
+const bPayment = bBill.payments.find((p) => p.kind === 'PAYMENT');
+const bCashDay = (await call(b, 'GET', '/cash-sessions/current')).json.recent[0];
+attempts.push(
+  ['Billing (URL)', "download B's bill PDF", () => call(a, 'GET', `/invoices/${bBill._id}/pdf`), 404],
+  ['Billing (URL)', "read B's bill history", () => call(a, 'GET', `/invoices/${bBill._id}/history`), 404],
+  ['Billing (URL)', "make a share link for B's bill", () => call(a, 'POST', `/invoices/${bBill._id}/share`), 404],
+  ['Billing (URL)', "void B's bill", () => call(a, 'POST', `/invoices/${bBill._id}/void`, { body: { reason: 'Spy test' }, idempotency: true }), 404],
+  ['Billing (URL)', "reverse B's payment", () => call(a, 'POST', `/payments/${bPayment._id}/reverse`, { body: { reason: 'Spy test' }, idempotency: true }), 404],
+  ['Billing (URL)', "adjust B's cash day", () => call(a, 'POST', `/cash-sessions/${bCashDay._id}/adjustments`, { body: { amount: 100, reason: 'Spy test' }, idempotency: true }), 404],
+  ['Billing (URL)', "read B's customer's money", () => call(a, 'GET', `/customers/${bCustomer._id}/money`), 404],
+  ['Billing (Body)', "pay B's bill", () => call(a, 'POST', '/payments', { body: { invoiceId: bBill._id, payments: [{ method: 'CASH', amount: 100 }] }, idempotency: true }), 404],
+  ['Billing (Body)', "refund B's bill", () => call(a, 'POST', '/refunds/quote', { body: { invoiceId: bBill._id, lines: [{ lineId: bBill.lines[0]._id, qty: 1 }] } }), 404],
+  ['Billing (Body)', "take an advance for B's customer", () => call(a, 'POST', '/advances', { body: { customerId: bCustomer._id, method: 'CASH', amount: 100 }, idempotency: true }), 404],
+  ['Billing (Query)', "read B's customer's advances", () => call(a, 'GET', `/advances?customerId=${bCustomer._id}`), 404],
+  ['Header', "X-Branch-Id = B's branch (billing reports)", () => call(a, 'GET', '/billing/reports/sales', { branch: bBranch._id }), 403],
+  ['Header', "X-Branch-Id = B's branch (cash drawer)", () => call(a, 'GET', '/cash-sessions/current', { branch: bBranch._id }), 403],
+  ['Header', "X-Branch-Id = B's branch (new sale)", () => call(a, 'POST', '/invoices/sale', { body: { customerId: null }, branch: bBranch._id }), 403]
+);
+
 console.log(`Tenant isolation smoke test against ${API}\nLogged in as Glamour Studio, using Desert Rose's ids (and the other way round for inventory):\n`);
 const rows = [];
 for (const [where, what, request, expected] of attempts) {

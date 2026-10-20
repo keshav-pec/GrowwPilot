@@ -3,43 +3,27 @@ import { AppError } from '../../utils/AppError.js';
 import { formatMoney } from '../../utils/money.js';
 import { moneyState } from '../billing/tax.rules.js';
 import { recordInvoiceCommissions } from '../payroll/commission.service.js';
+import { sourceOf } from './paymentSources.js';
 
-// What a customer has left in advances, oldest first (usable at any branch of the salon)
-export async function advancesOf(ctx, customerId, session = null) {
-  const advances = await CustomerAdvance.find({ orgId: ctx.orgId, customerId, remaining: { $gt: 0 } }).sort({ createdAt: 1 }).session(session).lean();
-  return { advances, balance: advances.reduce((sum, a) => sum + a.remaining, 0) };
-}
-
-// Takes `amount` from the customer's advances (oldest first) for a bill. Each advance only ever goes down
-// with a guarded update, so the same money can never be used twice, even from two desks at once.
-async function useAdvances(ctx, invoice, amount, session) {
-  const { advances, balance } = await advancesOf(ctx, invoice.customerId, session);
-  if (balance < amount) throw new AppError(400, 'ADVANCE_TOO_LOW', `Only ${formatMoney(balance)} is left in advances`);
-  let left = amount;
-  for (const advance of advances) {
-    if (left === 0) break;
-    const take = Math.min(advance.remaining, left);
-    const used = await CustomerAdvance.updateOne({ _id: advance._id, remaining: { $gte: take } }, { $inc: { remaining: -take } }, { session });
-    if (used.modifiedCount !== 1) throw new AppError(409, 'ADVANCE_CHANGED', 'That advance was just used on another bill. Please try again.');
-    await PaymentAllocation.create([{ orgId: invoice.orgId, branchId: invoice.branchId, advanceId: advance._id, invoiceId: invoice._id, amount: take }], { session });
-    left -= take;
-  }
-}
+export { advancesOf } from './paymentSources.js';
 
 // Puts money on an issued bill, inside the caller's transaction. The only place a bill's amountPaid goes up.
 //   - The bill is raised with a guarded update (only if at least this much is still due), so two desks paying
 //     at the same moment can never pay more than the bill.
-//   - Each payment is saved with an allocation saying which bill it paid; `advance` paise come from the
-//     customer's advances instead.
+//   - Each payment is saved with an allocation saying which bill it paid. `sources` take money the customer
+//     already has with the salon (see paymentSources.js): [{ type: 'ADVANCE', amount }]; `advance` is short for that.
 //   - Money beyond what is due is refused, unless keepExtraAsAdvance: then it becomes a new advance for the customer.
 //   - When the bill becomes fully paid (or costs nothing), the stylists earn their commission.
 // payments: [{ method, amount, reference }]; source: 'CHECKOUT' | 'LATER'
 // -> { invoice, advanceKept (paise) }
-export async function applyPayments(ctx, invoice, payments, { session, source, timezone, advance = 0, keepExtraAsAdvance = false }) {
+export async function applyPayments(ctx, invoice, payments, { session, source, timezone, advance = 0, sources = [], keepExtraAsAdvance = false }) {
+  const fromSources = [...sources, ...(advance > 0 ? [{ type: 'ADVANCE', amount: advance }] : [])].filter((s) => s.amount > 0);
+  for (const s of fromSources) sourceOf(s.type); // known kinds only
+  advance = fromSources.reduce((sum, s) => sum + s.amount, 0); // everything paid from what the customer already has
   const paying = payments.reduce((sum, p) => sum + p.amount, 0);
   const due = invoice.balanceDue;
-  if (advance > 0 && !invoice.customerId) throw new AppError(400, 'VALIDATION_ERROR', 'Advances belong to a customer');
-  if (advance > due) throw new AppError(400, 'OVERPAID', `Only ${formatMoney(due)} is due, so at most that much advance can be used`);
+  if (advance > 0 && !invoice.customerId) throw new AppError(400, 'VALIDATION_ERROR', 'Only a customer’s own balance can pay a bill');
+  if (advance > due) throw new AppError(400, 'OVERPAID', `Only ${formatMoney(due)} is due, so at most that much can come from the customer’s balance`);
 
   const toBill = Math.min(paying, due - advance);
   const extra = paying - toBill;
@@ -95,7 +79,7 @@ export async function applyPayments(ctx, invoice, payments, { session, source, t
       );
     }
   }
-  if (advance > 0) await useAdvances(ctx, current, advance, session);
+  for (const s of fromSources) await sourceOf(s.type).take(ctx, current, s.amount, session);
 
   return { invoice: await settle(current, { session, timezone }), advanceKept: extra };
 }

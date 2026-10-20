@@ -50,18 +50,24 @@ export function lineTax(amount, rateBps, { gstRegistered, pricesIncludeTax }) {
 //   3. the bill discount (flat or % of everything) is shared over the lines by their amounts, to the paisa
 //   4. GST is worked out on each line's final amount, rounded per line (half up)
 //
-// lines: [{ unitPrice, qty, comboDiscount, discount: { type, value } | null, taxRateBps, name }]
+// lines: [{ unitPrice, qty, comboDiscount, discount: { type, value } | null, taxRateBps, name, discountable (default true) }]
+// A line that is not discountable (e.g. a future gift card) takes no line discount and no share of the bill discount.
 // billDiscount: { type, value } | null
 // mode: { gstRegistered, pricesIncludeTax }
 // ---------------------------------------------------------------------------
 export function computeBill(lines, billDiscount, mode) {
   const afterCombo = lines.map((l) => Math.max(l.unitPrice * (l.qty ?? 1) - (l.comboDiscount ?? 0), 0));
-  const lineDiscounts = lines.map((l, i) => discountAmount(afterCombo[i], l.discount, l.name ?? 'this line'));
+  const lineDiscounts = lines.map((l, i) => {
+    if (l.discountable === false && l.discount?.value) throw new AppError(400, 'INVALID_DISCOUNT', `${l.name ?? 'This line'} can’t be discounted`);
+    return discountAmount(afterCombo[i], l.discount, l.name ?? 'this line');
+  });
   const afterLine = afterCombo.map((amount, i) => amount - lineDiscounts[i]);
 
-  const beforeBillDiscount = afterLine.reduce((a, b) => a + b, 0);
+  // The bill discount is shared over the lines that can be discounted, by their amounts
+  const sharable = afterLine.map((amount, i) => (lines[i].discountable === false ? 0 : amount));
+  const beforeBillDiscount = sharable.reduce((a, b) => a + b, 0);
   const billDiscountTotal = discountAmount(beforeBillDiscount, billDiscount, 'the bill');
-  const billShares = splitByPrice(afterLine, billDiscountTotal);
+  const billShares = billDiscountTotal === 0 ? sharable.map(() => 0) : splitByPrice(sharable, billDiscountTotal);
 
   const out = lines.map((l, i) => {
     const gross = l.unitPrice * (l.qty ?? 1);

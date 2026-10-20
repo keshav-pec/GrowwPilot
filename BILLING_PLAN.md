@@ -316,6 +316,25 @@ Billing Phase 3: daily cash closing, dues with aging, customer money history, bi
 Billing Phase 4: extensible bill line types and payment sources for future packages, demo data, isolation and performance checks, README and help
 ```
 
+**Phase 4 status: built (20 Oct 2026), waiting for the user's check. This finishes the plan.**
+- **Line kinds:** `server/src/modules/billing/lineKinds.js`. SERVICE and PRODUCT each declare:
+  - their GST lookup
+  - whether they can be discounted, need a customer, can be removed, or have a quantity
+  - the add-on they need
+  - what they do on issue, refund and void
+
+  Pricing, issuing, refunds and voids only go through these. A line that can't be discounted (a future gift card) is also kept out of the bill-discount share.
+- **Payment sources:** `server/src/modules/payments/paymentSources.js`. ADVANCE declares its balance and how it is taken. Bills and payments accept `sources: [{ type, amount }]`, and `useAdvance` stays as a short form. A future wallet or membership balance is one more entry, plus its field on PaymentAllocation.
+- **Demo data:**
+  - Glamour is GST registered, Desert Rose is not (plain bills).
+  - Andheri has a part-paid bill and a pay-later bill, a ₹2,000 advance, a serum sale with one bottle refunded (credit note), and a mask return waiting for the owner.
+  - Yesterday's cash days are closed at Andheri (₹50 short) and Dubai Marina.
+- **Isolation smoke test:** 14 billing attempts added; all 46 attempts are blocked.
+- **Speed (AC25), with 20,000 bills on file:** opening checkout about 25 ms (target 2 s), a quote about 3 ms (target 500 ms), issuing about 15 ms.
+- **PRD acceptance tests:** AC01–AC25 are mapped in the README. AC13 (payment-provider webhooks) doesn't apply, because there is no payment gateway.
+- **README:** billing section, data, demo data, deployment note, known limitations and the GST warning.
+- **In-app help:** a "GST and billing settings" topic for owners.
+
 ---
 
 ## Defaults chosen (to confirm when each phase is done)

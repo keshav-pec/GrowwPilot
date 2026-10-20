@@ -1,4 +1,4 @@
-import { Branch, Counter, CreditNote, InventoryLocation, Invoice, Payment, Refund, User } from '../../models/index.js';
+import { Branch, Counter, CreditNote, Invoice, Payment, Refund, User } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { formatMoney } from '../../utils/money.js';
@@ -8,12 +8,11 @@ import { financialYear, formatCreditNoteNumber } from '../../config/billing.js';
 import { logActivity } from '../activity/activity.service.js';
 import { notify } from '../notifications/notifications.service.js';
 import { markPayrollStale } from '../payroll/payrollStale.js';
-import { reverseCommissions } from '../payroll/commission.service.js';
 import { creditForLine, moneyState } from '../billing/tax.rules.js';
 import { billingPermissions, branchBilling, getBillingSettings } from '../billing/settings.service.js';
 import { loadInvoice, present } from '../invoices/invoices.service.js';
 import { settle } from '../payments/allocations.js';
-import { postMovement } from '../inventory/stock/stock.engine.js';
+import { runHook } from '../billing/lineKinds.js';
 
 // ---------------------------------------------------------------------------
 // Refunds and returns on an issued bill (BILLING_PLAN.md, Phase 2).
@@ -255,27 +254,9 @@ async function carryOut(ctx, refund, { session, settings }) {
     );
   }
 
-  // 4. Stock: sellable products back into the main store; damaged ones come back and are written off
-  const productLines = plan.lines.filter((l) => l.kind === 'PRODUCT');
-  if (productLines.length > 0) {
-    const store = await InventoryLocation.findOne(scoped(ctx, { branchId: invoice.branchId, isMain: true })).session(session).lean();
-    for (const part of productLines) {
-      const skuId = invoice.lines.find((x) => String(x._id) === String(part.lineId)).skuId;
-      const base = { branchId: invoice.branchId, reference: { kind: 'invoice', id: invoice._id } };
-      await postMovement(ctx, { ...base, type: 'SALE_RETURN', note: `Returned on bill ${invoice.invoiceNumber}`, requestKey: `return:${refund._id}:${part.lineId}`, lines: [{ skuId, locationId: store._id, qty: part.qty, bucket: 'SOLD' }] }, session);
-      if (part.restock === 'DAMAGED') {
-        await postMovement(
-          ctx,
-          { ...base, type: 'WRITE_OFF', reason: 'DAMAGE', note: `Returned damaged on bill ${invoice.invoiceNumber}`, requestKey: `return-damaged:${refund._id}:${part.lineId}`, lines: [{ skuId, locationId: store._id, qty: -part.qty, bucket: 'WASTED' }] },
-          session
-        );
-      }
-    }
-  }
-
-  // 5. Commission on refunded services is taken back (a service is always refunded whole)
-  const serviceItemIds = plan.lines.filter((l) => l.kind === 'SERVICE').map((l) => invoice.lines.find((x) => String(x._id) === String(l.lineId)).itemId).filter(Boolean);
-  if (serviceItemIds.length > 0) await reverseCommissions({ invoice, itemIds: serviceItemIds, eventKey: `refund:${refund._id}`, day: todayInZone(branch.timezone) }, session);
+  // 4. What each kind of line does when refunded, in the same transaction: sellable products back into the
+  //    main store (damaged ones written off), commission on refunded services taken back (see billing/lineKinds.js)
+  await runHook('onRefund', ctx, plan.lines, { invoice, refund, day: todayInZone(branch.timezone) }, session);
 
   const done = await Refund.findOneAndUpdate(
     { _id: refund._id, status: 'REQUESTED' },

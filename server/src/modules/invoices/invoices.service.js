@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import {
-  ActivityLog, Appointment, Branch, Counter, Customer, InventoryLocation, InventorySku, InventorySkuBranch, Invoice, Organization, Payment, PaymentAllocation, Refund, Service,
+  ActivityLog, Appointment, Branch, Counter, Customer, InventorySku, InventorySkuBranch, Invoice, Organization, Payment, PaymentAllocation, Refund,
 } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
@@ -18,7 +18,8 @@ import { branchApproverIds, notify } from '../notifications/notifications.servic
 import { computeBill, discountLimit } from '../billing/tax.rules.js';
 import { billingPermissions, branchBilling, getBillingSettings } from '../billing/settings.service.js';
 import { advancesOf, applyPayments } from '../payments/allocations.js';
-import { postMovement } from '../inventory/stock/stock.engine.js';
+import { PAYMENT_SOURCES, allocationSource } from '../payments/paymentSources.js';
+import { byKind, kindOf, runHook } from '../billing/lineKinds.js';
 import { branchStock } from '../inventory/stock/stock.queries.js';
 import { makeShareToken, readShareToken, SHARE_DAYS } from './share.js';
 
@@ -60,13 +61,6 @@ function assertVersion(invoice, version) {
   if (invoice.version !== version) throw stale();
 }
 
-// The branch's main store, where products are sold from and returned to
-async function mainStoreOf(ctx, branchId, session) {
-  const store = await InventoryLocation.findOne(scoped(ctx, { branchId, isMain: true })).session(session).lean();
-  if (!store) throw new AppError(409, 'NO_STORE', 'This branch has no stock set up yet');
-  return store;
-}
-
 // ---------------------------------------------------------------------------
 // Working out a draft: applies the requested changes, looks up today's GST rates and runs the bill maths.
 // Returns the fields to save, and where the bill stands with the front desk discount limit.
@@ -74,12 +68,9 @@ async function mainStoreOf(ctx, branchId, session) {
 // ---------------------------------------------------------------------------
 async function priceDraft(ctx, invoice, edits = {}, { session = null, settings } = {}) {
   settings ??= await getBillingSettings(ctx, session);
-  // One after the other: reads in a transaction must not race to start it
-  const serviceIds = invoice.lines.map((l) => l.serviceId).filter(Boolean);
-  const services = await Service.find(scoped(ctx, { _id: { $in: serviceIds } })).select('taxRateBps sacCode').session(session).lean();
-  const skuIds = invoice.lines.map((l) => l.skuId).filter(Boolean);
-  const skus = skuIds.length ? await InventorySku.find(scoped(ctx, { _id: { $in: skuIds } })).select('taxRateBps hsnCode').session(session).lean() : [];
-  const find = (list, id) => list.find((x) => String(x._id) === String(id));
+  // What each kind of line needs to work out its GST (one after the other: reads in a transaction must not race)
+  const lookups = {};
+  for (const [name, kind, lines] of byKind(invoice.lines)) lookups[name] = await kind.lookup(ctx, lines, session);
 
   const priceChanges = [];
   for (const change of edits.lines ?? []) {
@@ -93,7 +84,7 @@ async function priceDraft(ctx, invoice, edits = {}, { session = null, settings }
       next.discountValue = change.discount?.value ?? 0;
     }
     if (change?.qty !== undefined && change.qty !== line.qty) {
-      if (line.kind !== 'PRODUCT') throw new AppError(400, 'VALIDATION_ERROR', 'Only products are sold in quantities');
+      if (!kindOf(line).hasQuantity) throw new AppError(400, 'VALIDATION_ERROR', `${line.name} has no quantity to change`);
       next.qty = change.qty;
     }
     if (change?.unitPrice !== undefined && change.unitPrice !== line.unitPrice) {
@@ -106,15 +97,7 @@ async function priceDraft(ctx, invoice, edits = {}, { session = null, settings }
     }
     // A combo's lower price only applies at the list price; a price an owner set is the price
     next.comboDiscount = next.unitPrice === next.listUnitPrice ? (next.listComboDiscount ?? 0) : 0;
-    if (next.kind === 'SERVICE') {
-      const service = find(services, next.serviceId);
-      next.taxRateBps = settings.gstRegistered ? (service?.taxRateBps ?? settings.defaultServiceTaxBps) : 0;
-      next.sacCode = service?.sacCode || settings.defaultSacCode || undefined;
-    } else {
-      const sku = find(skus, next.skuId);
-      next.taxRateBps = settings.gstRegistered ? (sku?.taxRateBps ?? settings.defaultProductTaxBps ?? 1800) : 0;
-      next.hsnCode = sku?.hsnCode || undefined;
-    }
+    Object.assign(next, kindOf(next).tax(next, settings, lookups[next.kind]));
     return next;
   });
 
@@ -122,7 +105,7 @@ async function priceDraft(ctx, invoice, edits = {}, { session = null, settings }
   const billDiscountValue = edits.billDiscount !== undefined ? (edits.billDiscount?.value ?? 0) : invoice.billDiscountValue;
   const mode = { gstRegistered: settings.gstRegistered, pricesIncludeTax: settings.pricesIncludeTax };
   const bill = computeBill(
-    lines.map((l) => ({ name: l.name, unitPrice: l.unitPrice, qty: l.qty, comboDiscount: l.comboDiscount, discount: { type: l.discountType, value: l.discountValue }, taxRateBps: l.taxRateBps })),
+    lines.map((l) => ({ name: l.name, unitPrice: l.unitPrice, qty: l.qty, comboDiscount: l.comboDiscount, discount: { type: l.discountType, value: l.discountValue }, taxRateBps: l.taxRateBps, discountable: kindOf(l).discountable })),
     { type: billDiscountType, value: billDiscountValue },
     mode
   );
@@ -175,7 +158,8 @@ async function paymentsOf(invoiceId, session = null) {
     .session(session)
     .lean();
   return allocations.map((a) => {
-    if (a.advanceId) return { _id: a._id, kind: 'ADVANCE', method: 'ADVANCE', amount: a.amount, receivedAt: a.createdAt, source: 'ADVANCE', status: a.status };
+    const from = allocationSource(a); // money the customer already had (an advance...)
+    if (from) return { _id: a._id, kind: from, method: from, label: PAYMENT_SOURCES[from].label, amount: a.amount, receivedAt: a.createdAt, source: from, status: a.status };
     const p = payments.find((x) => String(x._id) === String(a.paymentId));
     return {
       _id: p._id,
@@ -427,7 +411,7 @@ export async function removeLine(ctx, id, lineId, { version }) {
   assertVersion(invoice, version);
   const line = invoice.lines.find((l) => String(l._id) === lineId);
   if (!line) throw new AppError(404, 'NOT_FOUND', 'That line is not on this bill');
-  if (line.kind !== 'PRODUCT') throw new AppError(400, 'VALIDATION_ERROR', 'Services done in the appointment stay on the bill. Give a discount instead.');
+  if (!kindOf(line).removable) throw new AppError(400, 'VALIDATION_ERROR', `${line.name} was done in the appointment, so it stays on the bill. Give a discount instead.`);
   const { fields, settings } = await priceDraft(ctx, { ...invoice, lines: invoice.lines.filter((l) => l !== line) });
   const updated = await mongoose.connection.transaction((session) => saveChanges(ctx, invoice, fields, [], session));
   return present(ctx, updated, { settings });
@@ -437,7 +421,7 @@ export async function removeLine(ctx, id, lineId, { version }) {
 // Issue the bill: number, lock, payments, advance used and products out of stock, all in one transaction.
 // input: { version, payments: [{ method, amount, reference }], useAdvance (paise), keepExtraAsAdvance, ...the same changes as saveDraft }
 // ---------------------------------------------------------------------------
-export async function issueInvoice(ctx, id, { version, payments = [], useAdvance = 0, keepExtraAsAdvance = false, ...edits }, key) {
+export async function issueInvoice(ctx, id, { version, payments = [], useAdvance = 0, sources = [], keepExtraAsAdvance = false, ...edits }, key) {
   const first = await loadInvoice(ctx, id); // 404 before anything else
 
   const result = await runOnce(ctx, { key, operation: 'billing.invoice.issue' }, async (session) => {
@@ -445,15 +429,17 @@ export async function issueInvoice(ctx, id, { version, payments = [], useAdvance
     assertDraft(invoice);
     assertVersion(invoice, version);
     if (invoice.lines.length === 0) throw new AppError(400, 'EMPTY_BILL', 'Add something to the bill first');
-    const products = invoice.lines.some((l) => l.kind === 'PRODUCT');
-    if (products && !hasInventory(ctx)) throw new AppError(403, 'ADDON_DISABLED', 'Selling products needs the Inventory add-on');
+    for (const [, kind] of byKind(invoice.lines)) {
+      if (kind.requiresAddon && !ctx.addons?.includes(kind.requiresAddon)) throw new AppError(403, 'ADDON_DISABLED', `Selling ${kind.label.toLowerCase()}s needs the ${kind.requiresAddon} add-on`);
+    }
 
     const { fields, priceChanges, settings, limits } = await priceDraft(ctx, invoice, edits, { session });
     if (limits.needsApproval) {
       if (fields.approval.status === 'PENDING') throw new AppError(409, 'APPROVAL_PENDING', 'This discount is waiting for an owner to approve it');
       throw new AppError(409, 'APPROVAL_NEEDED', `The discount is above the front desk limit of ${limits.limitBps / 100}% (${formatMoney(limits.limitAmount)} on this bill). Ask an owner to approve it first.`);
     }
-    if (!invoice.customerId && fields.lines.some((l) => l.kind === 'SERVICE')) throw new AppError(400, 'CUSTOMER_REQUIRED', 'A bill with services needs a customer');
+    const needsCustomer = byKind(fields.lines).find(([, kind]) => kind.needsCustomer);
+    if (!invoice.customerId && needsCustomer) throw new AppError(400, 'CUSTOMER_REQUIRED', `A bill with ${needsCustomer[1].label.toLowerCase()}s needs a customer`);
 
     const branch = await Branch.findById(invoice.branchId).select('name address city timezone').session(session).lean();
     const billing = await branchBilling(ctx, invoice.branchId, settings, session);
@@ -495,25 +481,11 @@ export async function issueInvoice(ctx, id, { version, payments = [], useAdvance
       settlementStatus: 'UNPAID',
     });
 
-    // Products leave the main store now, exactly once: this is the same transaction as the issue
-    if (products) {
-      const store = await mainStoreOf(ctx, invoice.branchId, session);
-      for (const line of issued.lines.filter((l) => l.kind === 'PRODUCT')) {
-        try {
-          await postMovement(
-            ctx,
-            { branchId: invoice.branchId, type: 'SALE', note: `Bill ${issued.invoiceNumber}`, reference: { kind: 'invoice', id: issued._id }, requestKey: `sale:${issued._id}:${line._id}`, lines: [{ skuId: line.skuId, locationId: store._id, qty: -line.qty, bucket: 'SOLD' }] },
-            session
-          );
-        } catch (err) {
-          if (err.code === 'INSUFFICIENT_AVAILABLE_STOCK') throw new AppError(409, 'NOT_ENOUGH_STOCK', `Not enough ${line.name} in stock: ${err.details.available} left in ${store.name}`, err.details);
-          throw err;
-        }
-      }
-    }
+    // What each kind of line does on issue, in the same transaction (products leave the store, exactly once)
+    await runHook('onIssue', ctx, issued.lines, { invoice: issued }, session);
 
     // Payments and advance; a bill that ends up fully paid (or costs nothing) earns the stylists' commission
-    const { invoice: final, advanceKept } = await applyPayments(ctx, issued, payments, { session, source: 'CHECKOUT', timezone: branch.timezone, advance: useAdvance, keepExtraAsAdvance });
+    const { invoice: final, advanceKept } = await applyPayments(ctx, issued, payments, { session, source: 'CHECKOUT', timezone: branch.timezone, advance: useAdvance, sources, keepExtraAsAdvance });
 
     const paid = final.amountPaid;
     const money = paid >= final.grandTotal ? 'paid in full' : paid > 0 ? `paid ${formatMoney(paid)}, ${formatMoney(final.balanceDue)} due` : 'nothing paid yet';
@@ -567,17 +539,7 @@ export async function voidInvoice(ctx, id, { reason }, key) {
     if (!updated) throw stale();
     if (invoice.appointmentId) await Appointment.updateOne({ _id: invoice.appointmentId, invoiceId: invoice._id }, { $set: { invoiceId: null } }, { session });
 
-    const productLines = invoice.lines.filter((l) => l.kind === 'PRODUCT');
-    if (productLines.length > 0) {
-      const store = await mainStoreOf(ctx, invoice.branchId, session);
-      for (const line of productLines) {
-        await postMovement(
-          ctx,
-          { branchId: invoice.branchId, type: 'SALE_RETURN', note: `Bill ${invoice.invoiceNumber} voided`, reference: { kind: 'invoice', id: invoice._id }, requestKey: `void:${invoice._id}:${line._id}`, lines: [{ skuId: line.skuId, locationId: store._id, qty: line.qty, bucket: 'SOLD' }] },
-          session
-        );
-      }
-    }
+    await runHook('onVoid', ctx, invoice.lines, { invoice }, session); // e.g. products back into the store
     const branch = await Branch.findById(invoice.branchId).select('timezone').session(session).lean();
     await reverseCommissions({ invoice, eventKey: `void:${invoice._id}`, day: todayInZone(branch.timezone) }, session);
 

@@ -255,6 +255,16 @@ export const KNOWLEDGE = [
     link: { label: 'Bills', to: '/app/bills' },
   },
 
+  {
+    id: 'gst-settings',
+    title: 'GST and billing settings',
+    audiences: OWNERS,
+    keywords: ['*gst', 'gstin', 'tax invoice', 'billing settings', 'sac code', 'hsn', 'bill prefix', 'bill number', 'cgst', 'sgst', 'tax rate'],
+    answer:
+      'Open **Bills → Billing settings** (the business owner changes them). Choose **GST registered** or **Not registered**; if registered, enter the legal name, whether menu prices include GST, the default rate for services and products, and each branch’s **GSTIN** and bill prefix (numbers look like AND/26-27/00001 and start again every 1 April). A service or product can have its own rate. **Please have your tax adviser check the rates, SAC/HSN codes and bill wording before you start issuing GST bills.** Bills already issued never change.',
+    link: { label: 'Billing settings', to: '/app/settings/billing' },
+  },
+
   // ---------------------------------------------------------------- attendance
   {
     id: 'attendance',

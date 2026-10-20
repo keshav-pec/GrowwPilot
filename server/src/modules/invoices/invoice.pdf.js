@@ -123,7 +123,7 @@ export function writeInvoicePdf(stream, invoice, { maskPhone: mask = false } = {
     doc.font('Helvetica-Bold').fontSize(9).fillColor(MUTED).text('Payments');
     for (const p of payments) {
       const when = DateTime.fromJSDate(new Date(p.receivedAt), { zone }).toFormat('d LLL yyyy');
-      doc.font('Helvetica').fontSize(9).fillColor('black').text(`${METHOD[p.method] ?? p.method}${p.reference ? ` (${p.reference})` : ''} · ${when}: ${money(p.amount)}`);
+      doc.font('Helvetica').fontSize(9).fillColor('black').text(`${p.label ?? METHOD[p.method] ?? p.method}${p.reference ? ` (${p.reference})` : ''} · ${when}: ${money(p.amount)}`);
     }
   }
   const refunds = (invoice.refunds ?? []).filter((r) => r.status === 'DONE');
