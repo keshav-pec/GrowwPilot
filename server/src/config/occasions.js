@@ -33,3 +33,10 @@ export function maskPhone(phone) {
   const text = String(phone ?? '');
   return text.length > 4 ? `${text.slice(0, 2)}${'*'.repeat(text.length - 4)}${text.slice(-2)}` : text;
 }
+
+// Campaigns (Phase 2)
+export const CAMPAIGN_SCOPES = ['BUSINESS_DEFAULT', 'BRANCH_ONLY']; // all branches, or one branch (overrides the salon-wide one)
+export const CAMPAIGN_STATUSES = ['DRAFT', 'PUBLISHED', 'DISABLED', 'ARCHIVED'];
+export const DISCOUNT_TYPES = ['PERCENT', 'FLAT'];
+export const DELIVERY_MODES = ['STAFF_ASSISTED']; // automatic sending comes later
+export const OCCASION_LABELS = { BIRTHDAY: 'Birthday', ANNIVERSARY: 'Anniversary' };

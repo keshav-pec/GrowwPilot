@@ -24,6 +24,8 @@ import InvoicePage from '../features/checkout/InvoicePage';
 import BillsListPage from '../features/billing/BillsListPage';
 import BillingSettingsPage from '../features/billing/BillingSettingsPage';
 import OccasionSettingsPage from '../features/occasions/settings/OccasionSettingsPage';
+import CampaignDetailPage from '../features/occasions/campaigns/CampaignDetailPage';
+import QuickSetup from '../features/occasions/setup/QuickSetup';
 import SaleEditPage from '../features/billing/SaleEditPage';
 import RefundPage from '../features/billing/RefundPage';
 import CashPage from '../features/billing/CashPage';
@@ -130,6 +132,8 @@ export const router = createBrowserRouter([
               { path: 'catalog', element: <CatalogPage /> },
               { path: 'settings/billing', element: <BillingSettingsPage /> },
               { path: 'settings/occasions', element: <OccasionSettingsPage /> }, // Birthday & Anniversary Offers
+              { path: 'settings/occasions/setup', element: <QuickSetup /> },
+              { path: 'settings/occasions/campaigns/:id', element: <CampaignDetailPage /> },
               { path: 'settings/salary', element: <Navigate to="/app/payroll" replace /> }, // old link
             ],
           },

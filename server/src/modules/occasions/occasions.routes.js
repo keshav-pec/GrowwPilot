@@ -7,10 +7,11 @@ import { requireIdempotencyKey } from '../../middleware/idempotency.js';
 import { objectId } from '../../utils/schemas.js';
 import { toCsv } from '../../utils/csv.js';
 import { z } from 'zod';
-import { consentSchema, datesSchema, ifMatchSchema, importSchema, reasonSchema, settingsSchema } from './occasions.schemas.js';
+import { consentSchema, createCampaignSchema, datesSchema, ifMatchSchema, importSchema, reasonSchema, settingsSchema, updateCampaignSchema } from './occasions.schemas.js';
 import { getSettingsForScreen, updateSettings } from './settings.service.js';
 import { consentHistory, getConsents, recordConsent, removeOccasionData, setCustomerDates } from './customers.service.js';
 import { importDates, importTemplate } from './import.service.js';
+import * as campaigns from './campaigns/campaigns.service.js';
 
 // /api/occasions — Birthday & Anniversary Offers. Owners and front desk; what each may do is checked in the
 // services (permissions.js). The salon and the role always come from the login.
@@ -55,6 +56,45 @@ router.get('/import/template', async (req, res) => {
 });
 router.post('/import', express.json({ limit: '2mb' }), validate({ body: importSchema }), async (req, res) => {
   res.json(await importDates(req.ctx, req.valid.body, req.get('Idempotency-Key')));
+});
+
+// Campaigns (owners; a branch owner only their branches' own campaigns). Writes need an Idempotency-Key;
+// an edit also needs If-Match with the campaign version the screen loaded.
+router.get('/campaigns', validate({ query: z.object({ includeArchived: z.enum(['true', 'false']).default('false') }) }), async (req, res) => {
+  res.json(await campaigns.listCampaigns(req.ctx, { includeArchived: req.valid.query.includeArchived === 'true' }));
+});
+router.post('/campaigns', requireIdempotencyKey, validate({ body: createCampaignSchema }), async (req, res) => {
+  res.status(201).json(await campaigns.createCampaign(req.ctx, req.valid.body, req.idempotencyKey));
+});
+router.post('/campaigns/starters', requireIdempotencyKey, async (req, res) => {
+  res.status(201).json(await campaigns.createStarterDrafts(req.ctx, req.idempotencyKey));
+});
+router.get('/campaigns/:id', idParams, async (req, res) => {
+  res.json(await campaigns.getCampaign(req.ctx, req.params.id));
+});
+router.patch('/campaigns/:id', idParams, requireIdempotencyKey, validate({ headers: ifMatchSchema, body: updateCampaignSchema }), async (req, res) => {
+  await campaigns.updateCampaign(req.ctx, req.params.id, req.valid.body, { version: req.valid.headers['if-match'], key: req.idempotencyKey });
+  res.json(await campaigns.getCampaign(req.ctx, req.params.id));
+});
+router.post('/campaigns/:id/publish', idParams, requireIdempotencyKey, async (req, res) => {
+  await campaigns.publishCampaign(req.ctx, req.params.id, req.idempotencyKey);
+  res.json(await campaigns.getCampaign(req.ctx, req.params.id));
+});
+for (const change of ['disable', 'enable', 'archive']) {
+  router.post(`/campaigns/:id/${change}`, idParams, requireIdempotencyKey, async (req, res) => {
+    await campaigns.changeCampaignStatus(req.ctx, req.params.id, change, req.idempotencyKey);
+    res.json(await campaigns.getCampaign(req.ctx, req.params.id));
+  });
+}
+router.post('/campaigns/:id/discard-draft', idParams, requireIdempotencyKey, async (req, res) => {
+  await campaigns.discardDraft(req.ctx, req.params.id, req.idempotencyKey);
+  res.json(await campaigns.getCampaign(req.ctx, req.params.id));
+});
+router.get('/campaigns/:id/versions', idParams, async (req, res) => {
+  res.json(await campaigns.listVersions(req.ctx, req.params.id));
+});
+router.get('/campaigns/:id/preview', idParams, async (req, res) => {
+  res.json(await campaigns.previewCampaign(req.ctx, req.params.id));
 });
 
 export default router;

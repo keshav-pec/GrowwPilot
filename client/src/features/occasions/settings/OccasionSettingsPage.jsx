@@ -7,6 +7,7 @@ import { newRequestKey } from '../../../lib/billing';
 import { formatDateTime } from '../../../lib/time';
 import { Button, Card, EmptyState, PageHeader, Spinner, Textarea } from '../../../components/ui';
 import ImportDatesModal from './ImportDatesModal';
+import CampaignList from '../campaigns/CampaignList';
 
 // Settings → Occasion offers (owners). The business owner switches the feature on and sets the consent wording;
 // branch owners can only look. Switching on doesn't publish or send anything.
@@ -85,6 +86,8 @@ function SettingsView({ saved }) {
             Add birthdays and anniversaries on each customer’s profile, or import them below. Customers without permission can still use their offer in the salon.
           </p>
         </Card>
+
+        <CampaignList />
 
         <Card title="Consent wording">
           <p className="mb-3 text-sm text-muted">

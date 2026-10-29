@@ -71,3 +71,65 @@ export function downloadRejected(rejected) {
   link.click();
   URL.revokeObjectURL(link.href);
 }
+
+// ---------------------------------------------------------------------------
+// Campaigns
+// ---------------------------------------------------------------------------
+export const OCCASION_LABEL = { BIRTHDAY: 'Birthday', ANNIVERSARY: 'Anniversary' };
+export const CAMPAIGN_STATUS = {
+  DRAFT: { label: 'Draft', tone: 'neutral' },
+  PUBLISHED: { label: 'Live', tone: 'gold' },
+  DISABLED: { label: 'Turned off', tone: 'orange' },
+  ARCHIVED: { label: 'Archived', tone: 'brown' },
+};
+export const DELIVERY_LABEL = { STAFF_ASSISTED: 'Staff sends offers' };
+
+const rupees = (paise) => (paise == null ? '' : String(paise / 100));
+
+// Saved terms -> form text. PERCENT value is basis points (1500 -> "15"); money is paise (50000 -> "500").
+export function toRulesForm(rules, allServiceIds = []) {
+  return {
+    discountType: rules?.discountType ?? 'PERCENT',
+    value: rules ? (rules.discountType === 'PERCENT' ? String(rules.value / 100) : rupees(rules.value)) : '',
+    maxDiscount: rupees(rules?.maxDiscount),
+    minSubtotal: rupees(rules?.minSubtotal ?? 0),
+    serviceIds: rules?.serviceIds?.map(String) ?? allServiceIds,
+  };
+}
+
+const amount = (text) => /^\d+(\.\d{1,2})?$/.test(String(text).trim());
+const toPaise = (text) => Math.round(Number(text) * 100);
+
+export function fromRulesForm(form) {
+  const percent = form.discountType === 'PERCENT';
+  return {
+    discountType: form.discountType,
+    value: toPaise(form.value), // % x 100 = basis points; ₹ x 100 = paise
+    maxDiscount: percent ? toPaise(form.maxDiscount) : null,
+    minSubtotal: toPaise(form.minSubtotal || 0),
+    serviceIds: form.serviceIds,
+  };
+}
+
+// Same checks as the server, so the form can show them before saving. { field: message }
+export function rulesFormErrors(form, activeServiceIds) {
+  const errors = {};
+  if (form.discountType === 'PERCENT') {
+    if (!amount(form.value) || Number(form.value) <= 0 || Number(form.value) > 100) errors.value = 'More than 0 and at most 100';
+    if (!amount(form.maxDiscount) || Number(form.maxDiscount) <= 0) errors.maxDiscount = 'Needed for a % offer';
+    else if (Number(form.maxDiscount) > 100000) errors.maxDiscount = 'At most ₹1,00,000';
+  } else if (!amount(form.value) || Number(form.value) <= 0) {
+    errors.value = 'More than ₹0';
+  }
+  if (form.minSubtotal !== '' && !amount(form.minSubtotal)) errors.minSubtotal = 'An amount in ₹, or 0';
+  if (!form.serviceIds.some((id) => activeServiceIds.includes(id))) errors.serviceIds = 'Choose at least one service';
+  return errors;
+}
+
+// "15% off (max ₹500)", "₹300 off on ₹1,500+" (the server sends the same words for saved campaigns)
+export function describeOffer(rules) {
+  if (!rules) return '';
+  const money = (paise) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: paise % 100 ? 2 : 0, minimumFractionDigits: paise % 100 ? 2 : 0 }).format(paise / 100);
+  const off = rules.discountType === 'PERCENT' ? `${rules.value / 100}% off (max ${money(rules.maxDiscount)})` : `${money(rules.value)} off`;
+  return rules.minSubtotal > 0 ? `${off} on ${money(rules.minSubtotal)}+` : off;
+}

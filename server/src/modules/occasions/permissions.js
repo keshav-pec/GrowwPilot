@@ -1,4 +1,5 @@
 import { AppError } from '../../utils/AppError.js';
+import { logActivity } from '../activity/activity.service.js';
 
 // Who may do what in Birthday & Anniversary Offers: the PRD's section 3 table, in one place.
 //
@@ -28,6 +29,11 @@ const RULES = {
   'occasions.importDates': { BUSINESS_OWNER: true, BRANCH_OWNER: true, FRONT_DESK: false },
   // Clear a customer's dates and set every channel to "opted out" (stand-in for an erasure request)
   'occasions.removeData': { BUSINESS_OWNER: true, BRANCH_OWNER: false, FRONT_DESK: false },
+  // Campaigns. A branch owner only manages "This branch only" campaigns of their own branches and sees the
+  // salon-wide ones read-only (checked in campaigns.service.js).
+  'occasions.viewCampaigns': { BUSINESS_OWNER: true, BRANCH_OWNER: true, FRONT_DESK: false },
+  'occasions.manageCampaigns': { BUSINESS_OWNER: true, BRANCH_OWNER: true, FRONT_DESK: false },
+  'occasions.manageSalonCampaigns': { BUSINESS_OWNER: true, BRANCH_OWNER: false, FRONT_DESK: false },
 };
 
 export const OCCASION_ACTIONS = Object.keys(RULES);
@@ -40,6 +46,18 @@ export function can(ctx, action) {
 
 export function assertCan(ctx, action) {
   if (!can(ctx, action)) throw new AppError(403, 'PERMISSION_DENIED', 'You do not have permission to do this');
+}
+
+// Same, but a refused attempt is written to the activity log first (PRD AT-31: a front desk edit is refused
+// and logged). `what` says what they tried, e.g. "edit the campaign Birthday Month Offer".
+export async function assertCanOrLog(ctx, action, what) {
+  if (!can(ctx, action)) await refuseAndLog(ctx, what);
+}
+
+// Logs the refused attempt (outside any transaction, so it stays even though the change doesn't happen) and throws
+export async function refuseAndLog(ctx, what) {
+  await logActivity(ctx, { action: 'occasions.refused', branchId: ctx.activeBranchId ?? null, summary: `Was refused: tried to ${what}` });
+  throw new AppError(403, 'PERMISSION_DENIED', 'You do not have permission to do this');
 }
 
 // What this user may do, for the screens: { 'occasions.importDates': true, ... }

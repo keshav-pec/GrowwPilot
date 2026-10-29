@@ -70,3 +70,48 @@ export function useImportDates() {
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// Campaigns (owners)
+// ---------------------------------------------------------------------------
+
+// { campaigns, audience, delivery, can }
+export function useCampaigns() {
+  return useQuery({ queryKey: ['occasions', 'campaigns'], queryFn: () => api.get('/occasions/campaigns').then((res) => res.data) });
+}
+
+export function useCampaign(id) {
+  return useQuery({ queryKey: ['occasions', 'campaigns', id], queryFn: () => api.get(`/occasions/campaigns/${id}`).then((res) => res.data.campaign), enabled: Boolean(id) });
+}
+
+export function useCampaignVersions(id) {
+  return useQuery({ queryKey: ['occasions', 'campaigns', id, 'versions'], queryFn: () => api.get(`/occasions/campaigns/${id}/versions`).then((res) => res.data.versions) });
+}
+
+// This month's audience as if live: { eligible, canMessage, customers }. Nothing is saved.
+export function useCampaignPreview(id, enabled = true) {
+  return useQuery({ queryKey: ['occasions', 'campaigns', id, 'preview'], queryFn: () => api.get(`/occasions/campaigns/${id}/preview`).then((res) => res.data), enabled });
+}
+
+function useCampaignMutation(request) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: request,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['occasions', 'campaigns'] }),
+  });
+}
+
+const keyed = (key, extra = {}) => ({ headers: { 'Idempotency-Key': key, ...extra } });
+
+// { key, ...campaign } -> { campaign: { _id } }
+export const useCreateCampaign = () => useCampaignMutation(({ key, ...body }) => api.post('/occasions/campaigns', body, keyed(key)).then((res) => res.data.campaign));
+
+// { key, id, version, ...changes } -> the campaign
+export const useUpdateCampaign = () =>
+  useCampaignMutation(({ key, id, version, ...body }) => api.patch(`/occasions/campaigns/${id}`, body, keyed(key, { 'If-Match': `"${version}"` })).then((res) => res.data.campaign));
+
+// { key, id, action: 'publish' | 'disable' | 'enable' | 'archive' | 'discard-draft' } -> the campaign
+export const useCampaignAction = () => useCampaignMutation(({ key, id, action }) => api.post(`/occasions/campaigns/${id}/${action}`, null, keyed(key)).then((res) => res.data.campaign));
+
+// Quick setup: the starting suggestions as drafts (only for occasions without a salon-wide campaign)
+export const useStarterCampaigns = () => useCampaignMutation(({ key }) => api.post('/occasions/campaigns/starters', null, keyed(key)).then((res) => res.data));

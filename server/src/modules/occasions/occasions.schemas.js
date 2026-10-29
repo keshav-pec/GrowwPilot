@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { objectId } from '../../utils/schemas.js';
-import { CONSENT_CHANNELS, CONSENT_SOURCES, dayFitsMonth } from '../../config/occasions.js';
+import { CAMPAIGN_SCOPES, CONSENT_CHANNELS, CONSENT_SOURCES, DISCOUNT_TYPES, OCCASION_TYPES, dayFitsMonth } from '../../config/occasions.js';
 
 // A birthday or anniversary: { month: 11, day: 5 }, { month: 11 } (no day) or null (clear it). Never a year.
 export const occasionDate = z
@@ -61,3 +61,23 @@ export const importSchema = z.object({
     .min(1, 'The file has no rows')
     .max(MAX_IMPORT_ROWS, `Import at most ${MAX_IMPORT_ROWS} rows at a time`),
 });
+
+// Campaign terms. PERCENT: value in basis points (1500 = 15%). FLAT: value in paise. Checked fully in campaign.rules.js.
+const whole = z.number().int('Use a whole number');
+export const rulesSchema = z.object({
+  discountType: z.enum(DISCOUNT_TYPES, { message: 'Choose % off or ₹ off' }),
+  value: whole,
+  maxDiscount: whole.nullable().optional(),
+  minSubtotal: whole.min(0).default(0),
+  serviceIds: z.array(objectId).max(1000).default([]),
+});
+
+export const createCampaignSchema = z.object({
+  type: z.enum(OCCASION_TYPES),
+  scope: z.enum(CAMPAIGN_SCOPES),
+  branchId: objectId.nullable().optional(),
+  name: z.string().trim().min(2, 'Give the campaign a name').max(80),
+  rules: rulesSchema,
+});
+
+export const updateCampaignSchema = createCampaignSchema.partial();
