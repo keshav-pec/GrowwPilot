@@ -13,7 +13,7 @@ function useBillMutation(mutationFn) {
     mutationFn,
     onSuccess: (invoice) => {
       if (invoice?._id) queryClient.setQueryData(['invoice', invoice._id], invoice);
-      for (const key of ['invoices', 'invoice', 'appointments', 'appointment', 'customers', 'advances', 'dashboard', 'notifications', 'inventory', 'sellable-products']) {
+      for (const key of ['invoices', 'invoice', 'appointments', 'appointment', 'customers', 'advances', 'dashboard', 'notifications', 'inventory', 'sellable-products', 'occasions', 'invoice-offers']) {
         queryClient.invalidateQueries({ queryKey: [key] });
       }
     },
@@ -103,3 +103,11 @@ export const downloadInvoicePdf = (invoice) => downloadFile(`/invoices/${invoice
 
 // A link the customer can open without logging in: { token, days, phone }
 export const useShareInvoice = () => useMutation({ mutationFn: (id) => api.post(`/invoices/${id}/share`).then((res) => res.data) });
+
+// Birthday / anniversary offers for a draft: { applied, offers: [{ _id, label, canApply, discount, payable, reason, linked, applied }] }
+export function useInvoiceOffers(invoiceId, version, enabled = true) {
+  return useQuery({ queryKey: ['invoice-offers', invoiceId, version], queryFn: () => api.get(`/invoices/${invoiceId}/occasion-offers`).then((res) => res.data), enabled });
+}
+
+// { _id, version, offerIssueId | null } -> the draft with the offer on (or off). Nothing is used until the bill is issued.
+export const useSetInvoiceOffer = () => useBillMutation(({ _id, version, offerIssueId }) => api.post(`/invoices/${_id}/occasion-offer`, { offerIssueId, version }).then((res) => res.data));

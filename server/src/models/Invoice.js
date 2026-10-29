@@ -20,6 +20,7 @@ const lineSchema = new mongoose.Schema({
   priceChangeReason: String,
   listComboDiscount: money({ default: 0 }), // this line's part of a combo's lower price, at the list price
   comboDiscount: money({ default: 0 }), // the combo part that applies (none once an owner sets the price)
+  occasionDiscount: money({ default: 0 }), // this line's part of a birthday / anniversary offer
   discountType: { type: String, enum: DISCOUNT_TYPES, default: 'flat' },
   discountValue: { type: Number, min: 0, default: 0 }, // flat: paise · percent: 0 to 100
   lineDiscount: money({ default: 0 }),
@@ -39,6 +40,22 @@ const lineSchema = new mongoose.Schema({
 
 const taxRowSchema = new mongoose.Schema(
   { rateBps: Number, taxableAmount: money(), cgst: money(), sgst: money() },
+  { _id: false }
+);
+
+// A birthday / anniversary offer on the bill (one per bill). Used up only when the bill is issued.
+const offerSchema = new mongoose.Schema(
+  {
+    offerIssueId: ref('OfferIssue', { required: true }),
+    type: String, // BIRTHDAY | ANNIVERSARY
+    campaignName: String,
+    rules: { type: mongoose.Schema.Types.Mixed }, // the offer's frozen terms
+    eligibleSubtotal: money({ default: 0 }), // what the eligible services cost, before GST
+    discount: money({ default: 0 }),
+    eligible: { type: Boolean, default: true }, // false: the bill no longer qualifies (e.g. a service was made cheaper)
+    code: String, // why not: NO_ELIGIBLE_SERVICE | MIN_SPEND
+    shortBy: money({ default: null }),
+  },
   { _id: false }
 );
 
@@ -89,7 +106,9 @@ const invoiceSchema = new mongoose.Schema(
     subtotal: money({ default: 0 }), // list prices x qty
     comboDiscountTotal: money({ default: 0 }),
     manualDiscount: money({ default: 0 }), // line + bill discounts a person gave
-    discountTotal: money({ default: 0 }), // combo + manual
+    occasionDiscountTotal: money({ default: 0 }), // a birthday / anniversary offer (not counted in manualDiscount)
+    offer: { type: offerSchema, default: null },
+    discountTotal: money({ default: 0 }), // combo + occasion offer + manual
     taxableTotal: money({ default: 0 }),
     cgstTotal: money({ default: 0 }),
     sgstTotal: money({ default: 0 }),

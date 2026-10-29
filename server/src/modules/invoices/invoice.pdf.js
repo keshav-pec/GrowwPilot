@@ -86,7 +86,7 @@ export function writeInvoicePdf(stream, invoice, { maskPhone: mask = false } = {
   const header = gst ? ['Item', 'Qty', 'Price', 'Discount', 'Taxable', 'GST', 'Amount'] : ['Item', 'Qty', 'Price', 'Discount', 'Amount'];
   row(doc, columns, header, { bold: true, color: MUTED });
   for (const line of invoice.lines) {
-    const discount = line.comboDiscount + line.lineDiscount + line.billDiscountShare;
+    const discount = line.comboDiscount + (line.occasionDiscount ?? 0) + line.lineDiscount + line.billDiscountShare;
     const code = line.sacCode ? `SAC ${line.sacCode}` : line.hsnCode ? `HSN ${line.hsnCode}` : '';
     const who = line.kind === 'PRODUCT' ? 'Product' : line.staffName;
     const refunded = line.refundedQty > 0 ? ` · ${line.refundedQty === line.qty ? 'refunded' : `${line.refundedQty} refunded`}` : '';
@@ -98,7 +98,10 @@ export function writeInvoicePdf(stream, invoice, { maskPhone: mask = false } = {
 
   // ----- Totals -----
   total(doc, 'Subtotal', money(invoice.subtotal));
-  if (invoice.discountTotal > 0) total(doc, 'Discounts', `-${money(invoice.discountTotal)}`, { color: MUTED });
+  // A birthday / anniversary offer gets its own row ("Birthday offer -Rs 300"); other discounts are added up
+  const offerOff = invoice.occasionDiscountTotal ?? 0;
+  if (offerOff > 0) total(doc, `${invoice.offer?.type === 'ANNIVERSARY' ? 'Anniversary' : 'Birthday'} offer`, `-${money(offerOff)}`, { color: MUTED });
+  if (invoice.discountTotal - offerOff > 0) total(doc, 'Discounts', `-${money(invoice.discountTotal - offerOff)}`, { color: MUTED });
   if (gst) {
     total(doc, 'Taxable value', money(invoice.taxableTotal), { color: MUTED });
     for (const t of invoice.taxSummary ?? []) {

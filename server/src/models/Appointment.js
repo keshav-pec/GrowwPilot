@@ -49,6 +49,10 @@ const appointmentSchema = new mongoose.Schema(
     source: { type: String, enum: APPOINTMENT_SOURCES, default: 'phone' },
     leadId: ref('Lead'),
     invoiceId: ref('Invoice'), // set at checkout; an appointment is paid only once
+    // Booked from the occasion list (or with the offer ticked): the birthday / anniversary offer it is for.
+    // Booking never uses the offer; it is used only when the bill is issued.
+    offerIssueId: ref('OfferIssue', { default: null }),
+    offerLinked: { type: Boolean, default: false },
     notes: { type: String, trim: true },
     createdBy: ref('User'),
   },

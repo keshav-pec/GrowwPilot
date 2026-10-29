@@ -9,6 +9,7 @@ import { SETTLEMENT } from '../../lib/billing';
 import { formatDateTime, formatTime } from '../../lib/time';
 import { Badge, Button, ConfirmDialog, Drawer, Textarea } from '../../components/ui';
 import AppointmentStatusBadge from '../../components/AppointmentStatusBadge';
+import OfferBadges from '../occasions/checkout/OfferBadges';
 
 // Everything about one appointment, plus its actions (next step, edit, cancel, checkout)
 export default function AppointmentDrawer({ appointment, onClose }) {
@@ -76,6 +77,7 @@ export default function AppointmentDrawer({ appointment, onClose }) {
             <AppointmentStatusBadge status={status} />
             {appointment.invoiceId && <Badge tone={SETTLEMENT[appointment.bill?.status ?? 'PAID'].tone}>{SETTLEMENT[appointment.bill?.status ?? 'PAID'].label}</Badge>}
             {alert && <Badge tone="orange">{alert}</Badge>}
+            <OfferBadges appointment={appointment} zone={zone} />
           </div>
 
           <div>

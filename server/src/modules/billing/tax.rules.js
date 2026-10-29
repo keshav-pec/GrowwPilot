@@ -44,24 +44,51 @@ export function lineTax(amount, rateBps, { gstRegistered, pricesIncludeTax }) {
 }
 
 // ---------------------------------------------------------------------------
+// A birthday / anniversary offer on a bill (OCCASION_OFFERS_PLAN.md, Phase 5). rules are the offer's frozen terms:
+// { discountType: PERCENT (value in basis points) | FLAT (value in paise), maxDiscount, minSubtotal }.
+// eligibleSubtotal: what the eligible services cost on this bill before GST is worked out.
+// Returns { eligible, discount, code?, shortBy? }:
+//   NO_ELIGIBLE_SERVICE  no service on the bill counts for this offer
+//   MIN_SPEND            shortBy paise more of eligible services are needed (₹1,499.99 against ₹1,500 doesn't count)
+// A % offer is rounded to the paisa and capped at its maximum; nothing ever takes off more than the eligible services cost.
+// ---------------------------------------------------------------------------
+export function occasionDiscount(rules, eligibleSubtotal) {
+  if (eligibleSubtotal <= 0) return { eligible: false, discount: 0, code: 'NO_ELIGIBLE_SERVICE' };
+  const min = rules.minSubtotal ?? 0;
+  if (eligibleSubtotal < min) return { eligible: false, discount: 0, code: 'MIN_SPEND', shortBy: min - eligibleSubtotal };
+  const raw = rules.discountType === 'PERCENT' ? Math.min(roundHalfUp(eligibleSubtotal * rules.value, 10000), rules.maxDiscount ?? Infinity) : rules.value;
+  return { eligible: true, discount: Math.min(raw, eligibleSubtotal) };
+}
+
+// ---------------------------------------------------------------------------
 // The whole bill, step by step:
 //   1. each line's price x qty, minus its combo price gap        -> what the line costs
+//   1b. minus its share of an occasion offer (only lines marked occasionEligible; shared by their amounts, to the paisa)
 //   2. minus the line's own discount (flat or %)                   -> after line discount
 //   3. the bill discount (flat or % of everything) is shared over the lines by their amounts, to the paisa
 //   4. GST is worked out on each line's final amount, rounded per line (half up)
 //
-// lines: [{ unitPrice, qty, comboDiscount, discount: { type, value } | null, taxRateBps, name, discountable (default true) }]
+// lines: [{ unitPrice, qty, comboDiscount, discount: { type, value } | null, taxRateBps, name, discountable (default true), occasionEligible }]
 // A line that is not discountable (e.g. a future gift card) takes no line discount and no share of the bill discount.
 // billDiscount: { type, value } | null
 // mode: { gstRegistered, pricesIncludeTax }
+// occasion: an offer's rules (see occasionDiscount), or null. Old bills have none and price exactly as before.
 // ---------------------------------------------------------------------------
-export function computeBill(lines, billDiscount, mode) {
+export function computeBill(lines, billDiscount, mode, occasion = null) {
   const afterCombo = lines.map((l) => Math.max(l.unitPrice * (l.qty ?? 1) - (l.comboDiscount ?? 0), 0));
+
+  // The occasion offer comes off the eligible services first, before any other discount and before GST
+  const eligibleAmounts = afterCombo.map((amount, i) => (lines[i].occasionEligible ? amount : 0));
+  const eligibleSubtotal = eligibleAmounts.reduce((a, b) => a + b, 0);
+  const offer = occasion ? { ...occasionDiscount(occasion, eligibleSubtotal), eligibleSubtotal } : null;
+  const occasionShares = offer?.discount ? splitByPrice(eligibleAmounts, offer.discount) : lines.map(() => 0);
+  const afterOccasion = afterCombo.map((amount, i) => amount - occasionShares[i]);
+
   const lineDiscounts = lines.map((l, i) => {
     if (l.discountable === false && l.discount?.value) throw new AppError(400, 'INVALID_DISCOUNT', `${l.name ?? 'This line'} can’t be discounted`);
-    return discountAmount(afterCombo[i], l.discount, l.name ?? 'this line');
+    return discountAmount(afterOccasion[i], l.discount, l.name ?? 'this line');
   });
-  const afterLine = afterCombo.map((amount, i) => amount - lineDiscounts[i]);
+  const afterLine = afterOccasion.map((amount, i) => amount - lineDiscounts[i]);
 
   // The bill discount is shared over the lines that can be discounted, by their amounts
   const sharable = afterLine.map((amount, i) => (lines[i].discountable === false ? 0 : amount));
@@ -75,6 +102,7 @@ export function computeBill(lines, billDiscount, mode) {
     return {
       gross,
       comboDiscount: gross - afterCombo[i],
+      occasionDiscount: occasionShares[i],
       lineDiscount: lineDiscounts[i],
       billDiscountShare: billShares[i],
       taxRateBps: mode.gstRegistered ? l.taxRateBps : 0,
@@ -86,6 +114,7 @@ export function computeBill(lines, billDiscount, mode) {
   const subtotal = sum('gross');
   const comboDiscountTotal = sum('comboDiscount');
   const lineDiscountTotal = sum('lineDiscount');
+  const occasionDiscountTotal = sum('occasionDiscount');
 
   // One row per GST rate, for the tax table on the bill
   const byRate = new Map();
@@ -106,7 +135,8 @@ export function computeBill(lines, billDiscount, mode) {
       lineDiscountTotal,
       billDiscountTotal,
       manualDiscount: lineDiscountTotal + billDiscountTotal, // what a person chose to give (the front desk limit applies to this)
-      discountTotal: comboDiscountTotal + lineDiscountTotal + billDiscountTotal,
+      occasionDiscountTotal, // a birthday / anniversary offer (not a manual discount)
+      discountTotal: comboDiscountTotal + occasionDiscountTotal + lineDiscountTotal + billDiscountTotal,
       taxableTotal: sum('taxableAmount'),
       cgstTotal: sum('cgst'),
       sgstTotal: sum('sgst'),
@@ -114,6 +144,7 @@ export function computeBill(lines, billDiscount, mode) {
       grandTotal: sum('lineTotal'),
     },
     taxSummary: [...byRate.values()].sort((a, b) => a.rateBps - b.rateBps),
+    occasion: offer, // { eligible, discount, eligibleSubtotal, code?, shortBy? } or null
   };
 }
 

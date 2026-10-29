@@ -28,10 +28,11 @@ export const createAppointmentSchema = z.object({
   comboId: objectId.optional(),
   source: z.enum(APPOINTMENT_SOURCES).default('phone'),
   notes: z.string().trim().max(1000).optional(),
+  offerIssueId: objectId.optional(), // booked for a birthday / anniversary offer (the offer is not used by booking)
 });
 
-// Edit / reschedule: same fields, but the customer and source stay as they were
-export const updateAppointmentSchema = createAppointmentSchema.omit({ customerId: true, source: true });
+// Edit / reschedule: same fields, but the customer, source and offer stay as they were
+export const updateAppointmentSchema = createAppointmentSchema.omit({ customerId: true, source: true, offerIssueId: true });
 
 export const listAppointmentsSchema = z.object({
   date: date.optional(),

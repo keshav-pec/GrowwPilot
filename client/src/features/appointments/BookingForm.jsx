@@ -14,6 +14,7 @@ import { formatDay } from '../../lib/time';
 import { Button, Card, Input, Select, Textarea } from '../../components/ui';
 import CustomerPicker from './CustomerPicker';
 import SlotPicker from './SlotPicker';
+import BookingOfferBox from '../occasions/checkout/BookingOfferBox';
 
 const SOURCES = [
   { value: 'phone', label: 'Phone call' },
@@ -47,6 +48,7 @@ export default function BookingForm({ initial, appointmentId, leadInfo }) {
   const [source, setSource] = useState('phone');
   const [notes, setNotes] = useState(initial.notes ?? '');
   const [conflict, setConflict] = useState(null); // message when another desk took the slot
+  const [offerId, setOfferId] = useState(initial.offerId ?? ''); // a birthday / anniversary offer this booking is for
 
   // Stylists marked absent or on leave for the chosen day can't be booked, so they're hidden
   const attendanceRows = useAttendance(date).data?.rows ?? [];
@@ -119,6 +121,7 @@ export default function BookingForm({ initial, appointmentId, leadInfo }) {
       comboId: combo?._id,
       notes: notes.trim() || undefined,
       ...(isEdit || lead ? {} : { customerId: customer._id, source }), // a lead's customer is found by phone on the server
+      ...(!isEdit && !lead && offerId ? { offerIssueId: offerId } : {}),
     };
 
     const when = `${formatDay(date)} at ${DateTime.fromFormat(startTime, 'HH:mm').toFormat('h:mm a')}`;
@@ -184,7 +187,19 @@ export default function BookingForm({ initial, appointmentId, leadInfo }) {
               )}
             </div>
           ) : (
-            <CustomerPicker customer={customer} onChange={setCustomer} locked={isEdit} />
+            <CustomerPicker
+              customer={customer}
+              onChange={(c) => {
+                setCustomer(c);
+                setOfferId('');
+              }}
+              locked={isEdit}
+            />
+          )}
+          {!isEdit && !lead && customer && (
+            <div className="mt-3">
+              <BookingOfferBox customerId={customer._id} serviceIds={serviceIds} isCombo={mode === 'combo'} date={date} value={offerId} onChange={setOfferId} />
+            </div>
           )}
         </Card>
 

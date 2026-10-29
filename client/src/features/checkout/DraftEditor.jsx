@@ -10,6 +10,7 @@ import { Button, Card, Input, Modal, Spinner, Textarea } from '../../components/
 import DiscountInput, { discountText, parseDiscount } from '../billing/DiscountInput';
 import PaymentRows, { emptyPayment, paidTotal, paymentsPayload, rowsInvalid } from '../billing/PaymentRows';
 import ProductPickerModal from '../billing/ProductPickerModal';
+import OfferPanel from '../occasions/checkout/OfferPanel';
 
 // What's in a line's boxes, starting from the saved line
 const startingLine = (l) => ({ ...discountText(l.discountType, l.discountValue), unitPrice: l.unitPrice, reason: l.priceChangeReason ?? '', qty: l.qty });
@@ -105,7 +106,8 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
     },
     onError: (err) => {
       toast.error(err.message);
-      if (err.code === 'STALE_VERSION') onStale();
+      // OFFER_TAKEN: another desk used the offer a moment ago; the server took it off this bill, so reload
+      if (err.code === 'STALE_VERSION' || err.code === 'OFFER_TAKEN') onStale();
     },
   });
 
@@ -122,6 +124,8 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
   const discountShare = (field) => shown.lines.reduce((sum, l) => sum + (l[field] ?? 0), 0);
   const lineDiscounts = discountShare('lineDiscount');
   const billDiscount = discountShare('billDiscountShare');
+  const offerOn = Boolean(shown.offer ?? draft.offer); // an occasion offer switches the other discounts off
+  const offerLabel = `${(shown.offer ?? draft.offer)?.type === 'ANNIVERSARY' ? 'Anniversary' : 'Birthday'} offer`;
   const putting = paying + advanceUse;
   const payLabel = putting === 0 && total > 0 ? `Issue bill · ${formatMoney(total)} due` : due > 0 ? `Issue & pay ${formatMoney(putting)} · ${formatMoney(due)} due` : `Issue & pay ${formatMoney(total)}`;
 
@@ -134,6 +138,17 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      <div className="lg:col-span-2">
+        <OfferPanel
+          draft={draft}
+          zone={draft.branchId?.timezone}
+          onStale={onStale}
+          onChanged={(invoice) => {
+            setEdits(startingEdits(invoice)); // the discount boxes start empty again
+            onReplace(invoice);
+          }}
+        />
+      </div>
       <Card
         title="Bill"
         actions={
@@ -210,10 +225,18 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
                     <span>−{formatMoney(now.comboDiscount)}</span>
                   </div>
                 )}
-                <div className="flex items-center justify-between gap-2">
-                  <DiscountInput value={e} onChange={(v) => setLine(line, { type: v.type, text: v.text })} error={parsedLines[i].error} label={`Discount on ${line.name}`} />
-                  {now.lineDiscount > 0 && <span className="text-muted">−{formatMoney(now.lineDiscount)}</span>}
-                </div>
+                {now.occasionDiscount > 0 && (
+                  <div className="flex justify-between text-xs text-muted">
+                    <span>{offerLabel}</span>
+                    <span>−{formatMoney(now.occasionDiscount)}</span>
+                  </div>
+                )}
+                {!offerOn && (
+                  <div className="flex items-center justify-between gap-2">
+                    <DiscountInput value={e} onChange={(v) => setLine(line, { type: v.type, text: v.text })} error={parsedLines[i].error} label={`Discount on ${line.name}`} />
+                    {now.lineDiscount > 0 && <span className="text-muted">−{formatMoney(now.lineDiscount)}</span>}
+                  </div>
+                )}
               </li>
             );
           })}
@@ -222,14 +245,19 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
         <dl className="mt-3 flex flex-col gap-2 border-t border-border pt-3 text-sm">
           <Row label="Subtotal" value={formatMoney(shown.subtotal)} />
           {shown.comboDiscountTotal > 0 && <Row label="Combo price" value={`−${formatMoney(shown.comboDiscountTotal)}`} muted />}
+          {shown.occasionDiscountTotal > 0 && <Row label={offerLabel} value={`−${formatMoney(shown.occasionDiscountTotal)}`} muted />}
           {lineDiscounts > 0 && <Row label="Line discounts" value={`−${formatMoney(lineDiscounts)}`} muted />}
-          <div className="flex items-center justify-between gap-2">
-            <dt>Bill discount</dt>
-            <dd className="flex items-center gap-3">
-              {billDiscount > 0 && <span className="text-muted">−{formatMoney(billDiscount)}</span>}
-              <DiscountInput value={edits.bill} onChange={(bill) => setEdits((c) => ({ ...c, bill }))} error={parsedBill.error} label="Bill discount" />
-            </dd>
-          </div>
+          {offerOn ? (
+            <p className="text-xs text-muted">Other discounts are off while the occasion offer is on this bill.</p>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <dt>Bill discount</dt>
+              <dd className="flex items-center gap-3">
+                {billDiscount > 0 && <span className="text-muted">−{formatMoney(billDiscount)}</span>}
+                <DiscountInput value={edits.bill} onChange={(bill) => setEdits((c) => ({ ...c, bill }))} error={parsedBill.error} label="Bill discount" />
+              </dd>
+            </div>
+          )}
           {shown.gstRegistered && (
             <>
               <Row label="Taxable value" value={formatMoney(shown.taxableTotal)} muted />

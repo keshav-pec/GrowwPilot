@@ -31,6 +31,7 @@ import * as campaigns from './campaigns/campaigns.service.js';
 import { customerOffers, getOffer, listOffers, offerSummary } from './worklist/worklist.service.js';
 import { revokeCampaignOffers, runAfterPublish, runNow } from './engine/actions.service.js';
 import { assignOffer, listAssignees, recordContact, sendOffer, sendPreview } from './outreach/followup.service.js';
+import { liveOffers } from './checkout/checkout.service.js';
 
 // /api/occasions — Birthday & Anniversary Offers. Owners and front desk; what each may do is checked in the
 // services (permissions.js). The salon and the role always come from the login.
@@ -156,6 +157,11 @@ router.get('/offers/:id/assignees', idParams, async (req, res) => {
 });
 router.post('/offers/:id/assign', idParams, requireIdempotencyKey, validate({ body: assignSchema }), async (req, res) => {
   res.json(await assignOffer(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
+});
+// Offers a customer can still use, with the likely discount on the chosen services (booking box, check-in badge)
+const liveQuery = z.object({ serviceIds: z.string().max(2000).optional().transform((v) => (v ? v.split(',').filter((id) => /^[a-f\d]{24}$/i.test(id)) : [])) });
+router.get('/customers/:id/live-offers', idParams, validate({ query: liveQuery }), async (req, res) => {
+  res.json(await liveOffers(req.ctx, req.params.id, req.valid.query));
 });
 router.get('/customers/:id/offers', idParams, async (req, res) => {
   res.json(await customerOffers(req.ctx, req.params.id));

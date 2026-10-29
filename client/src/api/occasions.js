@@ -206,3 +206,12 @@ export function useSaveCampaignMessages() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['occasions', 'campaigns'] }),
   });
 }
+
+// Offers a customer can still use, with the likely discount on the chosen services (booking box, check-in badge)
+export function useLiveOffers(customerId, serviceIds = [], enabled = true) {
+  return useQuery({
+    queryKey: ['occasions', 'live-offers', customerId, serviceIds.join(',')],
+    queryFn: () => api.get(`/occasions/customers/${customerId}/live-offers`, { params: serviceIds.length ? { serviceIds: serviceIds.join(',') } : {} }).then((res) => res.data.offers),
+    enabled: Boolean(customerId) && enabled,
+  });
+}

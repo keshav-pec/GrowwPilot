@@ -22,6 +22,7 @@ import { PAYMENT_SOURCES, allocationSource } from '../payments/paymentSources.js
 import { byKind, kindOf, runHook } from '../billing/lineKinds.js';
 import { branchStock } from '../inventory/stock/stock.queries.js';
 import { makeShareToken, readShareToken, SHARE_DAYS } from './share.js';
+import { redeemOffer, restoreOffer } from '../occasions/checkout/redeem.js';
 
 export { branchCode } from '../billing/settings.service.js';
 
@@ -66,7 +67,12 @@ function assertVersion(invoice, version) {
 // Returns the fields to save, and where the bill stands with the front desk discount limit.
 // edits: { billDiscount?: { type, value }, lines?: [{ lineId, discount?: { type, value } | null, qty? (products), unitPrice?, priceChangeReason? }] }
 // ---------------------------------------------------------------------------
-async function priceDraft(ctx, invoice, edits = {}, { session = null, settings } = {}) {
+// A service line counts for an occasion offer when its service is one the offer covers and it isn't part of a combo
+export function occasionEligible(line, rules) {
+  return Boolean(rules) && line.kind === 'SERVICE' && !line.listComboDiscount && (rules.serviceIds ?? []).map(String).includes(String(line.serviceId));
+}
+
+export async function priceDraft(ctx, invoice, edits = {}, { session = null, settings } = {}) {
   settings ??= await getBillingSettings(ctx, session);
   // What each kind of line needs to work out its GST (one after the other: reads in a transaction must not race)
   const lookups = {};
@@ -104,11 +110,17 @@ async function priceDraft(ctx, invoice, edits = {}, { session = null, settings }
   const billDiscountType = edits.billDiscount !== undefined ? (edits.billDiscount?.type ?? 'flat') : invoice.billDiscountType;
   const billDiscountValue = edits.billDiscount !== undefined ? (edits.billDiscount?.value ?? 0) : invoice.billDiscountValue;
   const mode = { gstRegistered: settings.gstRegistered, pricesIncludeTax: settings.pricesIncludeTax };
+  const offerRules = invoice.offer?.rules ?? null;
   const bill = computeBill(
-    lines.map((l) => ({ name: l.name, unitPrice: l.unitPrice, qty: l.qty, comboDiscount: l.comboDiscount, discount: { type: l.discountType, value: l.discountValue }, taxRateBps: l.taxRateBps, discountable: kindOf(l).discountable })),
+    lines.map((l) => ({ name: l.name, unitPrice: l.unitPrice, qty: l.qty, comboDiscount: l.comboDiscount, discount: { type: l.discountType, value: l.discountValue }, taxRateBps: l.taxRateBps, discountable: kindOf(l).discountable, occasionEligible: occasionEligible(l, offerRules) })),
     { type: billDiscountType, value: billDiscountValue },
-    mode
+    mode,
+    offerRules
   );
+  // An occasion offer doesn't mix with other discounts
+  if (invoice.offer && bill.totals.manualDiscount > 0) {
+    throw new AppError(400, 'OFFER_NO_MIXING', 'An occasion offer can’t be combined with other discounts. Remove the offer to give a discount.');
+  }
 
   const fields = {
     lines: lines.map((l, i) => {
@@ -121,6 +133,9 @@ async function priceDraft(ctx, invoice, edits = {}, { session = null, settings }
     subtotal: bill.totals.subtotal,
     comboDiscountTotal: bill.totals.comboDiscountTotal,
     manualDiscount: bill.totals.manualDiscount,
+    occasionDiscountTotal: bill.totals.occasionDiscountTotal,
+    // The offer re-worked for this bill (editing the bill changes it straight away)
+    offer: invoice.offer ? { ...invoice.offer, eligibleSubtotal: bill.occasion.eligibleSubtotal, discount: bill.occasion.discount, eligible: bill.occasion.eligible, code: bill.occasion.code ?? null, shortBy: bill.occasion.shortBy ?? null } : null,
     discountTotal: bill.totals.discountTotal,
     taxableTotal: bill.totals.taxableTotal,
     cgstTotal: bill.totals.cgstTotal,
@@ -425,6 +440,17 @@ export async function issueInvoice(ctx, id, { version, payments = [], useAdvance
   const first = await loadInvoice(ctx, id); // 404 before anything else
 
   const result = await runOnce(ctx, { key, operation: 'billing.invoice.issue' }, async (session) => {
+    return issueInTransaction(session);
+  }).catch(async (err) => {
+    // Another desk used the offer a moment ago: take it off this draft (re-priced) so the desk can review and issue again
+    if (err.code === 'OFFER_TAKEN') await dropOffer(ctx, id);
+    throw err;
+  });
+
+  await markPayrollStale(ctx.orgId, first.branchId); // commission and per-service pay may have changed
+  return result;
+
+  async function issueInTransaction(session) {
     const invoice = await loadInvoice(ctx, id, session);
     assertDraft(invoice);
     assertVersion(invoice, version);
@@ -437,6 +463,9 @@ export async function issueInvoice(ctx, id, { version, payments = [], useAdvance
     if (limits.needsApproval) {
       if (fields.approval.status === 'PENDING') throw new AppError(409, 'APPROVAL_PENDING', 'This discount is waiting for an owner to approve it');
       throw new AppError(409, 'APPROVAL_NEEDED', `The discount is above the front desk limit of ${limits.limitBps / 100}% (${formatMoney(limits.limitAmount)} on this bill). Ask an owner to approve it first.`);
+    }
+    if (fields.offer && !fields.offer.eligible) {
+      throw new AppError(409, 'OFFER_NOT_ELIGIBLE', 'The occasion offer no longer applies to this bill. Remove it, or add the services it needs.');
     }
     const needsCustomer = byKind(fields.lines).find(([, kind]) => kind.needsCustomer);
     if (!invoice.customerId && needsCustomer) throw new AppError(400, 'CUSTOMER_REQUIRED', `A bill with ${needsCustomer[1].label.toLowerCase()}s needs a customer`);
@@ -483,6 +512,8 @@ export async function issueInvoice(ctx, id, { version, payments = [], useAdvance
 
     // What each kind of line does on issue, in the same transaction (products leave the store, exactly once)
     await runHook('onIssue', ctx, issued.lines, { invoice: issued }, session);
+    // The occasion offer is used now (two desks can never both use it; any failure below leaves it unused)
+    if (issued.offer) await redeemOffer(ctx, issued, issued.offer, session);
 
     // Payments and advance; a bill that ends up fully paid (or costs nothing) earns the stylists' commission
     const { invoice: final, advanceKept } = await applyPayments(ctx, issued, payments, { session, source: 'CHECKOUT', timezone: branch.timezone, advance: useAdvance, sources, keepExtraAsAdvance });
@@ -502,10 +533,15 @@ export async function issueInvoice(ctx, id, { version, payments = [], useAdvance
       session
     );
     return present(ctx, final, { session, settings });
-  });
+  }
+}
 
-  await markPayrollStale(ctx.orgId, first.branchId); // commission and per-service pay may have changed
-  return result;
+// Takes the occasion offer off a draft and re-prices it (after OFFER_TAKEN)
+async function dropOffer(ctx, id) {
+  const invoice = await loadInvoice(ctx, id);
+  if (invoice.status !== 'DRAFT' || !invoice.offer) return;
+  const { fields } = await priceDraft(ctx, { ...invoice, offer: null });
+  await Invoice.updateOne(scoped(ctx, { _id: invoice._id, status: 'DRAFT', version: invoice.version }), { $set: { ...fields, offer: null }, $inc: { version: 1 } });
 }
 
 // ---------------------------------------------------------------------------
@@ -540,6 +576,7 @@ export async function voidInvoice(ctx, id, { reason }, key) {
     if (invoice.appointmentId) await Appointment.updateOne({ _id: invoice.appointmentId, invoiceId: invoice._id }, { $set: { invoiceId: null } }, { session });
 
     await runHook('onVoid', ctx, invoice.lines, { invoice }, session); // e.g. products back into the store
+    await restoreOffer(ctx, invoice, session); // an occasion offer can be used again if its month isn't over
     const branch = await Branch.findById(invoice.branchId).select('timezone').session(session).lean();
     await reverseCommissions({ invoice, eventKey: `void:${invoice._id}`, day: todayInZone(branch.timezone) }, session);
 

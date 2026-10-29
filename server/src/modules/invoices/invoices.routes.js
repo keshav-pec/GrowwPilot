@@ -6,6 +6,9 @@ import { validate } from '../../middleware/validate.js';
 import { requireIdempotencyKey } from '../../middleware/idempotency.js';
 import * as schemas from './invoices.schemas.js';
 import * as controller from './invoices.controller.js';
+import { offersForInvoice, setInvoiceOffer } from '../occasions/checkout/checkout.service.js';
+import { objectId } from '../../utils/schemas.js';
+import { z } from 'zod';
 
 // /api/invoices — bills (owners and front desk; branch access is checked in the service)
 const router = Router();
@@ -23,6 +26,13 @@ router.post('/:id/share', controller.share); // a link for the customer (see sha
 // Drafts (stale edits are refused by version)
 router.patch('/:id', validate({ body: schemas.saveDraftSchema }), controller.save);
 router.delete('/:id', validate({ query: schemas.versionQuerySchema }), controller.discard);
+// Birthday / anniversary offers on a draft: what can be applied, and apply one (or take it off)
+router.get('/:id/occasion-offers', async (req, res) => {
+  res.json(await offersForInvoice(req.ctx, req.params.id));
+});
+router.post('/:id/occasion-offer', validate({ body: z.object({ offerIssueId: objectId.nullable(), version: z.number().int().min(0) }) }), async (req, res) => {
+  res.json(await setInvoiceOffer(req.ctx, req.params.id, req.valid.body));
+});
 router.post('/:id/quote', validate({ body: schemas.quoteSchema }), controller.quote); // preview only, saves nothing
 router.post('/:id/products', validate({ body: schemas.addProductSchema }), controller.addProduct);
 router.delete('/:id/lines/:lineId', validate({ query: schemas.versionQuerySchema }), controller.removeLine);

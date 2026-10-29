@@ -1,6 +1,7 @@
 // The booking engine: builds the appointment's items, checks the rules, and saves it
 // without double-booking a stylist (even when two desks click "Book" at the same moment).
 import mongoose from 'mongoose';
+import { linkOfferToBooking } from '../occasions/checkout/checkout.service.js';
 import { DateTime } from 'luxon';
 import { Appointment, Attendance, Branch, Combo, Customer, Service, Staff } from '../../models/index.js';
 import { OPEN_APPOINTMENT_STATUSES, SERVICE_STAFF } from '../../config/constants.js';
@@ -265,6 +266,10 @@ export async function bookWithLock(ctx, payload) {
 
   return withStaffLock(ctx, booking.branch, booking.items, async (session) => {
     const [appointment] = await Appointment.create([newAppointment(ctx, booking, payload)], { session });
+    if (payload.offerIssueId) {
+      await linkOfferToBooking(ctx, appointment, payload.offerIssueId, session);
+      return Appointment.findById(appointment._id).session(session);
+    }
     return appointment;
   });
 }

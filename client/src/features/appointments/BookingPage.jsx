@@ -70,6 +70,7 @@ export default function BookingPage() {
         date: searchParams.get('date') || todayIn(activeBranch.timezone),
         customer: customerQuery.data?.customer ?? null,
         defaultStaffId: searchParams.get('staffId') ?? '',
+        offerId: searchParams.get('offerId') ?? '', // booked from the occasion list: linked to that offer
       };
 
   return (

@@ -52,6 +52,7 @@ export default function InvoicePage() {
   const badge = billBadge(invoice);
   const lineDiscounts = invoice.lines.reduce((sum, l) => sum + l.lineDiscount, 0);
   const billDiscount = invoice.lines.reduce((sum, l) => sum + l.billDiscountShare, 0);
+  const lineOff = (l) => l.comboDiscount + (l.occasionDiscount ?? 0) + l.lineDiscount + l.billDiscountShare;
   const salonName = seller.tradeName || user.org?.name;
   const permissions = invoice.permissions ?? {};
   const refunds = invoice.refunds ?? [];
@@ -170,7 +171,7 @@ export default function InvoicePage() {
                     </span>
                   </td>
                   <td className="py-2 text-right">{formatMoney(line.unitPrice * line.qty)}</td>
-                  <td className="py-2 text-right text-muted">{line.comboDiscount + line.lineDiscount + line.billDiscountShare > 0 ? `−${formatMoney(line.comboDiscount + line.lineDiscount + line.billDiscountShare)}` : '—'}</td>
+                  <td className="py-2 text-right text-muted">{lineOff(line) > 0 ? `−${formatMoney(lineOff(line))}` : '—'}</td>
                   {gst && <td className="py-2 text-right">{formatMoney(line.taxableAmount)}</td>}
                   {gst && <td className="py-2 text-right text-muted">{percentLabel(line.taxRateBps)}</td>}
                   <td className="py-2 text-right">{formatMoney(line.lineTotal)}</td>
@@ -183,6 +184,7 @@ export default function InvoicePage() {
         <dl className="ml-auto flex max-w-xs flex-col gap-1 text-sm">
           <Row label="Subtotal" value={formatMoney(invoice.subtotal)} />
           {invoice.comboDiscountTotal > 0 && <Row label="Combo price" value={`−${formatMoney(invoice.comboDiscountTotal)}`} muted />}
+          {invoice.occasionDiscountTotal > 0 && <Row label={`${invoice.offer?.type === 'ANNIVERSARY' ? 'Anniversary' : 'Birthday'} offer`} value={`−${formatMoney(invoice.occasionDiscountTotal)}`} muted />}
           {lineDiscounts > 0 && <Row label="Line discounts" value={`−${formatMoney(lineDiscounts)}`} muted />}
           {billDiscount > 0 && <Row label="Bill discount" value={`−${formatMoney(billDiscount)}`} muted />}
           {gst && (
