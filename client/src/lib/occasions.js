@@ -133,3 +133,40 @@ export function describeOffer(rules) {
   const off = rules.discountType === 'PERCENT' ? `${rules.value / 100}% off (max ${money(rules.maxDiscount)})` : `${money(rules.value)} off`;
   return rules.minSubtotal > 0 ? `${off} on ${money(rules.minSubtotal)}+` : off;
 }
+
+// ---------------------------------------------------------------------------
+// Offers given to customers
+// ---------------------------------------------------------------------------
+export const OFFER_STATUS = {
+  ISSUED: { label: 'Available', tone: 'gold' },
+  REDEEMED: { label: 'Used', tone: 'brown' },
+  EXPIRED: { label: 'Expired', tone: 'neutral' },
+  REVOKED: { label: 'Withdrawn', tone: 'danger' },
+  SUPERSEDED: { label: 'Replaced', tone: 'neutral' },
+};
+
+// The front desk's step, in plain words
+export function taskLabel(offer) {
+  const t = offer.task ?? {};
+  if (t.state === 'OPEN') return t.kind === 'WITHDRAWN_NOTICE' ? 'Tell customer: withdrawn' : 'To contact';
+  if (t.state === 'CONTACTED') return 'Contacted';
+  const reasons = { EXPIRED: 'Closed: expired', REDEEMED: 'Closed: used', WITHDRAWN: 'Closed: withdrawn', REPLACED: 'Closed: date corrected', UNREACHABLE: 'Unreachable' };
+  return reasons[t.closedReason] ?? 'Closed';
+}
+
+export const OFFER_EVENT_LABEL = {
+  ISSUED: 'Offer given',
+  ASSIGNED: 'Assigned',
+  CONTACT: 'Call recorded',
+  SENT: 'Message sent',
+  BOOKED: 'Booking linked',
+  REDEEMED: 'Used on a bill',
+  RESTORED: 'Given back (bill voided)',
+  EXPIRED: 'Expired',
+  REVOKED: 'Withdrawn',
+  SUPERSEDED: 'Replaced (date corrected)',
+  MOVED: 'Moved to another branch',
+};
+
+// "Birthday · 5 November", "Anniversary · November"
+export const occasionLine = (offer) => `${OCCASION_LABEL[offer.type]} · ${offer.day ? `${offer.day} ` : ''}${MONTHS[offer.month - 1]}`;

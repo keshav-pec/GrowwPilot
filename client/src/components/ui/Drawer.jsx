@@ -1,8 +1,11 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
 
-// A panel that slides in from the right (used for details like a lead's timeline).
-export default function Drawer({ open, onClose, title, footer, children }) {
+const widths = { md: 'max-w-md', wide: 'max-w-2xl' };
+
+// A panel that slides in from the right (used for details like a lead's timeline). On a phone it fills the screen.
+// size: 'md' (default) or 'wide'
+export default function Drawer({ open, onClose, title, footer, size = 'md', children }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -14,7 +17,7 @@ export default function Drawer({ open, onClose, title, footer, children }) {
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
-      <div className="flex h-full w-full max-w-md flex-col bg-bg shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className={`flex h-full w-full ${widths[size]} flex-col bg-bg shadow-xl`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <h2 className="font-semibold text-brown">{title}</h2>
           <button onClick={onClose} className="rounded p-1 text-muted hover:bg-surface" aria-label="Close">

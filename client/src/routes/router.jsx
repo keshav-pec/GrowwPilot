@@ -26,6 +26,7 @@ import BillingSettingsPage from '../features/billing/BillingSettingsPage';
 import OccasionSettingsPage from '../features/occasions/settings/OccasionSettingsPage';
 import CampaignDetailPage from '../features/occasions/campaigns/CampaignDetailPage';
 import QuickSetup from '../features/occasions/setup/QuickSetup';
+import OccasionsPage from '../features/occasions/worklist/OccasionsPage';
 import SaleEditPage from '../features/billing/SaleEditPage';
 import RefundPage from '../features/billing/RefundPage';
 import CashPage from '../features/billing/CashPage';
@@ -111,6 +112,7 @@ export const router = createBrowserRouter([
               { path: 'billing/reports', element: <BillingReportsPage /> }, // front desk: today's collections only
               { path: 'attendance', element: <AttendancePage /> },
               { path: 'payroll', element: <PayrollPage /> }, // front desk: pay setup + requests only
+              { path: 'occasions', element: <OccasionsPage /> }, // Birthday & Anniversary Offers: the front desk list
             ],
           },
 

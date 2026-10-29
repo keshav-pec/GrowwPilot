@@ -40,3 +40,10 @@ export const CAMPAIGN_STATUSES = ['DRAFT', 'PUBLISHED', 'DISABLED', 'ARCHIVED'];
 export const DISCOUNT_TYPES = ['PERCENT', 'FLAT'];
 export const DELIVERY_MODES = ['STAFF_ASSISTED']; // automatic sending comes later
 export const OCCASION_LABELS = { BIRTHDAY: 'Birthday', ANNIVERSARY: 'Anniversary' };
+
+// Offers given to customers (Phase 3)
+export const OFFER_STATUSES = ['ISSUED', 'REDEEMED', 'EXPIRED', 'REVOKED', 'SUPERSEDED'];
+export const TASK_STATES = ['OPEN', 'CONTACTED', 'CLOSED'];
+// CONTACT: get in touch about the offer. WITHDRAWN_NOTICE: tell a contacted customer the offer was withdrawn.
+export const TASK_KINDS = ['CONTACT', 'WITHDRAWN_NOTICE'];
+export const OFFER_EVENT_KINDS = ['ISSUED', 'ASSIGNED', 'CONTACT', 'SENT', 'BOOKED', 'REDEEMED', 'RESTORED', 'EXPIRED', 'REVOKED', 'SUPERSEDED', 'MOVED'];

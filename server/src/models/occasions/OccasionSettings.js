@@ -13,6 +13,14 @@ const occasionSettingsSchema = new mongoose.Schema(
     noticeVersion: { type: String, default: 'v1' },
     // Which channel staff use first when a customer allows several
     channelOrder: { type: [{ type: String, enum: CONSENT_CHANNELS }], default: () => [...CONSENT_CHANNELS] },
+    // The last monthly offer run (scheduled or "Check now")
+    lastRun: {
+      at: Date,
+      issued: Number,
+      expired: Number,
+      branches: Number,
+      by: { type: String, enum: ['SCHEDULE', 'MANUAL', 'PUBLISH'] },
+    },
     version: { type: Number, default: 0 }, // goes up on every change, so two people can't overwrite each other
     updatedBy: ref('User'),
   },

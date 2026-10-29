@@ -4,6 +4,7 @@ import { useDashboard } from '../../api/dashboard';
 import { formatMoney } from '../../lib/money';
 import { formatTime } from '../../lib/time';
 import { Card, EmptyState, PageHeader, Spinner } from '../../components/ui';
+import OccasionWidget from '../occasions/worklist/OccasionWidget';
 
 // Each status always has an icon AND a label, so colour is never the only signal
 const SIGNAL = {
@@ -117,6 +118,7 @@ export default function DashboardPage() {
         />
       </div>
 
+      <OccasionWidget />
       <RequiresAttention items={attention} />
     </>
   );

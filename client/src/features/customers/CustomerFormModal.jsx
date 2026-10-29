@@ -9,7 +9,7 @@ import { useSaveCustomer } from '../../api/customers';
 import { useServiceStaff } from '../../api/staff';
 import { isValidPhone } from '../../lib/phone';
 import { fromDateForm, toDateForm } from '../../lib/occasions';
-import { Button, Input, Modal, Select, Textarea } from '../../components/ui';
+import { Button, ConfirmDialog, Input, Modal, Select, Textarea } from '../../components/ui';
 import OccasionDateFields from './OccasionDateFields';
 
 const schema = z.object({
@@ -27,6 +27,8 @@ export default function CustomerFormModal({ customer, onClose, onSaved }) {
   const saveCustomer = useSaveCustomer();
   const staff = (useServiceStaff().data ?? []).filter((s) => s.status === 'active');
   const [existing, setExisting] = useState(null); // the customer who already has this phone
+  const [confirmCorrection, setConfirmCorrection] = useState(null); // form values waiting for "confirm correction"
+
 
   // The current preferred stylist may work at another branch, so make sure they're in the list
   const preferred = customer?.preferredStaffId;
@@ -60,10 +62,10 @@ export default function CustomerFormModal({ customer, onClose, onSaved }) {
     },
   });
 
-  function onSubmit(values) {
+  function onSubmit(values, { confirmOfferChange = false } = {}) {
     setExisting(null);
     saveCustomer.mutate(
-      { _id: customer?._id, ...values, birthday: fromDateForm(birthday), anniversary: fromDateForm(anniversary) },
+      { _id: customer?._id, ...values, birthday: fromDateForm(birthday), anniversary: fromDateForm(anniversary), ...(confirmOfferChange && { confirmOfferChange }) },
       {
         onSuccess: (saved) => {
           toast.success(customer ? 'Customer updated' : `Added ${saved.name}`);
@@ -72,6 +74,7 @@ export default function CustomerFormModal({ customer, onClose, onSaved }) {
         },
         onError: (err) => {
           if (err.code === 'CUSTOMER_EXISTS') setExisting(err.details.customer);
+          else if (err.code === 'OFFER_CHANGE_NEEDS_CONFIRM') setConfirmCorrection(values);
           else toast.error(err.message);
         },
       }
@@ -127,6 +130,17 @@ export default function CustomerFormModal({ customer, onClose, onSaved }) {
           <Textarea label="Notes (optional)" placeholder="e.g. allergic to ammonia, likes short hair" {...register('notes')} />
         </div>
       </form>
+      <ConfirmDialog
+        open={Boolean(confirmCorrection)}
+        onClose={() => setConfirmCorrection(null)}
+        onConfirm={() => {
+          onSubmit(confirmCorrection, { confirmOfferChange: true });
+          setConfirmCorrection(null);
+        }}
+        title="Review and confirm correction"
+        message="This change alters current-month offer eligibility. The customer’s unused offer for this month will be replaced. Review and confirm correction."
+        confirmLabel="Confirm correction"
+      />
     </Modal>
   );
 }

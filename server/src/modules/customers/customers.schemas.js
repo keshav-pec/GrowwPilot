@@ -20,6 +20,7 @@ export const createCustomerSchema = z.object({
   birthday: occasionDate.optional(),
   anniversary: occasionDate.optional(),
   homeBranchId: objectId.optional(), // new customers: the branch they were added at, unless chosen
+  confirmOfferChange: z.boolean().optional(), // yes, a corrected date may replace this month's unused offer
   notes: z.string().trim().max(1000).optional(),
   preferredStaffId: z.union([z.literal(''), objectId]).optional(), // '' = no preference
 });

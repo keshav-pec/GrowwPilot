@@ -54,6 +54,7 @@ export async function getSettingsForScreen(ctx) {
     noticeVersion: settings.noticeVersion,
     channelOrder: settings.channelOrder,
     version: settings.version,
+    lastRun: settings.lastRun?.at ? settings.lastRun : null,
     counts,
     can: capabilities(ctx),
   };

@@ -14,6 +14,7 @@ import CustomerFormModal from './CustomerFormModal';
 import AdvancesCard from './AdvancesCard';
 import CustomerMoneyTab from './CustomerMoneyTab';
 import MessagesPermissionTab from './MessagesPermissionTab';
+import OccasionOffersCard from './OccasionOffersCard';
 
 // "November (day not provided)", with where it came from in small grey text
 function OccasionDetail({ date }) {
@@ -138,6 +139,7 @@ export default function CustomerProfilePage() {
         </Card>
 
         <AdvancesCard customer={customer} />
+        <OccasionOffersCard customerId={customer._id} />
       </div>
 
       <Tabs

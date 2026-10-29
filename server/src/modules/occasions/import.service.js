@@ -6,6 +6,7 @@ import { MONTH_NAMES, dayFitsMonth, maskPhone } from '../../config/occasions.js'
 import { assertCan } from './permissions.js';
 import { customerScope } from './settings.service.js';
 import { occasionDateChanges } from './customers.service.js';
+import { reevaluateSoon } from './engine/reevaluate.js';
 
 // Spreadsheet import of birthdays and anniversaries (owners):
 //   1. download the template: one row per customer (ID, name, masked phone, the months saved now)
@@ -118,7 +119,7 @@ export async function importDates(ctx, { rows, checkOnly }, key) {
   if (checkOnly || checked.length === 0) return { ...summary, checkOnly };
   if (!key) throw new AppError(400, 'VALIDATION_ERROR', 'Missing Idempotency-Key header');
 
-  return runOnce(ctx, { key, operation: 'occasions.import' }, async (session) => {
+  const result = await runOnce(ctx, { key, operation: 'occasions.import' }, async (session) => {
     // Only where the dates are still what we checked, so a change made meanwhile isn't overwritten
     const unchangedSince = (customer, field) => ({ [`occasions.${field}.updatedAt`]: customer.occasions?.[field]?.updatedAt ?? null });
     const ops = checked.map(({ customer, set }) => ({
@@ -136,4 +137,7 @@ export async function importDates(ctx, { rows, checkOnly }, key) {
     );
     return { ...summary, saved, skippedChanged: checked.length - saved, checkOnly: false };
   });
+  // Imported dates in this month give offers within moments (in the background: a big file can take a while)
+  reevaluateSoon(ctx.orgId, checked.map((c) => c.customer._id), { ctx });
+  return result;
 }

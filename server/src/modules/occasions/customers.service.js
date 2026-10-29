@@ -6,6 +6,7 @@ import { actorRole, logActivity } from '../activity/activity.service.js';
 import { CHANNEL_LABELS, CONSENT_CHANNELS, describeOccasionDate } from '../../config/occasions.js';
 import { assertCan, can } from './permissions.js';
 import { consentWording, getOccasionSettings } from './settings.service.js';
+import { offersAffectedByDates, reevaluateCustomer } from './engine/reevaluate.js';
 
 // ---------------------------------------------------------------------------
 // Birthday, anniversary and home branch
@@ -56,10 +57,39 @@ export function logCustomerChange(ctx, customer, { action, summary, before, afte
   return logActivity(ctx, { action, branchId: customer.homeBranchId ?? null, summary, before, after }, session);
 }
 
+// A corrected date that would replace this month's unused offer must be confirmed first (the screen asks:
+// "This change alters current-month offer eligibility. Review and confirm correction.")
+export async function assertOfferChangeConfirmed(ctx, customer, input) {
+  if (input.confirmOfferChange || !customer?._id) return;
+  const changed = {};
+  for (const field of Object.keys(OCCASION_WORDS)) {
+    if (input[field] !== undefined && !sameDate(customer.occasions?.[field] ?? null, input[field])) changed[field] = input[field];
+  }
+  if (Object.keys(changed).length === 0) return;
+  const affected = await offersAffectedByDates(ctx.orgId, customer, changed);
+  if (affected.length > 0) {
+    throw new AppError(409, 'OFFER_CHANGE_NEEDS_CONFIRM', 'This change alters current-month offer eligibility. Review and confirm correction.', {
+      offers: affected.map(({ offer, type }) => ({ _id: offer._id, type, campaignName: offer.campaignName })),
+    });
+  }
+}
+
+// After a change to a customer: bring their offers in line (replace, move, give). A failure never undoes the
+// change itself; it is logged and the monthly run catches up.
+export async function recheckOffers(ctx, customerId) {
+  try {
+    await reevaluateCustomer(ctx.orgId, customerId, { ctx });
+  } catch (err) {
+    console.error('Occasion offers: re-check after a customer change failed:', err);
+  }
+}
+
 // PUT /api/occasions/customers/:id/dates — { birthday?, anniversary?, homeBranchId? }
 export async function setCustomerDates(ctx, id, input, key) {
   assertCan(ctx, 'occasions.editDates');
-  return runOnce(ctx, { key, operation: 'occasions.customer.dates' }, async (session) => {
+  const current = await Customer.findOne(scoped(ctx, { _id: id })).select('occasions homeBranchId').lean();
+  await assertOfferChangeConfirmed(ctx, current, input);
+  const result = await runOnce(ctx, { key, operation: 'occasions.customer.dates' }, async (session) => {
     const customer = await Customer.findOne(scoped(ctx, { _id: id })).session(session).lean();
     if (!customer) throw new AppError(404, 'NOT_FOUND', 'Customer not found');
     const { set, words } = await customerOccasionChanges(ctx, customer, input, session);
@@ -75,6 +105,8 @@ export async function setCustomerDates(ctx, id, input, key) {
     const saved = await Customer.findOne(scoped(ctx, { _id: id })).select('occasions homeBranchId').session(session).lean();
     return { customer: saved, changed: words.length > 0 };
   });
+  await recheckOffers(ctx, id);
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +181,7 @@ export async function recordConsent(ctx, id, input, key) {
     throw new AppError(400, 'CUSTOMER_ASK_REQUIRED', 'Tick “Customer asked for this” to record permission');
   }
 
-  return runOnce(ctx, { key, operation: 'occasions.consent.change' }, async (session) => {
+  const result = await runOnce(ctx, { key, operation: 'occasions.consent.change' }, async (session) => {
     const customer = await Customer.findOne(scoped(ctx, { _id: id })).session(session).lean();
     if (!customer) throw new AppError(404, 'NOT_FOUND', 'Customer not found');
     const label = CHANNEL_LABELS[input.channel];
@@ -180,6 +212,8 @@ export async function recordConsent(ctx, id, input, key) {
     );
     return { channel: input.channel, status: input.status };
   });
+  await recheckOffers(ctx, id); // the list's "can be messaged" follows straight away
+  return result;
 }
 
 // GET /api/occasions/customers/:id/consents/history — every change, newest first
@@ -197,7 +231,7 @@ export async function consentHistory(ctx, id) {
 // ---------------------------------------------------------------------------
 export async function removeOccasionData(ctx, id, { reason }, key) {
   assertCan(ctx, 'occasions.removeData');
-  return runOnce(ctx, { key, operation: 'occasions.customer.remove_data' }, async (session) => {
+  const result = await runOnce(ctx, { key, operation: 'occasions.customer.remove_data' }, async (session) => {
     const customer = await Customer.findOne(scoped(ctx, { _id: id })).session(session).lean();
     if (!customer) throw new AppError(404, 'NOT_FOUND', 'Customer not found');
 
@@ -214,4 +248,6 @@ export async function removeOccasionData(ctx, id, { reason }, key) {
     );
     return { removed: true };
   });
+  await recheckOffers(ctx, id); // an unused offer of this month is replaced, as the dates are gone
+  return result;
 }

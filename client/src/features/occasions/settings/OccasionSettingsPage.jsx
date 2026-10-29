@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Cake, FileSpreadsheet, Heart, Info, MessageCircle } from 'lucide-react';
+import { Cake, FileSpreadsheet, Heart, Info, MessageCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../../auth/AuthContext';
-import { useOccasionSettings, useSaveOccasionSettings } from '../../../api/occasions';
+import { useOccasionSettings, useRunNow, useSaveOccasionSettings } from '../../../api/occasions';
 import { newRequestKey } from '../../../lib/billing';
 import { formatDateTime } from '../../../lib/time';
 import { Button, Card, EmptyState, PageHeader, Spinner, Textarea } from '../../../components/ui';
@@ -30,6 +30,7 @@ function SettingsView({ saved }) {
   const [key, setKey] = useState(newRequestKey);
   const [consentText, setConsentText] = useState(saved.consentText);
   const [importing, setImporting] = useState(false);
+  const runNow = useRunNow();
   const canEdit = saved.can['occasions.manageSettings'];
   const { counts } = saved;
 
@@ -88,6 +89,32 @@ function SettingsView({ saved }) {
         </Card>
 
         <CampaignList />
+
+        <Card title="Monthly offers">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted">
+              Offers are given by themselves from 01:00 on the 1st of each month, in each branch’s time, and to new or corrected customers within moments.
+              <span className="mt-1 block text-ink">
+                Last successful run:{' '}
+                {saved.lastRun ? `${formatDateTime(saved.lastRun.at, activeBranch.timezone)} · ${saved.lastRun.issued} new, ${saved.lastRun.expired} expired` : 'not yet'}
+              </span>
+            </p>
+            {canEdit && saved.enabled && (
+              <Button
+                variant="secondary"
+                loading={runNow.isPending}
+                onClick={() =>
+                  runNow.mutate(undefined, {
+                    onSuccess: (r) => toast.success(`Checked: ${r.issued} new offer${r.issued === 1 ? '' : 's'}`),
+                    onError: (err) => toast.error(err.message),
+                  })
+                }
+              >
+                <RefreshCw size={16} /> Check now
+              </Button>
+            )}
+          </div>
+        </Card>
 
         <Card title="Consent wording">
           <p className="mb-3 text-sm text-muted">

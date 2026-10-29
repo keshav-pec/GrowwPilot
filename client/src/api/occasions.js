@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import { downloadFile } from './download';
 
@@ -115,3 +115,51 @@ export const useCampaignAction = () => useCampaignMutation(({ key, id, action })
 
 // Quick setup: the starting suggestions as drafts (only for occasions without a salon-wide campaign)
 export const useStarterCampaigns = () => useCampaignMutation(({ key }) => api.post('/occasions/campaigns/starters', null, keyed(key)).then((res) => res.data));
+
+// ---------------------------------------------------------------------------
+// The occasion list (front desk and owners)
+// ---------------------------------------------------------------------------
+const clean = (params) => Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null));
+
+// One tab of the list, 50 at a time ("Load more" fetches the next page). filters: { tab, search, type, year, month, canMessage, assignee, branch }
+export function useOffers(filters) {
+  return useInfiniteQuery({
+    queryKey: ['occasions', 'offers', 'list', filters],
+    queryFn: ({ pageParam }) => api.get('/occasions/offers', { params: clean({ ...filters, cursor: pageParam }) }).then((res) => res.data),
+    initialPageParam: undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  });
+}
+
+// { year, month, eligible, needsAction, booked, used } for the tiles and the Dashboard / Today widget
+export function useOfferSummary(filters = {}, enabled = true) {
+  return useQuery({ queryKey: ['occasions', 'offers', 'summary', filters], queryFn: () => api.get('/occasions/offers/summary', { params: clean(filters) }).then((res) => res.data), enabled });
+}
+
+// The side drawer: { offer, permission, events }
+export function useOffer(id) {
+  return useQuery({ queryKey: ['occasions', 'offers', id], queryFn: () => api.get(`/occasions/offers/${id}`).then((res) => res.data), enabled: Boolean(id) });
+}
+
+// A customer's offers (this year and last), for their profile
+export function useCustomerOffers(customerId) {
+  return useQuery({ queryKey: ['occasions', 'customer-offers', customerId], queryFn: () => api.get(`/occasions/customers/${customerId}/offers`).then((res) => res.data.offers) });
+}
+
+// "Check now" (business owner)
+export function useRunNow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post('/occasions/settings/run-now').then((res) => res.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['occasions'] }),
+  });
+}
+
+// Emergency withdraw (business owner): { key, id, year, reason } -> { revoked, toTell }
+export function useRevokeOffers() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, id, year, reason }) => api.post(`/occasions/campaigns/${id}/revoke`, { year, reason }, { headers: { 'Idempotency-Key': key } }).then((res) => res.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['occasions'] }),
+  });
+}

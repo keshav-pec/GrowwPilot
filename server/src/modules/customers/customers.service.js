@@ -4,7 +4,7 @@ import { OPEN_APPOINTMENT_STATUSES, SERVICE_STAFF } from '../../config/constants
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { escapeRegex } from '../../utils/regex.js';
-import { customerOccasionChanges, logCustomerChange } from '../occasions/customers.service.js';
+import { assertOfferChangeConfirmed, customerOccasionChanges, logCustomerChange, recheckOffers } from '../occasions/customers.service.js';
 
 // ---------------------------------------------------------------------------
 // Visits, spend and last visit are CALCULATED from appointments and invoices every time.
@@ -80,7 +80,7 @@ async function assertPreferredStaff(ctx, staffId) {
 // Turns form values into what we save: '' means "clear this field".
 // Birthday, anniversary and home branch are handled by customerOccasionChanges (occasions module).
 function toDocument(input) {
-  const { birthday, anniversary, homeBranchId, ...doc } = input;
+  const { birthday, anniversary, homeBranchId, confirmOfferChange, ...doc } = input;
   if ('preferredStaffId' in input) doc.preferredStaffId = input.preferredStaffId || null;
   return doc;
 }
@@ -106,7 +106,7 @@ async function assertPhoneFree(ctx, phone, exceptId) {
 export async function createCustomer(ctx, input) {
   await assertPhoneFree(ctx, input.phone);
   await assertPreferredStaff(ctx, input.preferredStaffId);
-  return mongoose.connection.transaction(async (session) => {
+  const created = await mongoose.connection.transaction(async (session) => {
     const occasionInput = { birthday: input.birthday, anniversary: input.anniversary, homeBranchId: input.homeBranchId ?? ctx.activeBranchId };
     const { set, words } = await customerOccasionChanges(ctx, {}, occasionInput, session);
     const customer = new Customer({ ...toDocument(input), orgId: ctx.orgId });
@@ -115,14 +115,17 @@ export async function createCustomer(ctx, input) {
     if (input.birthday || input.anniversary) await logDateChange(ctx, customer, words, null, session);
     return customer;
   });
+  await recheckOffers(ctx, created._id); // added mid-month with an occasion this month: their offer now
+  return created;
 }
 
 export async function updateCustomer(ctx, id, input) {
   const customer = await findCustomer(ctx, id);
   if (input.phone && input.phone !== customer.phone) await assertPhoneFree(ctx, input.phone, id);
   await assertPreferredStaff(ctx, input.preferredStaffId);
+  await assertOfferChangeConfirmed(ctx, customer.toObject(), input);
 
-  return mongoose.connection.transaction(async (session) => {
+  const updated = await mongoose.connection.transaction(async (session) => {
     const before = customer.toObject();
     const { set, words } = await customerOccasionChanges(ctx, before, input, session);
     customer.set(toDocument(input));
@@ -131,6 +134,8 @@ export async function updateCustomer(ctx, id, input) {
     if (words.length > 0) await logDateChange(ctx, customer, words, { occasions: before.occasions, homeBranchId: before.homeBranchId }, session);
     return customer;
   });
+  await recheckOffers(ctx, updated._id); // dates, home branch, name, phone or email may affect their offers
+  return updated;
 }
 
 // Profile page: details, calculated numbers, and upcoming / past appointments (from every branch)

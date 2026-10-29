@@ -7,11 +7,13 @@ import { requireIdempotencyKey } from '../../middleware/idempotency.js';
 import { objectId } from '../../utils/schemas.js';
 import { toCsv } from '../../utils/csv.js';
 import { z } from 'zod';
-import { consentSchema, createCampaignSchema, datesSchema, ifMatchSchema, importSchema, reasonSchema, settingsSchema, updateCampaignSchema } from './occasions.schemas.js';
+import { consentSchema, createCampaignSchema, datesSchema, ifMatchSchema, importSchema, offersQuerySchema, reasonSchema, revokeSchema, settingsSchema, updateCampaignSchema } from './occasions.schemas.js';
 import { getSettingsForScreen, updateSettings } from './settings.service.js';
 import { consentHistory, getConsents, recordConsent, removeOccasionData, setCustomerDates } from './customers.service.js';
 import { importDates, importTemplate } from './import.service.js';
 import * as campaigns from './campaigns/campaigns.service.js';
+import { customerOffers, getOffer, listOffers, offerSummary } from './worklist/worklist.service.js';
+import { revokeCampaignOffers, runAfterPublish, runNow } from './engine/actions.service.js';
 
 // /api/occasions — Birthday & Anniversary Offers. Owners and front desk; what each may do is checked in the
 // services (permissions.js). The salon and the role always come from the login.
@@ -27,6 +29,10 @@ router.get('/settings', async (req, res) => {
 router.put('/settings', requireIdempotencyKey, validate({ headers: ifMatchSchema, body: settingsSchema }), async (req, res) => {
   await updateSettings(req.ctx, req.valid.body, { version: req.valid.headers['if-match'], key: req.idempotencyKey });
   res.json(await getSettingsForScreen(req.ctx));
+});
+// "Check now": this month's offers again for every branch (nothing is ever given twice)
+router.post('/settings/run-now', async (req, res) => {
+  res.json(await runNow(req.ctx));
 });
 
 // One customer: dates and home branch, messaging permission and its history, remove occasion data
@@ -76,16 +82,23 @@ router.patch('/campaigns/:id', idParams, requireIdempotencyKey, validate({ heade
   await campaigns.updateCampaign(req.ctx, req.params.id, req.valid.body, { version: req.valid.headers['if-match'], key: req.idempotencyKey });
   res.json(await campaigns.getCampaign(req.ctx, req.params.id));
 });
+// Publishing (or turning back on) gives this month's offers straight away
 router.post('/campaigns/:id/publish', idParams, requireIdempotencyKey, async (req, res) => {
   await campaigns.publishCampaign(req.ctx, req.params.id, req.idempotencyKey);
+  await runAfterPublish(req.ctx);
   res.json(await campaigns.getCampaign(req.ctx, req.params.id));
 });
 for (const change of ['disable', 'enable', 'archive']) {
   router.post(`/campaigns/:id/${change}`, idParams, requireIdempotencyKey, async (req, res) => {
     await campaigns.changeCampaignStatus(req.ctx, req.params.id, change, req.idempotencyKey);
+    if (change === 'enable') await runAfterPublish(req.ctx);
     res.json(await campaigns.getCampaign(req.ctx, req.params.id));
   });
 }
+// Emergency withdraw (business owner): every unused offer of the campaign for a year
+router.post('/campaigns/:id/revoke', idParams, requireIdempotencyKey, validate({ body: revokeSchema }), async (req, res) => {
+  res.json(await revokeCampaignOffers(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
+});
 router.post('/campaigns/:id/discard-draft', idParams, requireIdempotencyKey, async (req, res) => {
   await campaigns.discardDraft(req.ctx, req.params.id, req.idempotencyKey);
   res.json(await campaigns.getCampaign(req.ctx, req.params.id));
@@ -95,6 +108,20 @@ router.get('/campaigns/:id/versions', idParams, async (req, res) => {
 });
 router.get('/campaigns/:id/preview', idParams, async (req, res) => {
   res.json(await campaigns.previewCampaign(req.ctx, req.params.id));
+});
+
+// The occasion list: tiles, one page of offers, one offer for the drawer, and a customer's offers for their profile
+router.get('/offers/summary', validate({ query: offersQuerySchema }), async (req, res) => {
+  res.json(await offerSummary(req.ctx, req.valid.query));
+});
+router.get('/offers', validate({ query: offersQuerySchema }), async (req, res) => {
+  res.json(await listOffers(req.ctx, req.valid.query));
+});
+router.get('/offers/:id', idParams, async (req, res) => {
+  res.json(await getOffer(req.ctx, req.params.id));
+});
+router.get('/customers/:id/offers', idParams, async (req, res) => {
+  res.json(await customerOffers(req.ctx, req.params.id));
 });
 
 export default router;

@@ -58,3 +58,6 @@ export { default as OccasionSettings } from './occasions/OccasionSettings.js';
 export { default as ConsentEvent } from './occasions/ConsentEvent.js';
 export { default as OccasionCampaign } from './occasions/OccasionCampaign.js';
 export { default as OccasionCampaignVersion } from './occasions/OccasionCampaignVersion.js';
+export { default as OfferIssue } from './occasions/OfferIssue.js';
+export { default as OfferEvent } from './occasions/OfferEvent.js';
+export { default as OccasionEngineRun } from './occasions/OccasionEngineRun.js';

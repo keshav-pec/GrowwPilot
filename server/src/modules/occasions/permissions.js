@@ -34,6 +34,10 @@ const RULES = {
   'occasions.viewCampaigns': { BUSINESS_OWNER: true, BRANCH_OWNER: true, FRONT_DESK: false },
   'occasions.manageCampaigns': { BUSINESS_OWNER: true, BRANCH_OWNER: true, FRONT_DESK: false },
   'occasions.manageSalonCampaigns': { BUSINESS_OWNER: true, BRANCH_OWNER: false, FRONT_DESK: false },
+  // The occasion list (each sees their own branches' customers), the emergency withdraw, and "Check now"
+  'occasions.viewOffers': { BUSINESS_OWNER: true, BRANCH_OWNER: true, FRONT_DESK: true },
+  'occasions.revokeOffers': { BUSINESS_OWNER: true, BRANCH_OWNER: false, FRONT_DESK: false },
+  'occasions.runEngine': { BUSINESS_OWNER: true, BRANCH_OWNER: false, FRONT_DESK: false },
 };
 
 export const OCCASION_ACTIONS = Object.keys(RULES);

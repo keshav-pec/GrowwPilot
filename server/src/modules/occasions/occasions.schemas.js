@@ -12,7 +12,8 @@ export const occasionDate = z
   .nullable();
 
 export const datesSchema = z
-  .object({ birthday: occasionDate.optional(), anniversary: occasionDate.optional(), homeBranchId: objectId.optional() })
+  // confirmOfferChange: yes, replace this month's unused offer (the screen asked first)
+  .object({ birthday: occasionDate.optional(), anniversary: occasionDate.optional(), homeBranchId: objectId.optional(), confirmOfferChange: z.boolean().optional() })
   .refine((d) => d.birthday !== undefined || d.anniversary !== undefined || d.homeBranchId !== undefined, 'Nothing to change');
 
 // Record or withdraw permission on one channel
@@ -81,3 +82,19 @@ export const createCampaignSchema = z.object({
 });
 
 export const updateCampaignSchema = createCampaignSchema.partial();
+
+export const revokeSchema = z.object({ year: z.number().int().min(2000).max(2100), reason: z.string().trim().min(3, 'Please give a reason').max(500) });
+
+const month = z.coerce.number().int().min(1).max(12);
+export const offersQuerySchema = z.object({
+  tab: z.enum(['action', 'all', 'contacted', 'booked', 'used', 'excluded']).default('action'),
+  search: z.string().trim().max(100).optional(),
+  type: z.enum(OCCASION_TYPES).optional(),
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
+  month: month.optional(),
+  canMessage: z.enum(['yes', 'no']).optional(),
+  assignee: z.union([z.enum(['me', 'none']), objectId]).optional(),
+  branch: z.union([z.enum(['current', 'all']), objectId]).default('current'),
+  cursor: z.string().max(300).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});

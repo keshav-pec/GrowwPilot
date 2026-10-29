@@ -10,6 +10,7 @@ import { useAttendance } from '../../api/attendance';
 import { NEXT_STEP, STATUS_LABEL, getAlert } from '../../lib/appointments';
 import { addDays, formatDay, formatTime, todayIn } from '../../lib/time';
 import { Button, EmptyState, PageHeader, Spinner } from '../../components/ui';
+import OccasionWidget from '../occasions/worklist/OccasionWidget';
 import AppointmentDrawer from './AppointmentDrawer';
 
 const PX_PER_MINUTE = 1.6; // 15 minutes = 24px tall
@@ -112,6 +113,8 @@ export default function DayBoardPage() {
           </>
         }
       />
+
+      {isToday && <OccasionWidget />}
 
       {isLoading ? (
         <div className="flex justify-center py-12">

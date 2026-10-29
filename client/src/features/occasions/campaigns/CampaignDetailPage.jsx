@@ -4,11 +4,11 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Pencil } from 'lucide-react';
 import { useAuth } from '../../../auth/AuthContext';
 import { useServices } from '../../../api/catalog';
-import { useCampaign, useCampaignAction, useCampaignPreview, useCampaignVersions } from '../../../api/occasions';
+import { useCampaign, useCampaignAction, useCampaignPreview, useCampaignVersions, useOccasionSettings, useRevokeOffers } from '../../../api/occasions';
 import { newRequestKey } from '../../../lib/billing';
 import { CAMPAIGN_STATUS, DELIVERY_LABEL, OCCASION_LABEL, formatOccasion } from '../../../lib/occasions';
 import { formatDateTime } from '../../../lib/time';
-import { Badge, Button, Card, ConfirmDialog, EmptyState, PageHeader, Spinner, Table } from '../../../components/ui';
+import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Modal, PageHeader, Spinner, Table, Textarea } from '../../../components/ui';
 import CampaignFormModal from './CampaignFormModal';
 
 // What each button does, in the confirm popup
@@ -33,6 +33,9 @@ export default function CampaignDetailPage() {
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(null); // an ACTIONS key
   const [key, setKey] = useState(newRequestKey);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const settingsQuery = useOccasionSettings();
+  const canWithdraw = Boolean(settingsQuery.data?.can['occasions.revokeOffers']);
 
   if (campaignQuery.isPending) {
     return (
@@ -150,6 +153,17 @@ export default function CampaignDetailPage() {
         )}
       </Card>
 
+      {canWithdraw && c.currentVersion > 0 && (
+        <Card title="Emergency withdraw" className="mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted">Takes back every unused offer of this campaign for a year (for example a wrong price). Used offers and their bills stay as they are.</p>
+            <Button variant="danger" onClick={() => setWithdrawing(true)}>
+              Withdraw unused offers
+            </Button>
+          </div>
+        </Card>
+      )}
+
       <Card title="Version history">
         {versionsQuery.isPending ? (
           <Spinner />
@@ -158,6 +172,7 @@ export default function CampaignDetailPage() {
         )}
       </Card>
 
+      {withdrawing && <WithdrawModal campaign={c} onClose={() => setWithdrawing(false)} />}
       {editing && <CampaignFormModal campaign={c} canCreateSalonWide={c.scope === 'BUSINESS_DEFAULT'} onClose={() => setEditing(false)} />}
       <ConfirmDialog
         open={Boolean(confirming)}
@@ -189,5 +204,56 @@ function Rules({ title, summary, rules, serviceName, highlight }) {
         </div>
       </dl>
     </Card>
+  );
+}
+
+// Emergency withdraw: pick a year, type a reason, confirm
+function WithdrawModal({ campaign, onClose }) {
+  const revoke = useRevokeOffers();
+  const [key] = useState(newRequestKey);
+  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [reason, setReason] = useState('');
+  const [sure, setSure] = useState(false);
+  const ready = /^\d{4}$/.test(year) && reason.trim().length >= 3 && sure;
+
+  function confirm() {
+    revoke.mutate(
+      { key, id: campaign._id, year: Number(year), reason: reason.trim() },
+      {
+        onSuccess: (r) => {
+          toast.success(`Withdrew ${r.revoked} offer${r.revoked === 1 ? '' : 's'}${r.toTell ? `; ${r.toTell} customer${r.toTell === 1 ? '' : 's'} to let know` : ''}`);
+          onClose();
+        },
+        onError: (err) => toast.error(err.message),
+      }
+    );
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Withdraw unused ${campaign.name} offers`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="danger" disabled={!ready} loading={revoke.isPending} onClick={confirm}>
+            Withdraw
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4 text-sm">
+        <p className="text-muted">Every unused offer of this campaign for the year is withdrawn straight away. Customers who were already contacted get a task so staff can let them know. This can’t be undone.</p>
+        <Input label="Year" inputMode="numeric" value={year} onChange={(e) => setYear(e.target.value)} />
+        <Textarea label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Wrong discount was published" />
+        <label className="flex items-center gap-2">
+          <input type="checkbox" className="accent-gold" checked={sure} onChange={(e) => setSure(e.target.checked)} />
+          I understand unused offers will stop working
+        </label>
+      </div>
+    </Modal>
   );
 }

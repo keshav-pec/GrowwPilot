@@ -37,7 +37,9 @@ const APP_NAV = [
   { to: '/app/team', label: 'Team', icon: UserCog, roles: ['OWNER'] },
   { to: '/app/branches', label: 'Branches', icon: Building2, roles: ['OWNER'] },
   { to: '/app/catalog', label: 'Services & combos', icon: Scissors, roles: ['OWNER'] },
-  { to: '/app/settings/occasions', label: 'Occasion offers', icon: Gift, roles: ['OWNER'] }, // settings (the list comes in Phase 3)
+  // Birthday & Anniversary Offers: the list while switched on; owners reach the settings while it is off
+  { to: '/app/occasions', label: 'Occasion offers', icon: Gift, roles: ['OWNER', 'FRONT_DESK'], occasions: true },
+  { to: '/app/settings/occasions', label: 'Occasion offers', icon: Gift, roles: ['OWNER'], occasions: false },
   // Same screen: owners get all of payroll, the front desk only pay setup and requests
   { to: '/app/payroll', label: 'Payroll', icon: Wallet, roles: ['OWNER'] },
   { to: '/app/payroll', label: 'Staff pay', icon: Wallet, roles: ['FRONT_DESK'] },
@@ -45,7 +47,10 @@ const APP_NAV = [
 
 export default function AppLayout() {
   const { user } = useAuth();
-  const navItems = APP_NAV.filter((item) => item.roles.includes(user.role) && (!item.addon || hasAddon(user, item.addon)));
+  const occasionsOn = Boolean(user.org?.occasionOffers?.enabled);
+  const navItems = APP_NAV.filter(
+    (item) => item.roles.includes(user.role) && (!item.addon || hasAddon(user, item.addon)) && (item.occasions === undefined || item.occasions === occasionsOn)
+  );
 
   return (
     <>
