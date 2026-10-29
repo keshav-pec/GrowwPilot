@@ -109,6 +109,22 @@ attempts.push(
   ['Header', "X-Branch-Id = B's branch (new sale)", () => call(a, 'POST', '/invoices/sale', { body: { customerId: null }, branch: bBranch._id }), 403]
 );
 
+// Birthday & Anniversary Offers (only Glamour Studio has it on): each salon aims at the other's offers and customers
+const aCampaign = (await call(a, 'GET', '/occasions/campaigns')).json.campaigns[0];
+const aOffer = (await call(a, 'GET', '/occasions/offers?tab=all&branch=all')).json.offers[0];
+attempts.push(
+  ['Occasions (B→A)', "B opens A's campaign", () => call(b, 'GET', `/occasions/campaigns/${aCampaign._id}`), 404],
+  ['Occasions (B→A)', "B withdraws A's offers", () => call(b, 'POST', `/occasions/campaigns/${aCampaign._id}/revoke`, { body: { year: new Date().getFullYear(), reason: 'Spy test' }, idempotency: true }), 404],
+  ['Occasions (B→A)', "B previews A's offer message", () => call(b, 'GET', `/occasions/offers/${aOffer._id}/send-preview`), 404],
+  ['Occasions (B→A)', "B records a call on A's offer", () => call(b, 'POST', `/occasions/offers/${aOffer._id}/contact`, { body: { outcome: 'REACHED' }, idempotency: true }), 404],
+  ['Occasions (B→A)', "B reads A's customer's offers", () => call(b, 'GET', `/occasions/customers/${aOffer.customerId}/offers`), 404],
+  ['Occasions (URL)', "read B's customer's messaging permission", () => call(a, 'GET', `/occasions/customers/${bCustomer._id}/consents`), 404],
+  ['Occasions (URL)', "change B's customer's birthday", () => call(a, 'PUT', `/occasions/customers/${bCustomer._id}/dates`, { body: { birthday: { month: 1 } }, idempotency: true }), 404],
+  ['Occasions (URL)', "record permission for B's customer", () => call(a, 'POST', `/occasions/customers/${bCustomer._id}/consents`, { body: { channel: 'SMS', status: 'OPTED_OUT', source: 'IN_SALON' }, idempotency: true }), 404],
+  ['Header', "X-Branch-Id = B's branch (occasion list)", () => call(a, 'GET', '/occasions/offers', { branch: bBranch._id }), 403],
+  ['Header', "X-Branch-Id = B's branch (occasion reports)", () => call(a, 'GET', '/occasions/reports', { branch: bBranch._id }), 403]
+);
+
 console.log(`Tenant isolation smoke test against ${API}\nLogged in as Glamour Studio, using Desert Rose's ids (and the other way round for inventory):\n`);
 const rows = [];
 for (const [where, what, request, expected] of attempts) {

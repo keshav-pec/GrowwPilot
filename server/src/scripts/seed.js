@@ -31,6 +31,11 @@ import { addProduct, createSaleDraft, issueInvoice, openDraft } from '../modules
 import { takeAdvance } from '../modules/payments/payments.service.js';
 import { approveRefund, createRefund } from '../modules/refunds/refunds.service.js';
 import { closeCashDay, currentCashDay } from '../modules/cash/cash.service.js';
+import { createCampaign, publishCampaign } from '../modules/occasions/campaigns/campaigns.service.js';
+import { recordConsent } from '../modules/occasions/customers.service.js';
+import { recordContact } from '../modules/occasions/outreach/followup.service.js';
+import { setInvoiceOffer } from '../modules/occasions/checkout/checkout.service.js';
+import { runForOrg } from '../modules/occasions/engine/scheduler.js';
 import sharp from 'sharp';
 import { DESERT_ROSE_CUSTOMERS, DESERT_ROSE_SERVICES, GLAMOUR_CUSTOMERS, GLAMOUR_SERVICES, LEADS } from './seed-data.js';
 
@@ -545,6 +550,49 @@ for (const [branchName, ctx, float, gap, note] of [['Andheri', desk, rupees(3000
 }
 
 // ===========================================================================
+// 9. Birthday & Anniversary Offers (OCCASION_OFFERS_PLAN.md). Months are worked out from today, so the demo
+//    always looks live. Glamour Studio has the feature on; Desert Rose has it off.
+// ===========================================================================
+const thisMonth = A.month;
+const occasionsOn = { ...anitaAtAndheri, occasionOffers: true };
+const deskOccasions = { ...desk, occasionOffers: true };
+await Organization.updateOne({ _id: glamour._id }, { $set: { 'occasionOffers.enabled': true, 'occasionOffers.enabledAt': new Date(), 'occasionOffers.enabledBy': anita._id } });
+const okey = () => `seed-occasions-${++billKey}`;
+const allGlamourServices = Object.values(gs).filter((svc) => svc.status === 'active').map((svc) => String(svc._id));
+const occasionCampaigns = [
+  { type: 'BIRTHDAY', scope: 'BUSINESS_DEFAULT', name: 'Birthday Month Hair Spa', rules: { discountType: 'PERCENT', value: 1500, maxDiscount: rupees(500), minSubtotal: 0, serviceIds: [String(gs['Hair Spa']._id)] } },
+  { type: 'ANNIVERSARY', scope: 'BUSINESS_DEFAULT', name: 'Anniversary Month Treat', rules: { discountType: 'FLAT', value: rupees(300), minSubtotal: rupees(1500), serviceIds: allGlamourServices } },
+  { type: 'BIRTHDAY', scope: 'BRANCH_ONLY', branchId: String(branch.Bandra._id), name: 'Bandra Birthday Special', rules: { discountType: 'PERCENT', value: 2000, maxDiscount: rupees(600), minSubtotal: 0, serviceIds: [String(gs['Hair Spa']._id)] } },
+];
+for (const input of occasionCampaigns) {
+  const { campaign } = await createCampaign(occasionsOn, input, okey());
+  await publishCampaign(occasionsOn, String(campaign._id), okey());
+}
+// Who has an occasion this month: Priya (birthday, WhatsApp allowed, to contact), Simran (anniversary, no permission:
+// in-salon only), Neha (both, one call with no answer), Meera (birthday offer already used), Rohit (Bandra's own offer)
+const occasion = (day) => ({ month: thisMonth, day, source: 'STAFF', updatedAt: new Date() });
+await Customer.updateOne({ _id: gc['Priya Sharma']._id }, { $set: { 'occasions.birthday': occasion(Math.min(A.day + 3, 28)) } });
+await Customer.updateOne({ _id: gc['Meera Nair']._id }, { $set: { homeBranchId: branch.Andheri._id, 'occasions.birthday': occasion(Math.max(A.day - 2, 1)) } });
+await Customer.updateOne({ _id: gc['Rohit Jain']._id }, { $set: { homeBranchId: branch.Bandra._id, 'occasions.birthday': occasion(null) } });
+const [, nehaG] = await Customer.create([
+  { orgId: glamour._id, name: 'Simran Kaur', phone: '9820011021', homeBranchId: branch.Andheri._id, occasions: { anniversary: occasion(Math.min(A.day + 5, 28)) } },
+  { orgId: glamour._id, name: 'Neha Gupta', phone: '9820011020', homeBranchId: branch.Andheri._id, email: 'neha.gupta@example.com', occasions: { birthday: occasion(1), anniversary: occasion(Math.min(A.day + 8, 28)) } },
+]);
+for (const [customer, channel] of [[gc['Priya Sharma'], 'WHATSAPP'], [nehaG, 'SMS']]) {
+  await recordConsent(deskOccasions, String(customer._id), { channel, status: 'OPTED_IN', source: 'IN_SALON', agreed: true, customerAsked: true, note: 'Asked at the counter' }, okey());
+}
+await migrateOccasions({ log: () => {} }); // permission "not recorded" for the new customers
+await runForOrg(glamour._id, { force: true, by: 'MANUAL' });
+// Neha: one call, no answer (a follow-up tomorrow at 11:00)
+const nehaBirthday = await models.OfferIssue.findOne({ customerId: nehaG._id, type: 'BIRTHDAY' }).lean();
+await recordContact(deskOccasions, String(nehaBirthday._id), { outcome: 'NO_ANSWER' }, okey());
+// Meera came in for a Hair Spa and used her birthday offer
+const meeraOffer = await models.OfferIssue.findOne({ customerId: gc['Meera Nair']._id, type: 'BIRTHDAY' }).lean();
+const spaDraft = await openDraft(deskOccasions, { appointmentId: (await visit(glamour, 'Andheri', gc['Meera Nair'], [gs['Hair Spa'], staff.Neha]))._id });
+const withOffer = await setInvoiceOffer(deskOccasions, spaDraft._id, { offerIssueId: String(meeraOffer._id), version: spaDraft.version });
+await issueInvoice(deskOccasions, spaDraft._id, { version: withOffer.version, payments: [{ method: 'UPI', amount: withOffer.grandTotal, reference: 'UPI 5512' }] }, bkey());
+
+// ===========================================================================
 // Done
 // ===========================================================================
 console.log(`\nSeeded: 2 salons, 3 branches, ${Object.keys(staff).length} staff, ${GLAMOUR_SERVICES.length + DESERT_ROSE_SERVICES.length} services, 2 combos,`);
@@ -552,6 +600,7 @@ console.log(`        ${glamourCustomers.length + desertCustomers.length} custome
 console.log(`        8 pay setups (2 front desk), 1 pay change request waiting for approval, 1 locked payroll month with payments, 1 advance, ${await models.CommissionEntry.countDocuments()} commission lines`);
 console.log(`        Inventory (Glamour Andheri): ${Object.keys(sku).length} products (2 for sale on bills), 3 recipes, 4 hand-outs, 2 purchase orders, 1 write-off waiting for approval, 1 problem report, 4 product photos`);
 console.log('        Billing: Glamour GST registered (Desert Rose not); 2 bills with money due, 1 advance, 2 product sales (1 refund done with a credit note, 1 waiting for approval), yesterday\'s cash days closed');
+console.log(`        Occasion offers (Glamour on, Desert Rose off): 3 campaigns (1 Bandra-only), ${await models.OfferIssue.countDocuments()} offers this month (1 already used on a bill), Priya and Neha can be messaged`);
 console.log(`Today is centred on ${A.toFormat('h:mm a')} at Andheri (${A.zoneName}).`);
 console.log('\nEvery account uses the password:', DEMO_PASSWORD);
 console.table([

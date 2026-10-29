@@ -156,5 +156,6 @@ invoiceSchema.index({ orgId: 1, branchId: 1, issuedAt: -1 }); // bills list and 
 invoiceSchema.index({ orgId: 1, branchId: 1, balanceDue: 1 }); // bills with dues
 invoiceSchema.index({ orgId: 1, customerId: 1 }); // customer spend
 invoiceSchema.index({ orgId: 1, paidAt: 1 }); // commission on fully paid bills
+invoiceSchema.index({ 'offer.offerIssueId': 1 }, { partialFilterExpression: { 'offer.offerIssueId': { $type: 'objectId' } } }); // occasion offer reports
 
 export default mongoose.model('Invoice', invoiceSchema);

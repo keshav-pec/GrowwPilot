@@ -2,7 +2,8 @@ import { DateTime } from 'luxon';
 
 // What a recorded call does to the task. Pure. A call never counts as a promotional message and never needs
 // messaging permission.
-//   Reached        -> contacted (a "tell them it was withdrawn" task is done)
+//   Reached        -> contacted (a "tell them it was withdrawn" task is done). Only Reached counts as "contacted" in the
+//                     reports (PRD section 16: contacted = an offer message sent, or a Reached call)
 //   No answer      -> one follow-up the next day at 11:00; a second no answer closes the task as Unreachable
 //   Not interested -> closed
 //   Call later     -> due at the chosen time (before the offer's month ends)
@@ -38,7 +39,6 @@ export function applyOutcome(task, { outcome, callbackAt }, { now, zone, validUn
       return { set, note: `No answer: follow up ${when(followUp)}` };
     }
     case 'NOT_INTERESTED':
-      reached();
       close('NOT_INTERESTED');
       return { set, note: LABEL.NOT_INTERESTED };
     case 'CALL_LATER': {
@@ -46,7 +46,6 @@ export function applyOutcome(task, { outcome, callbackAt }, { now, zone, validUn
       if (!at || Number.isNaN(at.getTime())) refuse('CALLBACK_REQUIRED', 'Choose when to call back');
       if (at <= now) refuse('CALLBACK_IN_PAST', 'Choose a time in the future');
       if (at > validUntil) refuse('CALLBACK_AFTER_EXPIRY', 'Choose a time before the offer ends');
-      reached();
       Object.assign(set, { 'task.state': 'OPEN', 'task.dueAt': at });
       return { set, note: `Call later: ${when(at)}` };
     }

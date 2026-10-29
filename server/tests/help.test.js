@@ -48,6 +48,19 @@ describe('Understanding the question', () => {
     ['how do I pay the front desk salary', 'front-desk-pay'],
     ['approve a pay request', 'pay-requests'],
     ['who changed the commission rate in the activity log', 'activity-log'],
+    ['how do I set up birthday offers', 'occasions-setup'],
+    ['switch on the occasion offers', 'occasions-setup'],
+    ['where do I add a customer birthday month', 'occasions-dates'],
+    ['import birthdays from excel', 'occasions-dates'],
+    ['how do I record whatsapp permission', 'occasions-permission'],
+    ['customer wants to opt out of messages', 'occasions-permission'],
+    ['who to contact for birthdays this month', 'occasions-list'],
+    ['send birthday offer on whatsapp', 'occasions-list'],
+    ['how do I apply the birthday offer at checkout', 'occasions-checkout'],
+    ['anniversary discount', 'occasions-checkout'],
+    ['why can’t I apply the offer', 'occasions-cant-apply'],
+    ['offer redeemed elsewhere message', 'occasions-cant-apply'],
+    ['birthday report with associated sales', 'occasions-reports'],
     ['hello', 'greeting'],
     ['thanks!', 'thanks'],
   ];
@@ -94,6 +107,16 @@ describe('When it does not understand', () => {
     const reply = answerQuestion('what is the weather in Mumbai', desk);
     expect(reply.kind).toBe('fallback');
     expect(reply.suggestions).toContain('How do I book an appointment?');
+  });
+
+  it('occasion offer topics: owners set them up, the front desk is told who does', () => {
+    expect(answerQuestion('how do I set up birthday offers', owner).kind).toBe('answer');
+    const deskReply = answerQuestion('how do I set up birthday offers', desk);
+    expect(deskReply).toMatchObject({ topicId: 'occasions-setup', kind: 'not-allowed', link: null });
+    expect(deskReply.answer).toMatch(/owners/);
+    expect(answerQuestion('show me the birthday report', desk).answer).toMatch(/Today page/);
+    expect(answerQuestion('how do I record whatsapp permission', desk).answer).toMatch(/Customer asked for this/);
+    expect(answerQuestion('how do I set up birthday offers', branchOwner).answer).toMatch(/This branch only/);
   });
 
   it('every knowledge entry is complete', () => {

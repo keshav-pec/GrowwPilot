@@ -40,6 +40,8 @@ const RULES = {
   'occasions.runEngine': { BUSINESS_OWNER: true, BRANCH_OWNER: false, FRONT_DESK: false },
   // Follow-up on their branches' offers: send the message, record a call, assign
   'occasions.followUp': { BUSINESS_OWNER: true, BRANCH_OWNER: true, FRONT_DESK: true },
+  // Reports and their CSV (a branch owner: their branches). The front desk sees only the widget counts.
+  'occasions.viewReports': { BUSINESS_OWNER: true, BRANCH_OWNER: true, FRONT_DESK: false },
 };
 
 export const OCCASION_ACTIONS = Object.keys(RULES);

@@ -104,6 +104,28 @@ There are **two kinds of owner**: the **primary owner** (shown as **Business own
 - **Product photos and catalogue:** up to 4 photos per product (one main), a **Catalogue** view of photo cards next to the product list, **bulk photo upload** matched by product code (`SKU-000012.jpg`, `SKU-000012-2.jpg`), and a **printable catalogue** (print or save as PDF; costs only for owners).
 - **Inventory logins** are created by owners in **Team → Inventory logins**, one branch each.
 
+**Birthday & Anniversary Offers** (built from the *Customer Occasions & Offers PRD v1.1*; full plan and decisions in [`OCCASION_OFFERS_PLAN.md`](OCCASION_OFFERS_PLAN.md)). The business owner switches it on in **Occasion offers** (Settings); it is off by default.
+
+| | Business owner | Branch owner | Front desk |
+|---|---|---|---|
+| Switch on, consent wording, "Check now" | Yes | See only | No |
+| Campaigns (Birthday / Anniversary, versions, turn off, archive) | All | "This branch only" campaigns of their branches; all-branches ones read-only | No (a refused try is logged) |
+| Emergency withdraw of unused offers | Yes | No | No |
+| Customer birthday / anniversary, home branch, messaging permission | Yes | Yes | Yes (must tick "Customer asked for this" to record permission) |
+| Import dates (CSV), remove occasion data | Import: all; remove: yes | Import: their branches' customers | No |
+| Occasion list: send offer, record call, assign, book | Every branch | Their branches | Their branch |
+| Apply an offer at checkout | Yes | Yes | Yes |
+| Reports and CSV | Every branch | Their branches | Widget counts only |
+
+- **Customer dates:** birthday and wedding anniversary as **month + optional day, never the year**. Old dates of birth were copied into the birthday month and day at start-up (marked *From the old date of birth*). Every customer has a **home branch**.
+- **Messaging permission** per channel (WhatsApp, SMS, Email) with the exact wording and its version, how it was given, and a history that can't be edited. "Not recorded" counts as no. A customer without permission still gets and can use their offer in the salon.
+- **Campaigns** set up once and repeated every year: % off (with a maximum) or ₹ off, a minimum spend, and the services that count. A **3-step quick setup** with starting suggestions. A branch can have its own campaign that replaces the all-branches one for its customers. Editing a live campaign makes a **new version**; offers already given keep their terms.
+- **Offers appear by themselves** from 01:00 on the 1st of each month, in each branch's own time zone, valid to 23:59:59 on the last day; customers added or corrected mid-month get theirs within moments. One offer per customer, occasion and year, even when the run repeats or two servers run at once.
+- **Front desk occasion list** (with tiles, tabs, filters, tablet cards and a side panel): **Send offer** opens WhatsApp / SMS / email on the staff member's phone with the message ready (only with permission, at most one offer message per customer every 7 days), **Record call** (no answer twice closes it as unreachable), **Assign**, **Create booking**. A widget on the Dashboard and the Today page.
+- **Checkout:** the offer comes off the eligible services **before GST**, shown as "Birthday offer −₹300"; one offer per bill, no mixing with other discounts. It is **used only when the bill is issued**; two desks can never use the same offer; a voided bill in the same month gives it back.
+- **Reports:** offers issued, customers contacted, offer-linked appointments, used offers, discounts given and **associated sales** (bills that used an offer, after refunds; never called ROI), by branch and staff, with CSV. The billing *Discounts given* report has an *Occasion offer* column.
+- **Not in this build:** automatic sending (WhatsApp Business API, DLT SMS, email domain), a public booking page or signed booking links, customer merge, and a full privacy / erasure workflow ("Remove occasion data" stands in).
+
 **Help assistant:** owners, front desk and inventory users also get a round chat button at the bottom right. Ask it *"how do I take a split payment?"* or *"what does Salon Pulse mean?"* and it answers with the steps **for your role**, links you to the right screen, and tells a front desk user who to ask for owner-only tasks. The **Need help?** link in the sidebar still emails GrowwPilot support.
 
 ---
@@ -258,7 +280,7 @@ npm run dev
 
 ```bash
 cd server
-npm test                  # 476 Vitest tests, on a temporary in-memory MongoDB replica set (never your real data)
+npm test                  # 700 Vitest tests, on a temporary in-memory MongoDB replica set (never your real data)
 npm run smoke:isolation   # tenant isolation check against a running API with the demo seed (see section 12)
 ```
 
@@ -271,7 +293,8 @@ The tests cover the parts where a bug would cost money or trust:
 - **Dashboard warnings:** no-show, waiting and running-late rules.
 - **Payroll:** each way of paying; mid-month pay changes; absences not cutting salary; the PRD's commission example (₹2,500 service, ₹200 off, 10% = ₹230); combos and two stylists on one bill; a rate change never changing past commission; commission and payments never counted twice (including two identical requests at the same moment); locking refused while something must be fixed, and a locked month refusing every change; part payments, overpayment rules, cancelled payments, staff who have left; advances; and that branch owners, the front desk and another salon only reach what they're allowed to. **Front desk pay:** never booked, no commission, moving a stylist to the front desk only once their pay fits, the separate front desk totals, and an API test that logs in as each role and tries every front desk pay action (owners only; front desk logins can't reach any of it).
 - **Inventory:** every PRD acceptance test that applies (map below), plus: stock never going below zero when five people take the last bottles at once, the same request sent twice changing stock once, approval limits for write-offs and orders, CSV import duplicates, recipe versions never overlapping, the add-on switch, photo uploads (type and 2 MB limits, at most 4, another salon's photo not found, the front desk can view but not upload, bulk matching by code), and an API test that logs in as the business owner, a branch owner of another branch, an inventory login and the front desk and tries **every inventory action** (and cost visibility in screens and CSV exports).
-- **Help assistant:** 35 typical questions land on the right topic; answers are limited to the asker's role (front desk vs owner, main owner vs branch owner); unknown questions get an honest "not sure" with suggestions.
+- **Birthday & Anniversary Offers:** every PRD acceptance test that applies (map below), plus the start-up migration run twice, consent history that can't be edited, campaign versions that never change, branch time zones, date corrections, the send check and 7-day limit, bill maths with GST, an API test that logs in as each role and tries **every occasion action**, and a speed test with **100,000 customers** (monthly run ~1.5 s against a 15-minute target; the list ~5 ms per 50 rows against 2 s; the checkout offer preview ~3 ms against 700 ms).
+- **Help assistant:** 48 typical questions land on the right topic; answers are limited to the asker's role (front desk vs owner, main owner vs branch owner); unknown questions get an honest "not sure" with suggestions.
 
 **Inventory acceptance tests (PRD AC01–AC30)** — all in `server/tests/`:
 
@@ -320,6 +343,41 @@ The tests cover the parts where a bug would cost money or trust:
 | AC23 | A bill (and its PDF) doesn't change when the catalogue or settings change | `invoices.test.js`, `billingPhase3.test.js` |
 | AC24 | Payment reversal keeps the record; money records can't be edited | `billingPhase2.test.js`, `billingPhase4.test.js` |
 | AC25 | Speed with 20,000 bills on file: opening checkout ~25 ms (target 2 s), a quote ~3 ms (target 500 ms) | `billingSpeed.test.js` |
+
+**Birthday & Anniversary Offers acceptance tests (PRD AT-01–AT-36)** — all in `server/tests/`:
+
+| PRD test | What it checks | File |
+|---|---|---|
+| AT-01, AT-03 | Every matching customer gets one offer for the whole month from 01:00 on the 1st; month-only dates too | `occasionsPhase3.test.js` |
+| AT-02 | A customer saved without dates works | `occasionsPhase1.test.js` |
+| AT-04 | A 29 Feb birthday gets the whole of February in a non-leap year | `occasionsPhase3.test.js` |
+| AT-05 | A customer added mid-month gets their offer straight away | `occasionsPhase3.test.js` |
+| AT-06 | The run repeated 5 times: one offer, one task | `occasionsPhase3.test.js` |
+| AT-07 | A branch campaign wins for its customers | `occasionsPhase2.test.js`, `occasionsPhase3.test.js` |
+| AT-08 | Moving branch mid-month keeps the one offer | `occasionsPhase3.test.js` |
+| AT-09 | Both occasions in one month: two offers; the second message waits 7 days | `occasionsPhase3.test.js`, `occasionsPhase4.test.js` |
+| AT-10 | No permission: the offer is still given and usable, but no message | `occasionsPhase3.test.js`, `occasionsPhase4.test.js` |
+| AT-11 | WhatsApp opted out, SMS opted in: sent by SMS | `occasionsPhase4.test.js` |
+| AT-12 | Permission withdrawn between preview and send: refused and logged | `occasionsPhase4.test.js` |
+| AT-13, AT-14, AT-15 | Provider delivery, retries and fallback | *Not applicable:* staff send from their own phone in this build (no automatic sending) |
+| AT-16 | No answer twice: closed as unreachable, full history | `occasionsPhase4.test.js` |
+| AT-17, AT-18 | A booking from the list links the offer without using it; a cancelled booking leaves it usable | `occasionsPhase5.test.js` |
+| AT-19, AT-20 | No eligible service; ₹1,499.99 against a ₹1,500 minimum is refused | `occasionsPhase5.test.js` |
+| AT-21, AT-22, AT-23 | 15% of ₹2,000 (max ₹500) = ₹300 spread over lines; flat ₹300 on ₹200 = ₹200; mixed GST rates, prices with and without GST | `occasionsPhase5.test.js` |
+| AT-24 | No mixing with other discounts | `occasionsPhase5.test.js` |
+| AT-25 | Two bills issued at the same moment: one wins, the other gets "redeemed elsewhere" and nothing is used | `occasionsPhase5.test.js` |
+| AT-26 | A failed payment leaves the offer unused | `occasionsPhase5.test.js` |
+| AT-27, AT-28 | A void in the month gives it back once; after the month it stays expired | `occasionsPhase5.test.js` |
+| AT-29 | A turned-off campaign gives no new offers; given ones still work | `occasionsPhase3.test.js` |
+| AT-30 | Emergency withdraw: unused only, a task for contacted customers, a bell for owners | `occasionsPhase3.test.js` |
+| AT-31 | A front desk edit is refused with 403, logged, and nothing changes | `occasionsPhase2.test.js` |
+| AT-32 | Another salon reaches nothing | `occasionsPhase1–6.test.js`, `npm run smoke:isolation` |
+| AT-33 | The month ends at 23:59:59 branch time, Dubai included | `occasionsPhase3.test.js` |
+| AT-34 | A partial import saves good rows, lists bad ones, never turns on permission | `occasionsPhase1.test.js` |
+| AT-35 | The report after a refund matches billing | `occasionsPhase6.test.js` |
+| AT-36 | Remove occasion data (partly: no full erasure workflow yet) | `occasionsPhase1.test.js` |
+
+> **Before sending offers, have a lawyer check the consent wording and how permission is recorded (India's DPDP Act).** The app keeps the wording, its version, who recorded it and how, but whether that is enough is a legal question.
 
 > **Before going live with GST bills, have a tax professional check the GST rates, SAC/HSN codes and bill and credit note wording.** Salon services moved from 18% to 5% GST (without input tax credit) from 22 Sep 2025; the app's default for services is still 18%, and each salon sets its own rate in Billing settings.
 
@@ -428,6 +486,7 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 - Analytics "utilisation" counts every day in the range as a working day (minus marked absences).
 - Billing: no payment gateway or card machine link (payments are recorded by the desk); no IGST (every bill is CGST + SGST, for salons selling where they are); no composition scheme; no rounding to the nearest rupee; no email or SMS sending (the share link is copied or sent on WhatsApp by hand); refunds give money back by any method but not back into an advance; packages, memberships and gift cards aren't built yet (the bill line kinds and payment sources are ready for them, see `billing/lineKinds.js` and `payments/paymentSources.js`); GST rules must be checked by a tax professional before going live.
 - Inventory: no moving stock between branches, a completed service can't be reversed (the app has no "un-complete"), no camera barcode scanning (USB/Bluetooth scanners work), photos are stored in the database (GridFS) rather than a CDN, and reports cover one or all of your branches but not a custom set.
+- Birthday & Anniversary Offers: staff send messages from their own phone (no automatic sending or delivery receipts); messages say "Reply or call to book" because there is no public booking page; every day counts as a working day for follow-up times; branches have no phone of their own, so messages use the salon's contact number; no customer merge, and "Remove occasion data" stands in for a full erasure workflow.
 - Payroll: stylists don't log in, so there's no "My earnings" screen (owners download payslips instead); front desk members can't see their own payslip yet; no PF, ESI, TDS or professional tax (add them as deductions until a payroll expert has reviewed them); one service can't be split between two stylists; notifications are in the app only (no email); monthly pay periods only.
 
 ---

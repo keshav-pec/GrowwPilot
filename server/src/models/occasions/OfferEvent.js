@@ -12,6 +12,7 @@ const offerEventSchema = new mongoose.Schema(
     actorId: ref('User', { default: null }), // null = the app did it by itself
     actorName: { type: String, default: 'System' },
     note: { type: String, trim: true },
+    outcome: { type: String, default: null }, // CONTACT: the call outcome (REACHED, NO_ANSWER...); SENT: the channel
   },
   { timestamps: { createdAt: true, updatedAt: false }, collection: 'offer_events' }
 );

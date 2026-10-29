@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { DateTime } from 'luxon';
-import { Settings } from 'lucide-react';
+import { ChartColumn, Settings } from 'lucide-react';
 import { useAuth } from '../../../auth/AuthContext';
 import { useOfferSummary, useOffers } from '../../../api/occasions';
 import { useDebounce } from '../../../lib/useDebounce';
@@ -74,9 +74,14 @@ export default function OccasionsPage() {
         subtitle={`${showBranch ? 'All my branches' : activeBranch.name}${shownMonth ? ` · ${shownMonth}` : ''}`}
         actions={
           isOwner && (
-            <Link to="/app/settings/occasions" className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-surface">
-              <Settings size={16} /> Settings
-            </Link>
+            <>
+              <Link to="/app/occasions/reports" className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-surface">
+                <ChartColumn size={16} /> Reports
+              </Link>
+              <Link to="/app/settings/occasions" className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-surface">
+                <Settings size={16} /> Settings
+              </Link>
+            </>
           )
         }
       />

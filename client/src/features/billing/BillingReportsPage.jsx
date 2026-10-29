@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Download } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
@@ -44,9 +45,16 @@ export default function BillingReportsPage() {
         title="Billing reports"
         subtitle={owner ? 'Sales, GST, collections, dues and more. Download any of them as CSV.' : 'Today’s collections at your branch'}
         actions={
-          <Button variant="secondary" onClick={download} loading={downloading} disabled={!data}>
-            <Download size={16} /> Download CSV
-          </Button>
+          <>
+            {owner && user.org?.occasionOffers?.enabled && (
+              <Link to="/app/occasions/reports" className="inline-flex items-center rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-surface">
+                Occasion offers report
+              </Link>
+            )}
+            <Button variant="secondary" onClick={download} loading={downloading} disabled={!data}>
+              <Download size={16} /> Download CSV
+            </Button>
+          </>
         }
       />
 

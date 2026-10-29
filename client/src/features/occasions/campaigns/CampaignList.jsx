@@ -57,6 +57,11 @@ export default function CampaignList() {
       title="Campaigns"
       actions={
         <div className="flex flex-wrap gap-2">
+          {anyLive && (
+            <Button size="sm" variant="secondary" onClick={() => navigate('/app/occasions/reports')}>
+              Results
+            </Button>
+          )}
           {can.createSalonCampaign && (
             <Button size="sm" variant={anyLive ? 'secondary' : 'primary'} onClick={() => navigate('/app/settings/occasions/setup')}>
               <Wand2 size={14} /> Quick setup

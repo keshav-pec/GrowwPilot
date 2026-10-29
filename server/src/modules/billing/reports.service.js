@@ -140,18 +140,20 @@ async function discounts(ctx, { branches, from, to }) {
   for (const b of bills) {
     for (const l of b.lines) {
       const amount = l.lineDiscount + l.billDiscountShare;
-      if (amount <= 0) continue;
+      const offer = l.occasionDiscount ?? 0; // a birthday / anniversary offer
+      if (amount <= 0 && offer <= 0) continue;
       const by = b.issuedBy?.name ?? 'Unknown';
-      const r = add(rows, `${by}|${l.name}`, () => ({ person: by, item: l.name, kind: l.kind === 'PRODUCT' ? 'Product' : 'Service', lines: 0, approved: 0, discount: 0 }));
+      const r = add(rows, `${by}|${l.name}`, () => ({ person: by, item: l.name, kind: l.kind === 'PRODUCT' ? 'Product' : 'Service', lines: 0, approved: 0, discount: 0, occasion: 0 }));
       r.lines += 1;
       r.discount += amount;
+      r.occasion += offer;
       if (b.approval?.status === 'APPROVED') r.approved += 1;
     }
   }
-  const list = [...rows.values()].sort((a, b) => b.discount - a.discount);
+  const list = [...rows.values()].sort((a, b) => b.discount + b.occasion - (a.discount + a.occasion));
   return {
     title: 'Discounts given',
-    note: 'Discounts on lines and on whole bills (shared over the lines), by who issued the bill. Approved = above the front desk limit, approved by an owner.',
+    note: 'Discounts on lines and on whole bills (shared over the lines), by who issued the bill. Approved = above the front desk limit, approved by an owner. Occasion offer = birthday and anniversary offers (not counted in Discount).',
     columns: [
       { key: 'person', label: 'Issued by' },
       { key: 'item', label: 'Service or product' },
@@ -159,9 +161,10 @@ async function discounts(ctx, { branches, from, to }) {
       { key: 'lines', label: 'Times' },
       { key: 'approved', label: 'Approved by owner' },
       { key: 'discount', label: 'Discount', money: true },
+      { key: 'occasion', label: 'Occasion offer', money: true },
     ],
     rows: list,
-    totals: totalsOf(list, ['lines', 'approved', 'discount']),
+    totals: totalsOf(list, ['lines', 'approved', 'discount', 'occasion']),
   };
 }
 

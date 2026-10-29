@@ -215,3 +215,10 @@ export function useLiveOffers(customerId, serviceIds = [], enabled = true) {
     enabled: Boolean(customerId) && enabled,
   });
 }
+
+// Reports → Occasion offers (owners): { period, tiles, funnel, money, byBranch, staff, campaigns }
+export function useOccasionReport(params) {
+  return useQuery({ queryKey: ['occasions', 'report', params], queryFn: () => api.get('/occasions/reports', { params: clean(params) }).then((res) => res.data), placeholderData: (previous) => previous });
+}
+
+export const downloadOccasionReport = (params) => downloadFile('/occasions/reports', clean({ ...params, format: 'csv' }), 'occasion-offers.csv');

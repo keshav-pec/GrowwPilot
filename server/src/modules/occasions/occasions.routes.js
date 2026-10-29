@@ -18,6 +18,7 @@ import {
   messagesSchema,
   offersQuerySchema,
   reasonSchema,
+  reportQuerySchema,
   revokeSchema,
   sendPreviewSchema,
   sendSchema,
@@ -32,6 +33,7 @@ import { customerOffers, getOffer, listOffers, offerSummary } from './worklist/w
 import { revokeCampaignOffers, runAfterPublish, runNow } from './engine/actions.service.js';
 import { assignOffer, listAssignees, recordContact, sendOffer, sendPreview } from './outreach/followup.service.js';
 import { liveOffers } from './checkout/checkout.service.js';
+import { occasionReport, occasionReportCsv } from './reports/report.service.js';
 
 // /api/occasions — Birthday & Anniversary Offers. Owners and front desk; what each may do is checked in the
 // services (permissions.js). The salon and the role always come from the login.
@@ -165,6 +167,17 @@ router.get('/customers/:id/live-offers', idParams, validate({ query: liveQuery }
 });
 router.get('/customers/:id/offers', idParams, async (req, res) => {
   res.json(await customerOffers(req.ctx, req.params.id));
+});
+
+// Reports → Occasion offers (owners). ?format=csv downloads one row per offer (logged).
+router.get('/reports', validate({ query: reportQuerySchema }), async (req, res) => {
+  if (req.valid.query.format === 'csv') {
+    const report = await occasionReportCsv(req.ctx, req.valid.query);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${report.fileName}"`);
+    return res.send(`\uFEFF${toCsv(report)}`);
+  }
+  res.json(await occasionReport(req.ctx, req.valid.query));
 });
 
 export default router;

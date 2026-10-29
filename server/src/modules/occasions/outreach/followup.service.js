@@ -103,6 +103,7 @@ export async function sendOffer(ctx, id, { channel }, key) {
           {
             $set: {
               'task.sentAt': now,
+              'task.sentVia': channel,
               'task.contactedAt': { $ifNull: ['$task.contactedAt', now] },
               'task.outcome': `SENT_${channel}`,
               'task.state': { $cond: [{ $eq: ['$task.state', 'CLOSED'] }, 'CLOSED', 'CONTACTED'] },
@@ -111,7 +112,7 @@ export async function sendOffer(ctx, id, { channel }, key) {
         ],
         { session }
       );
-      await addOfferEvents(ctx.orgId, [offer], 'SENT', { ctx, note: `via ${CHANNEL_LABELS[channel]}` }, session);
+      await addOfferEvents(ctx.orgId, [offer], 'SENT', { ctx, note: `via ${CHANNEL_LABELS[channel]}`, outcome: channel }, session);
       await logActivity(ctx, { action: 'occasions.offer_sent', branchId: offer.homeBranchId, summary: `Sent ${customer.name} the ${offer.campaignName} offer via ${CHANNEL_LABELS[channel]}` }, session);
 
       const message = buildMessage({ offer, customer, org, campaign, zone: branch?.timezone ?? 'Asia/Kolkata' }, channel);
@@ -141,7 +142,7 @@ export async function recordContact(ctx, id, input, key) {
     const saved = await OfferIssue.updateOne({ _id: offer._id, status: offer.status, 'task.attempts': offer.task?.attempts ?? 0 }, { $set: result.set }, { session });
     if (saved.modifiedCount !== 1) throw new AppError(409, 'OFFER_CHANGED', 'Someone else just updated this offer. Please reload.');
     const note = input.note ? `${result.note}. ${input.note}` : result.note;
-    await addOfferEvents(ctx.orgId, [offer], 'CONTACT', { ctx, note }, session);
+    await addOfferEvents(ctx.orgId, [offer], 'CONTACT', { ctx, note, outcome: input.outcome }, session);
     await logActivity(ctx, { action: 'occasions.call_recorded', branchId: offer.homeBranchId, summary: `Call with ${offer.customerName} about the ${offer.campaignName} offer: ${result.note}` }, session);
     return { outcome: input.outcome, fixDetails: Boolean(result.fixDetails) };
   });

@@ -113,3 +113,17 @@ export const messagesSchema = z.object({
   SMS: z.object({ body: wording.max(480) }),
   EMAIL: z.object({ subject: z.string().trim().min(3).max(120), body: wording.max(3000) }),
 });
+
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
+export const reportQuerySchema = z.object({
+  month: z.string().regex(/^\d{4}-\d{2}$/, 'Use YYYY-MM').optional(),
+  from: day.optional(),
+  to: day.optional(),
+  type: z.enum(OCCASION_TYPES).optional(),
+  campaignId: objectId.optional(),
+  campaignVersionId: objectId.optional(),
+  branch: z.union([z.enum(['current', 'all']), objectId]).default('all'),
+  channel: z.enum(CONSENT_CHANNELS).optional(),
+  canMessage: z.enum(['yes', 'no']).optional(),
+  format: z.enum(['json', 'csv']).default('json'),
+});

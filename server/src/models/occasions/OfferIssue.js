@@ -14,6 +14,7 @@ const taskSchema = new mongoose.Schema(
     outcome: { type: String, default: null }, // the last call outcome (Phase 4)
     contactedAt: { type: Date, default: null }, // when the customer was first reached or messaged
     sentAt: { type: Date, default: null }, // the last offer message sent for this offer
+    sentVia: { type: String, default: null }, // its channel (WHATSAPP, SMS, EMAIL), for the reports
     closedReason: { type: String, default: null }, // EXPIRED, REDEEMED, WITHDRAWN, REPLACED, ...
     closedAt: { type: Date, default: null },
   },

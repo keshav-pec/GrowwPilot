@@ -502,6 +502,87 @@ export const KNOWLEDGE = [
     link: { label: 'Activity log', to: '/app/payroll?tab=activity' },
   },
 
+  // ---------------------------------------------------------------- birthday & anniversary offers
+  {
+    id: 'occasions-setup',
+    title: 'Setting up birthday and anniversary offers',
+    audiences: OWNERS,
+    keywords: ['*occasion', 'occasion offer', 'switch occasion', 'set up birthday offer', 'setup birthday offer', 'anniversary offer setup', 'birthday campaign', 'anniversary campaign', 'quick setup birthday', 'switch on birthday', 'enable birthday offer', 'branch birthday offer'],
+    answer:
+      'Open **Occasion offers** in the menu (Settings) and click **Quick setup**: 1) switch on **Birthday & Anniversary Offers**, 2) check the Birthday and Anniversary offers (% or ₹ off, maximum, minimum spend and the services that count), 3) **Publish**. Offers then go out by themselves every month, from 01:00 on the 1st, for the whole month. Editing a live offer makes a new version; offers already given keep their terms.',
+    for: {
+      BRANCH_OWNER:
+        'The business owner switches the feature on and sets the offers for all branches. You can add a **This branch only** campaign for your branch under **Occasion offers → Add campaign**; it replaces the all-branches offer for your branch’s customers.',
+    },
+    denied: 'Birthday and anniversary offers are set up by the owners.',
+    link: { label: 'Occasion offers', to: '/app/settings/occasions' },
+  },
+  {
+    id: 'occasions-dates',
+    title: 'Adding birthdays and anniversaries',
+    audiences: EVERYONE,
+    keywords: ['add birthday', 'birthday month', 'add anniversary', 'anniversary date', 'wedding anniversary', 'date of birth', 'import birthday', 'birthday day', 'customer birthday'],
+    answer:
+      'Open the customer, click **Edit**, and open **Optional details**: pick the **month** of their birthday or wedding anniversary, and the day if you know it. The year is never asked. A customer added in their birthday month gets this month’s offer straight away.',
+    for: {
+      PRIMARY_OWNER:
+        'Open the customer, click **Edit**, and open **Optional details**: pick the month (and the day if you know it). The year is never asked. To fill many at once, use **Occasion offers → Import dates**: download the template, fill in months and days, upload it, and you’ll see every row before anything is saved.',
+      BRANCH_OWNER:
+        'Open the customer, click **Edit**, and open **Optional details**: pick the month (and the day if you know it). To fill many of your branch’s customers at once, use **Occasion offers → Import dates**.',
+    },
+    link: { label: 'Customers', to: '/app/customers' },
+  },
+  {
+    id: 'occasions-permission',
+    title: 'Permission to send offers',
+    audiences: EVERYONE,
+    keywords: ['*consent', 'messaging permission', 'whatsapp permission', 'sms permission', 'opt in', 'opt out', 'stop message', 'record permission', 'withdraw permission'],
+    answer:
+      'Open the customer and the **Messages & permission** tab. Click **Record permission** for WhatsApp, SMS or Email, read the wording to the customer, tick the box and choose how they gave it. **Withdraw** works straight away. “Not recorded” counts as no. A customer without permission can still use their offer in the salon; you just can’t message them about it.',
+    for: {
+      FRONT_DESK:
+        'Open the customer and the **Messages & permission** tab. Click **Record permission**, read the wording to the customer, tick the box, tick **Customer asked for this** and choose how they gave it. **Withdraw** works straight away. Without permission they can still use their offer in the salon.',
+    },
+    link: { label: 'Customers', to: '/app/customers' },
+  },
+  {
+    id: 'occasions-list',
+    title: 'The occasion list: who to contact',
+    audiences: EVERYONE,
+    keywords: ['occasion list', 'customer occasions', 'who to contact', 'send birthday offer', 'send anniversary offer', 'birthday list', 'birthday this month', 'birthday whatsapp', 'call birthday customer', 'no answer'],
+    answer:
+      'Open **Occasion offers** in the menu. **Action required** lists who to contact this month. Click a customer: **Send offer** (only if they allowed messages) opens WhatsApp, SMS or email with the message ready; one offer message per customer every 7 days. **Record call** for calls (no answer twice closes it as unreachable), **Create booking** to book them, and **Assigned to** to share the work.',
+    link: { label: 'Occasion offers', to: '/app/occasions' },
+  },
+  {
+    id: 'occasions-checkout',
+    title: 'Using a birthday or anniversary offer at checkout',
+    audiences: EVERYONE,
+    keywords: ['*birthday', '*anniversary', 'apply offer', 'offer checkout', 'use offer', 'birthday discount', 'anniversary discount'],
+    answer:
+      'At checkout, the **Available occasion offer** box shows the customer’s offer with the discount and the new amount. Click **Apply offer**. It comes off the services that count, before GST, and shows as “Birthday offer” on the bill. One offer per bill, and other discounts are off while it’s on. It is used only when you issue the bill; voiding the bill in the same month gives it back.',
+    link: { label: 'Day board', to: '/app/today' },
+    general: true,
+  },
+  {
+    id: 'occasions-cant-apply',
+    title: 'Why an offer can’t be applied',
+    audiences: EVERYONE,
+    keywords: ['offer cant apply', 'cant apply offer', 'offer not working', 'offer not eligible', 'offer redeemed elsewhere', 'offer expired', 'offer greyed', 'offer not showing'],
+    answer:
+      'The checkout box says why: **Add ₹… of eligible services** (the minimum spend isn’t reached), **No eligible service on this bill** (none of the services count; combo services never do), **expired** (the month is over), **redeemed on invoice …** (already used on another bill), or **Remove the other discounts** (an offer doesn’t mix with other discounts). If another desk used it a moment earlier, the offer is taken off your bill: check the total and issue again.',
+  },
+  {
+    id: 'occasions-reports',
+    title: 'Occasion offer reports',
+    audiences: OWNERS,
+    keywords: ['*birthday', '*anniversary', 'occasion report', 'birthday report', 'anniversary report', 'offer report', 'offers used', 'associated sales'],
+    answer:
+      'Open **Occasion offers → Reports**: offers issued, customers contacted, linked bookings and offers used, the steps from eligible to used, discounts given and associated sales (the bills that used an offer; not a profit claim), by branch and by staff. Pick a month or dates and filters, then **Download CSV**.',
+    denied: 'Occasion offer reports are for the owners. The front desk sees this month’s counts on the Today page.',
+    link: { label: 'Occasion reports', to: '/app/occasions/reports' },
+  },
+
   // ---------------------------------------------------------------- inventory add-on
   {
     id: 'inventory-setup',
