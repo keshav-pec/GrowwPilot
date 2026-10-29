@@ -52,3 +52,7 @@ export { default as InventorySupplier } from './inventory/InventorySupplier.js';
 export { default as InventoryPurchaseOrder } from './inventory/InventoryPurchaseOrder.js';
 export { default as InventoryGoodsReceipt } from './inventory/InventoryGoodsReceipt.js';
 export { default as InventoryStockCount } from './inventory/InventoryStockCount.js';
+
+// Birthday & Anniversary Offers (OCCASION_OFFERS_PLAN.md)
+export { default as OccasionSettings } from './occasions/OccasionSettings.js';
+export { default as ConsentEvent } from './occasions/ConsentEvent.js';

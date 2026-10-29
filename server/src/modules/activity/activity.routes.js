@@ -12,7 +12,7 @@ const router = Router();
 router.use(requireAuth, tenantContext, requireRole('OWNER'));
 
 // GET /api/activity?page=2&area=payroll
-const querySchema = z.object({ page: z.coerce.number().int().min(1).default(1), area: z.enum(['payroll', 'inventory', 'billing']).optional() });
+const querySchema = z.object({ page: z.coerce.number().int().min(1).default(1), area: z.enum(['payroll', 'inventory', 'billing', 'occasions']).optional() });
 router.get('/', validate({ query: querySchema }), async (req, res) => {
   res.json(await listActivity(req.ctx, req.valid.query));
 });

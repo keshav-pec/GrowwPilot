@@ -138,7 +138,7 @@ export async function convertLead(ctx, id, payload) {
     let customer = await Customer.findOne(scoped(ctx, { phone: lead.phone })).session(session);
     const isExistingCustomer = Boolean(customer);
     if (!customer) {
-      [customer] = await Customer.create([{ orgId: ctx.orgId, name: lead.name, phone: lead.phone }], { session });
+      [customer] = await Customer.create([{ orgId: ctx.orgId, name: lead.name, phone: lead.phone, homeBranchId: lead.branchId }], { session });
     }
 
     // 2. The appointment

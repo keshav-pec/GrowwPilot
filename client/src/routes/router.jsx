@@ -23,6 +23,7 @@ import CheckoutPage from '../features/checkout/CheckoutPage';
 import InvoicePage from '../features/checkout/InvoicePage';
 import BillsListPage from '../features/billing/BillsListPage';
 import BillingSettingsPage from '../features/billing/BillingSettingsPage';
+import OccasionSettingsPage from '../features/occasions/settings/OccasionSettingsPage';
 import SaleEditPage from '../features/billing/SaleEditPage';
 import RefundPage from '../features/billing/RefundPage';
 import CashPage from '../features/billing/CashPage';
@@ -128,6 +129,7 @@ export const router = createBrowserRouter([
               { path: 'team', element: <TeamPage /> },
               { path: 'catalog', element: <CatalogPage /> },
               { path: 'settings/billing', element: <BillingSettingsPage /> },
+              { path: 'settings/occasions', element: <OccasionSettingsPage /> }, // Birthday & Anniversary Offers
               { path: 'settings/salary', element: <Navigate to="/app/payroll" replace /> }, // old link
             ],
           },

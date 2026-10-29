@@ -9,7 +9,8 @@
     "seed": "node src/scripts/seed.js",
     "test": "vitest run",
     "smoke:isolation": "node src/scripts/isolation-smoke-test.js",
-    "migrate:billing": "node src/scripts/migrate-billing-v2.js"
+    "migrate:billing": "node src/scripts/migrate-billing-v2.js",
+    "migrate:occasions": "node src/scripts/migrate-occasions-v1.js"
   },
   "author": "",
   "license": "ISC",

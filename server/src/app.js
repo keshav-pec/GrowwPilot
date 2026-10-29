@@ -32,6 +32,7 @@ import payrollRoutes from './modules/payroll/payroll.routes.js';
 import activityRoutes from './modules/activity/activity.routes.js';
 import notificationRoutes from './modules/notifications/notifications.routes.js';
 import inventoryRoutes from './modules/inventory/inventory.routes.js';
+import occasionRoutes from './modules/occasions/occasions.routes.js';
 
 const app = express();
 
@@ -42,10 +43,11 @@ app.set('trust proxy', env.TRUST_PROXY);
 // --- Global middleware ---
 app.use(helmet()); // sets safe HTTP headers
 app.use(cors({ origin: env.CLIENT_ORIGIN, credentials: true })); // only our frontend may call the API, with cookies
-// Reads JSON request bodies (at most 100 kb). The spreadsheet import reads its own bigger body,
-// after the login check (see inventory/imports/imports.routes.js).
+// Reads JSON request bodies (at most 100 kb). The spreadsheet imports read their own bigger body,
+// after the login check (see inventory/imports/imports.routes.js and occasions/occasions.routes.js).
 const readJson = express.json({ limit: '100kb' });
-app.use((req, res, next) => (req.path.startsWith('/api/inventory/imports') ? next() : readJson(req, res, next)));
+const readsOwnBody = (path) => path.startsWith('/api/inventory/imports') || path === '/api/occasions/import';
+app.use((req, res, next) => (readsOwnBody(req.path) ? next() : readJson(req, res, next)));
 app.use(cookieParser()); // reads cookies (we'll store the login token in one)
 if (env.NODE_ENV === 'development') app.use(morgan('dev')); // logs each request in the terminal
 
@@ -79,6 +81,7 @@ app.use('/api/payroll', payrollRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/inventory', inventoryRoutes); // Inventory add-on
+app.use('/api/occasions', occasionRoutes); // Birthday & Anniversary Offers
 
 // --- Errors (must come after all routes) ---
 app.use(notFound);

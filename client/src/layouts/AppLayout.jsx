@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ChartColumn,
   ClipboardCheck,
+  Gift,
   LayoutDashboard,
   Package,
   Receipt,
@@ -36,6 +37,7 @@ const APP_NAV = [
   { to: '/app/team', label: 'Team', icon: UserCog, roles: ['OWNER'] },
   { to: '/app/branches', label: 'Branches', icon: Building2, roles: ['OWNER'] },
   { to: '/app/catalog', label: 'Services & combos', icon: Scissors, roles: ['OWNER'] },
+  { to: '/app/settings/occasions', label: 'Occasion offers', icon: Gift, roles: ['OWNER'] }, // settings (the list comes in Phase 3)
   // Same screen: owners get all of payroll, the front desk only pay setup and requests
   { to: '/app/payroll', label: 'Payroll', icon: Wallet, roles: ['OWNER'] },
   { to: '/app/payroll', label: 'Staff pay', icon: Wallet, roles: ['FRONT_DESK'] },

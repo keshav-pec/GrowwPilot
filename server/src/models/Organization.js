@@ -14,6 +14,19 @@ const addonSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Birthday & Anniversary Offers: switched on by the business owner (not a Super Admin add-on).
+// Kept here, like add-ons, so every login session knows whether it is on.
+const occasionOffersSchema = new mongoose.Schema(
+  {
+    enabled: { type: Boolean, default: false },
+    enabledAt: Date,
+    enabledBy: ref('User'),
+    disabledAt: Date,
+    disabledBy: ref('User'),
+  },
+  { _id: false }
+);
+
 // One salon brand. This is the "tenant": every other record points to an organization.
 const organizationSchema = new mongoose.Schema(
   {
@@ -27,6 +40,7 @@ const organizationSchema = new mongoose.Schema(
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
     // Paid add-ons, switched on by the Super Admin: { inventory: { enabled, enabledAt, enabledBy } }
     addons: Object.fromEntries(ADDONS.map((name) => [name, { type: addonSchema, default: () => ({}) }])),
+    occasionOffers: { type: occasionOffersSchema, default: () => ({}) },
   },
   { timestamps: true }
 );

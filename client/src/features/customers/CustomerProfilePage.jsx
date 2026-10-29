@@ -6,12 +6,25 @@ import { useCustomerProfile } from '../../api/customers';
 import { staffNames } from '../../lib/appointments';
 import { formatMoney } from '../../lib/money';
 import { formatDate, formatDateTime } from '../../lib/time';
+import { DATE_SOURCE_LABEL, formatOccasion } from '../../lib/occasions';
 import { Button, Card, EmptyState, PageHeader, Spinner, Table, Tabs } from '../../components/ui';
 import AppointmentStatusBadge from '../../components/AppointmentStatusBadge';
 import AppointmentDrawer from '../appointments/AppointmentDrawer';
 import CustomerFormModal from './CustomerFormModal';
 import AdvancesCard from './AdvancesCard';
 import CustomerMoneyTab from './CustomerMoneyTab';
+import MessagesPermissionTab from './MessagesPermissionTab';
+
+// "November (day not provided)", with where it came from in small grey text
+function OccasionDetail({ date }) {
+  if (!date?.month) return null;
+  return (
+    <>
+      {formatOccasion(date)}
+      <span className="block text-xs text-muted">{DATE_SOURCE_LABEL[date.source]}</span>
+    </>
+  );
+}
 
 function Detail({ label, children }) {
   return (
@@ -37,7 +50,7 @@ export default function CustomerProfilePage() {
   const { activeBranch, activeBranchId } = useAuth();
   const profileQuery = useCustomerProfile(id);
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = ['past', 'money'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'upcoming';
+  const tab = ['past', 'money', 'messages'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'upcoming';
   const [editing, setEditing] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
 
@@ -99,8 +112,13 @@ export default function CustomerProfilePage() {
         <Card title="Details">
           <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             <Detail label="Email">{customer.email}</Detail>
-            {/* dob is saved as midnight UTC, so show it in UTC to avoid slipping a day */}
-            <Detail label="Date of birth">{customer.dob && formatDate(customer.dob, 'UTC')}</Detail>
+            <Detail label="Birthday">
+              <OccasionDetail date={customer.occasions?.birthday} />
+            </Detail>
+            <Detail label="Wedding anniversary">
+              <OccasionDetail date={customer.occasions?.anniversary} />
+            </Detail>
+            <Detail label="Home branch">{customer.homeBranchName}</Detail>
             <Detail label="Preferred stylist">{preferred?.name}</Detail>
             <Detail label="Customer since">{formatDate(customer.createdAt, activeBranch.timezone)}</Detail>
             <div className="sm:col-span-2">
@@ -127,12 +145,15 @@ export default function CustomerProfilePage() {
           { value: 'upcoming', label: `Upcoming (${upcoming.length})` },
           { value: 'past', label: `Past (${past.length})` },
           { value: 'money', label: 'Bills & payments' },
+          { value: 'messages', label: 'Messages & permission' },
         ]}
         value={tab}
         onChange={(value) => setSearchParams({ tab: value }, { replace: true })}
       />
       {tab === 'money' ? (
         <CustomerMoneyTab customerId={customer._id} zone={activeBranch.timezone} />
+      ) : tab === 'messages' ? (
+        <MessagesPermissionTab customer={customer} zone={activeBranch.timezone} />
       ) : (
         <Table
           columns={columns}

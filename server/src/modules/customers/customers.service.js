@@ -4,6 +4,7 @@ import { OPEN_APPOINTMENT_STATUSES, SERVICE_STAFF } from '../../config/constants
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { escapeRegex } from '../../utils/regex.js';
+import { customerOccasionChanges, logCustomerChange } from '../occasions/customers.service.js';
 
 // ---------------------------------------------------------------------------
 // Visits, spend and last visit are CALCULATED from appointments and invoices every time.
@@ -76,12 +77,17 @@ async function assertPreferredStaff(ctx, staffId) {
   if (!exists) throw new AppError(400, 'INVALID_STAFF', 'That stylist was not found');
 }
 
-// Turns form values into what we save: '' means "clear this field"
+// Turns form values into what we save: '' means "clear this field".
+// Birthday, anniversary and home branch are handled by customerOccasionChanges (occasions module).
 function toDocument(input) {
-  const doc = { ...input };
-  if ('dob' in input) doc.dob = input.dob ? new Date(input.dob) : null; // "1995-05-12" -> midnight UTC
+  const { birthday, anniversary, homeBranchId, ...doc } = input;
   if ('preferredStaffId' in input) doc.preferredStaffId = input.preferredStaffId || null;
   return doc;
+}
+
+// The activity row when a form changed a birthday or anniversary (the home branch alone isn't logged for new customers)
+async function logDateChange(ctx, customer, words, before, session) {
+  await logCustomerChange(ctx, customer, { action: 'occasions.dates_changed', summary: `Changed ${customer.name}’s details: ${words.join('; ')}`, before }, session);
 }
 
 // One phone number = one customer per salon
@@ -96,10 +102,19 @@ async function assertPhoneFree(ctx, phone, exceptId) {
 
 // If the phone already exists we don't create a duplicate: we return 409 with the existing
 // customer, so the screen can link to them instead.
+// A new customer's home branch is the branch they were added at, unless one is chosen.
 export async function createCustomer(ctx, input) {
   await assertPhoneFree(ctx, input.phone);
   await assertPreferredStaff(ctx, input.preferredStaffId);
-  return Customer.create({ ...toDocument(input), orgId: ctx.orgId });
+  return mongoose.connection.transaction(async (session) => {
+    const occasionInput = { birthday: input.birthday, anniversary: input.anniversary, homeBranchId: input.homeBranchId ?? ctx.activeBranchId };
+    const { set, words } = await customerOccasionChanges(ctx, {}, occasionInput, session);
+    const customer = new Customer({ ...toDocument(input), orgId: ctx.orgId });
+    customer.set(set);
+    await customer.save({ session });
+    if (input.birthday || input.anniversary) await logDateChange(ctx, customer, words, null, session);
+    return customer;
+  });
 }
 
 export async function updateCustomer(ctx, id, input) {
@@ -107,8 +122,15 @@ export async function updateCustomer(ctx, id, input) {
   if (input.phone && input.phone !== customer.phone) await assertPhoneFree(ctx, input.phone, id);
   await assertPreferredStaff(ctx, input.preferredStaffId);
 
-  customer.set(toDocument(input));
-  return customer.save();
+  return mongoose.connection.transaction(async (session) => {
+    const before = customer.toObject();
+    const { set, words } = await customerOccasionChanges(ctx, before, input, session);
+    customer.set(toDocument(input));
+    customer.set(set);
+    await customer.save({ session });
+    if (words.length > 0) await logDateChange(ctx, customer, words, { occasions: before.occasions, homeBranchId: before.homeBranchId }, session);
+    return customer;
+  });
 }
 
 // Profile page: details, calculated numbers, and upcoming / past appointments (from every branch)
@@ -137,7 +159,7 @@ export async function getCustomerProfile(ctx, id) {
   const isUpcoming = (a) => OPEN_APPOINTMENT_STATUSES.includes(a.status) && a.startAt >= now;
 
   return {
-    customer,
+    customer: { ...customer, homeBranchName: branchById[customer.homeBranchId]?.name ?? null },
     stats: stats[customer._id],
     upcoming: withBranch.filter(isUpcoming).reverse(), // soonest first
     past: withBranch.filter((a) => !isUpcoming(a)), // latest first

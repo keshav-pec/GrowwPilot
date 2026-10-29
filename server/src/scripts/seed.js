@@ -25,6 +25,7 @@ import { createOrder, moveOrder, receiveOrder, submitOrder } from '../modules/in
 import { markSetupStep } from '../modules/inventory/setup/setup.service.js';
 import { addImages } from '../modules/inventory/images/images.service.js';
 import { migrateBilling } from './migrate-billing-v2.js';
+import { migrateOccasions } from './migrate-occasions-v1.js';
 import { gstinCheckChar } from '../config/billing.js';
 import { addProduct, createSaleDraft, issueInvoice, openDraft } from '../modules/invoices/invoices.service.js';
 import { takeAdvance } from '../modules/payments/payments.service.js';
@@ -293,6 +294,7 @@ await Appointment.insertMany(appointments);
 await Invoice.collection.insertMany(invoices);
 await Counter.insertMany(Object.entries(counters).map(([name, seq]) => ({ _id: `invoice:${branch[name]._id}`, seq })));
 await migrateBilling({ log: () => {} });
+await migrateOccasions({ log: () => {} }); // home branches and "not recorded" permission for the demo customers
 
 // Billing settings: Glamour Studio is GST registered in Maharashtra (prices include GST); Desert Rose isn't
 const demoGstin = (first14) => first14 + gstinCheckChar(first14);

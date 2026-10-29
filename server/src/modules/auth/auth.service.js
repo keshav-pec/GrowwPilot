@@ -38,7 +38,7 @@ export async function assertCanLogIn(user) {
   }
   if (user.role === 'SUPER_ADMIN') return null;
 
-  const org = await Organization.findById(user.orgId).select('name status addons').lean();
+  const org = await Organization.findById(user.orgId).select('name status addons occasionOffers').lean();
   if (!org || org.status !== 'active') {
     throw new AppError(401, 'ORG_INACTIVE', 'This salon has been deactivated. Please contact GrowwPilot support.');
   }
@@ -82,7 +82,8 @@ export function toSessionUser(user, org, branches) {
     email: user.email,
     role: user.role,
     allBranches: user.allBranches,
-    org: org ? { _id: org._id, name: org.name, addons: enabledAddons(org) } : null, // addons: e.g. ['inventory']
+    // addons: e.g. ['inventory']; occasionOffers: whether Birthday & Anniversary Offers are switched on
+    org: org ? { _id: org._id, name: org.name, addons: enabledAddons(org), occasionOffers: { enabled: Boolean(org.occasionOffers?.enabled) } } : null,
     branches,
   };
 }

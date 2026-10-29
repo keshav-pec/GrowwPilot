@@ -19,11 +19,13 @@ export async function logActivity(ctx, { action, branchId, staffId, invoiceId, s
   );
 }
 
-// Inventory actions are named inventory.*, billing actions billing.*; every other logged action is a pay change
+// Inventory actions are named inventory.*, billing actions billing.*, occasion offers occasions.*;
+// every other logged action is a pay change
 const AREAS = {
   inventory: { action: /^inventory\./ },
   billing: { action: /^billing\./ },
-  payroll: { action: { $not: /^(inventory|billing)\./ } },
+  occasions: { action: /^occasions\./ },
+  payroll: { action: { $not: /^(inventory|billing|occasions)\./ } },
 };
 
 // Newest first. The business owner sees every branch; a branch owner only their own branches.

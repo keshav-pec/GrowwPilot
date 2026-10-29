@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { objectId } from '../../utils/schemas.js';
+import { occasionDate } from '../occasions/occasions.schemas.js';
 import { normalizePhone, PHONE_REGEX } from '../../utils/phone.js';
 
 export const listCustomersSchema = z.object({
@@ -10,13 +11,15 @@ export const listCustomersSchema = z.object({
 
 const phone = z.string().transform(normalizePhone).pipe(z.string().regex(PHONE_REGEX, 'Enter a valid 10-digit mobile number'));
 const email = z.union([z.literal(''), z.string().trim().toLowerCase().pipe(z.email('Enter a valid email'))]);
-const dob = z.union([z.literal(''), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')]); // '' = not set
 
 export const createCustomerSchema = z.object({
   name: z.string().trim().min(2, 'Name is required'),
   phone,
   email: email.optional(),
-  dob: dob.optional(),
+  // Birthday and anniversary: { month, day? } or null (clear). The old full date of birth is no longer taken.
+  birthday: occasionDate.optional(),
+  anniversary: occasionDate.optional(),
+  homeBranchId: objectId.optional(), // new customers: the branch they were added at, unless chosen
   notes: z.string().trim().max(1000).optional(),
   preferredStaffId: z.union([z.literal(''), objectId]).optional(), // '' = no preference
 });

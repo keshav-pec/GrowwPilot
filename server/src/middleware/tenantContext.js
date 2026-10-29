@@ -31,6 +31,7 @@ export async function tenantContext(req, res, next) {
     allowedBranchIds,
     activeBranchId: requested || allowedBranchIds[0] || null,
     addons: enabledAddons(req.org), // e.g. ['inventory']
+    occasionOffers: Boolean(req.org?.occasionOffers?.enabled), // Birthday & Anniversary Offers switched on
   };
   next();
 }
