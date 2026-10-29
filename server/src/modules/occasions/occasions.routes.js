@@ -7,13 +7,30 @@ import { requireIdempotencyKey } from '../../middleware/idempotency.js';
 import { objectId } from '../../utils/schemas.js';
 import { toCsv } from '../../utils/csv.js';
 import { z } from 'zod';
-import { consentSchema, createCampaignSchema, datesSchema, ifMatchSchema, importSchema, offersQuerySchema, reasonSchema, revokeSchema, settingsSchema, updateCampaignSchema } from './occasions.schemas.js';
+import {
+  assignSchema,
+  consentSchema,
+  contactSchema,
+  createCampaignSchema,
+  datesSchema,
+  ifMatchSchema,
+  importSchema,
+  messagesSchema,
+  offersQuerySchema,
+  reasonSchema,
+  revokeSchema,
+  sendPreviewSchema,
+  sendSchema,
+  settingsSchema,
+  updateCampaignSchema,
+} from './occasions.schemas.js';
 import { getSettingsForScreen, updateSettings } from './settings.service.js';
 import { consentHistory, getConsents, recordConsent, removeOccasionData, setCustomerDates } from './customers.service.js';
 import { importDates, importTemplate } from './import.service.js';
 import * as campaigns from './campaigns/campaigns.service.js';
 import { customerOffers, getOffer, listOffers, offerSummary } from './worklist/worklist.service.js';
 import { revokeCampaignOffers, runAfterPublish, runNow } from './engine/actions.service.js';
+import { assignOffer, listAssignees, recordContact, sendOffer, sendPreview } from './outreach/followup.service.js';
 
 // /api/occasions — Birthday & Anniversary Offers. Owners and front desk; what each may do is checked in the
 // services (permissions.js). The salon and the role always come from the login.
@@ -103,6 +120,10 @@ router.post('/campaigns/:id/discard-draft', idParams, requireIdempotencyKey, asy
   await campaigns.discardDraft(req.ctx, req.params.id, req.idempotencyKey);
   res.json(await campaigns.getCampaign(req.ctx, req.params.id));
 });
+router.put('/campaigns/:id/messages', idParams, requireIdempotencyKey, validate({ headers: ifMatchSchema, body: messagesSchema }), async (req, res) => {
+  await campaigns.updateMessages(req.ctx, req.params.id, req.valid.body, { version: req.valid.headers['if-match'], key: req.idempotencyKey });
+  res.json(await campaigns.getCampaign(req.ctx, req.params.id));
+});
 router.get('/campaigns/:id/versions', idParams, async (req, res) => {
   res.json(await campaigns.listVersions(req.ctx, req.params.id));
 });
@@ -119,6 +140,22 @@ router.get('/offers', validate({ query: offersQuerySchema }), async (req, res) =
 });
 router.get('/offers/:id', idParams, async (req, res) => {
   res.json(await getOffer(req.ctx, req.params.id));
+});
+// Follow-up: preview and send the message, record a call, assign
+router.get('/offers/:id/send-preview', idParams, validate({ query: sendPreviewSchema }), async (req, res) => {
+  res.json(await sendPreview(req.ctx, req.params.id, req.valid.query));
+});
+router.post('/offers/:id/send', idParams, requireIdempotencyKey, validate({ body: sendSchema }), async (req, res) => {
+  res.json(await sendOffer(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
+});
+router.post('/offers/:id/contact', idParams, requireIdempotencyKey, validate({ body: contactSchema }), async (req, res) => {
+  res.json(await recordContact(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
+});
+router.get('/offers/:id/assignees', idParams, async (req, res) => {
+  res.json(await listAssignees(req.ctx, req.params.id));
+});
+router.post('/offers/:id/assign', idParams, requireIdempotencyKey, validate({ body: assignSchema }), async (req, res) => {
+  res.json(await assignOffer(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
 });
 router.get('/customers/:id/offers', idParams, async (req, res) => {
   res.json(await customerOffers(req.ctx, req.params.id));

@@ -163,3 +163,46 @@ export function useRevokeOffers() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['occasions'] }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Follow-up (Phase 4)
+// ---------------------------------------------------------------------------
+
+// Who it goes to, on which channel, and the finished message — or why it can't be sent now
+export function useSendPreview(offerId, channel, enabled = true) {
+  return useQuery({
+    queryKey: ['occasions', 'offers', offerId, 'send-preview', channel ?? null],
+    queryFn: () => api.get(`/occasions/offers/${offerId}/send-preview`, { params: channel ? { channel } : {} }).then((res) => res.data),
+    enabled,
+  });
+}
+
+function useOfferMutation(request) {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: request, onSettled: () => queryClient.invalidateQueries({ queryKey: ['occasions'] }) });
+}
+
+// { key, offerId, channel } -> { link, body, subject, channel, to }
+export const useSendOffer = () => useOfferMutation(({ key, offerId, channel }) => api.post(`/occasions/offers/${offerId}/send`, { channel }, { headers: { 'Idempotency-Key': key } }).then((res) => res.data));
+
+// { key, offerId, outcome, note?, callbackAt? } -> { outcome, fixDetails }
+export const useRecordContact = () =>
+  useOfferMutation(({ key, offerId, ...body }) => api.post(`/occasions/offers/${offerId}/contact`, body, { headers: { 'Idempotency-Key': key } }).then((res) => res.data));
+
+export function useAssignees(offerId) {
+  return useQuery({ queryKey: ['occasions', 'offers', offerId, 'assignees'], queryFn: () => api.get(`/occasions/offers/${offerId}/assignees`).then((res) => res.data.assignees) });
+}
+
+// { key, offerId, assigneeId | null }
+export const useAssignOffer = () =>
+  useOfferMutation(({ key, offerId, assigneeId }) => api.post(`/occasions/offers/${offerId}/assign`, { assigneeId }, { headers: { 'Idempotency-Key': key } }).then((res) => res.data));
+
+// { key, id, version, WHATSAPP, SMS, EMAIL } -> the campaign
+export function useSaveCampaignMessages() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, id, version, ...messages }) =>
+      api.put(`/occasions/campaigns/${id}/messages`, messages, { headers: { 'Idempotency-Key': key, 'If-Match': `"${version}"` } }).then((res) => res.data.campaign),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['occasions', 'campaigns'] }),
+  });
+}

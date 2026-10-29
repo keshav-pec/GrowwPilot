@@ -17,6 +17,8 @@ const occasionCampaignSchema = new mongoose.Schema(
     currentVersionId: ref('OccasionCampaignVersion', { default: null }),
     draftRules: { type: campaignRulesSchema, default: null }, // unpublished terms (a draft, or the next version)
     deliveryMode: { type: String, enum: DELIVERY_MODES, default: 'STAFF_ASSISTED' },
+    // The ready-made message per channel: { WHATSAPP: { body }, SMS: { body }, EMAIL: { subject, body } }. null = the defaults.
+    messages: { type: mongoose.Schema.Types.Mixed, default: null },
     version: { type: Number, default: 0 }, // goes up on every change, so two people can't overwrite each other
     createdBy: ref('User'),
     updatedBy: ref('User'),

@@ -1,5 +1,5 @@
 import { Branch, Customer, OfferIssue, Organization } from '../../../models/index.js';
-import { OCCASION_TYPES } from '../../../config/occasions.js';
+import { CONSENT_CHANNELS, OCCASION_TYPES } from '../../../config/occasions.js';
 import { localMonth } from './window.js';
 import { addOfferEvents } from './events.js';
 import { campaignsForBranch, customerCopy, issueForCustomer } from './issue.js';
@@ -46,6 +46,15 @@ export async function reevaluateCustomer(orgId, customerId, { ctx = null, now = 
   const customer = await Customer.findOne({ _id: customerId, orgId }).select('name phone email occasions marketing homeBranchId').lean();
   if (!customer) return;
   await OfferIssue.updateMany({ orgId, customerId: customer._id, status: { $in: ['ISSUED', 'REDEEMED'] } }, { $set: customerCopy(customer) });
+
+  // Opted out of every channel: nothing left to follow up (the offer itself still works in the salon)
+  if (CONSENT_CHANNELS.every((c) => customer.marketing?.[c]?.status === 'OPTED_OUT')) {
+    const open = await OfferIssue.find({ orgId, customerId: customer._id, status: 'ISSUED', 'task.state': { $ne: 'CLOSED' }, 'task.kind': 'CONTACT' }).select('customerId').lean();
+    if (open.length) {
+      await OfferIssue.updateMany({ _id: { $in: open.map((o) => o._id) }, 'task.state': { $ne: 'CLOSED' } }, { $set: { 'task.state': 'CLOSED', 'task.closedReason': 'OPTED_OUT', 'task.closedAt': now } });
+      await addOfferEvents(orgId, open, 'CONTACT', { ctx, note: 'Task closed: the customer opted out of all messages' });
+    }
+  }
 
   const org = await Organization.findById(orgId).select('occasionOffers').lean();
   if (!org?.occasionOffers?.enabled) return; // switched off: no new offers

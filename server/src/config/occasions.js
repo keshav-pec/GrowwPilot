@@ -47,3 +47,7 @@ export const TASK_STATES = ['OPEN', 'CONTACTED', 'CLOSED'];
 // CONTACT: get in touch about the offer. WITHDRAWN_NOTICE: tell a contacted customer the offer was withdrawn.
 export const TASK_KINDS = ['CONTACT', 'WITHDRAWN_NOTICE'];
 export const OFFER_EVENT_KINDS = ['ISSUED', 'ASSIGNED', 'CONTACT', 'SENT', 'BOOKED', 'REDEEMED', 'RESTORED', 'EXPIRED', 'REVOKED', 'SUPERSEDED', 'MOVED'];
+
+// Staff follow-up (Phase 4)
+export const CALL_OUTCOMES = ['REACHED', 'NO_ANSWER', 'NOT_INTERESTED', 'CALL_LATER', 'WRONG_DETAILS'];
+export const PROMO_GAP_DAYS = 7; // at most one promotional message per customer per 7 days

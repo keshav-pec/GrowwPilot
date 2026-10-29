@@ -170,3 +170,12 @@ export const OFFER_EVENT_LABEL = {
 
 // "Birthday · 5 November", "Anniversary · November"
 export const occasionLine = (offer) => `${OCCASION_LABEL[offer.type]} · ${offer.day ? `${offer.day} ` : ''}${MONTHS[offer.month - 1]}`;
+
+// Call outcomes (Record call outcome)
+export const CALL_OUTCOMES = [
+  { value: 'REACHED', label: 'Reached', hint: 'Spoke to the customer' },
+  { value: 'NO_ANSWER', label: 'No answer', hint: 'One follow-up tomorrow at 11:00; a second no answer closes it' },
+  { value: 'NOT_INTERESTED', label: 'Not interested', hint: 'Closes the task' },
+  { value: 'CALL_LATER', label: 'Call later', hint: 'Pick a time before the offer ends' },
+  { value: 'WRONG_DETAILS', label: 'Wrong details', hint: 'Closes the task; fix the number on the profile' },
+];

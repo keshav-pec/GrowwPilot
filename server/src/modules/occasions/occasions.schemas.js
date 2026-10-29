@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { objectId } from '../../utils/schemas.js';
-import { CAMPAIGN_SCOPES, CONSENT_CHANNELS, CONSENT_SOURCES, DISCOUNT_TYPES, OCCASION_TYPES, dayFitsMonth } from '../../config/occasions.js';
+import { CALL_OUTCOMES, CAMPAIGN_SCOPES, CONSENT_CHANNELS, CONSENT_SOURCES, DISCOUNT_TYPES, OCCASION_TYPES, dayFitsMonth } from '../../config/occasions.js';
 
 // A birthday or anniversary: { month: 11, day: 5 }, { month: 11 } (no day) or null (clear it). Never a year.
 export const occasionDate = z
@@ -97,4 +97,19 @@ export const offersQuerySchema = z.object({
   branch: z.union([z.enum(['current', 'all']), objectId]).default('current'),
   cursor: z.string().max(300).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+export const sendSchema = z.object({ channel: z.enum(CONSENT_CHANNELS) });
+export const sendPreviewSchema = z.object({ channel: z.enum(CONSENT_CHANNELS).optional() });
+export const contactSchema = z.object({
+  outcome: z.enum(CALL_OUTCOMES, { message: 'Choose what happened' }),
+  note: z.string().trim().max(500).optional(),
+  callbackAt: z.iso.datetime({ offset: true }).optional(), // Call later: when (UTC)
+});
+export const assignSchema = z.object({ assigneeId: objectId.nullable() });
+const wording = z.string().trim().min(10, 'The message is too short').max(1000);
+export const messagesSchema = z.object({
+  WHATSAPP: z.object({ body: wording }),
+  SMS: z.object({ body: wording.max(480) }),
+  EMAIL: z.object({ subject: z.string().trim().min(3).max(120), body: wording.max(3000) }),
 });

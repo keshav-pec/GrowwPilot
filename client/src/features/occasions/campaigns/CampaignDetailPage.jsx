@@ -10,6 +10,7 @@ import { CAMPAIGN_STATUS, DELIVERY_LABEL, OCCASION_LABEL, formatOccasion } from 
 import { formatDateTime } from '../../../lib/time';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Modal, PageHeader, Spinner, Table, Textarea } from '../../../components/ui';
 import CampaignFormModal from './CampaignFormModal';
+import CampaignMessagesCard from './CampaignMessagesCard';
 
 // What each button does, in the confirm popup
 const ACTIONS = {
@@ -152,6 +153,8 @@ export default function CampaignDetailPage() {
           </>
         )}
       </Card>
+
+      <CampaignMessagesCard key={c.version} campaign={c} />
 
       {canWithdraw && c.currentVersion > 0 && (
         <Card title="Emergency withdraw" className="mb-4">

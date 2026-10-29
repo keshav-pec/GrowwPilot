@@ -38,6 +38,8 @@ const RULES = {
   'occasions.viewOffers': { BUSINESS_OWNER: true, BRANCH_OWNER: true, FRONT_DESK: true },
   'occasions.revokeOffers': { BUSINESS_OWNER: true, BRANCH_OWNER: false, FRONT_DESK: false },
   'occasions.runEngine': { BUSINESS_OWNER: true, BRANCH_OWNER: false, FRONT_DESK: false },
+  // Follow-up on their branches' offers: send the message, record a call, assign
+  'occasions.followUp': { BUSINESS_OWNER: true, BRANCH_OWNER: true, FRONT_DESK: true },
 };
 
 export const OCCASION_ACTIONS = Object.keys(RULES);

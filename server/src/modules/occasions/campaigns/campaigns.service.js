@@ -8,6 +8,7 @@ import { OCCASION_LABELS, OCCASION_TYPES } from '../../../config/occasions.js';
 import { assertCan, assertCanOrLog, can, refuseAndLog } from '../permissions.js';
 import { STARTER_CAMPAIGNS, checkRules, cleanRules, describeOffer, sameRules } from './campaign.rules.js';
 import { campaignAudience } from './audience.js';
+import { campaignMessages, checkMessages } from '../outreach/templates.js';
 
 // Birthday and Anniversary campaigns: drafts, publishing (each publish freezes a new version), turning off and
 // on, archiving. The business owner manages every campaign; a branch owner only "This branch only" campaigns of
@@ -99,6 +100,8 @@ function toView(ctx, campaign, { published, branchName }) {
     draftSummary: campaign.draftRules ? describeOffer(campaign.draftRules) : null,
     publishedAt: campaign.publishedAt ?? null,
     updatedAt: campaign.updatedAt,
+    messages: campaignMessages(campaign), // the ready-made WhatsApp / SMS / email wording (defaults if never changed)
+    messagesChanged: Boolean(campaign.messages),
     canManage: canManageCampaign(ctx, campaign),
   };
 }
@@ -342,5 +345,19 @@ export async function createStarterDrafts(ctx, key) {
       await logActivity(ctx, { action: 'occasions.campaign_created', summary: `Created the draft campaign ${starter.name} from the starting suggestion: ${describeOffer(rules)}` }, session);
     }
     return { created };
+  });
+}
+
+// PUT /api/occasions/campaigns/:id/messages — { WHATSAPP: { body }, SMS: { body }, EMAIL: { subject, body } }.
+// The wording must keep {first_name}, {salon_name}, {offer_summary}, {expiry_date} and the opt-out line.
+export async function updateMessages(ctx, id, messages, { version, key }) {
+  const found = await campaignToChange(ctx, id, 'change a campaign’s message wording');
+  const problems = checkMessages(messages);
+  if (problems.length > 0) throw new AppError(400, 'INVALID_MESSAGES', problems[0].message, problems);
+  return runOnce(ctx, { key, operation: 'occasions.campaign.messages' }, async (session) => {
+    const saved = await OccasionCampaign.updateOne(scoped(ctx, { _id: found._id, version }), { $set: { messages, updatedBy: ctx.userId }, $inc: { version: 1 } }, { session });
+    if (saved.matchedCount !== 1) throw STALE();
+    await logActivity(ctx, { action: 'occasions.campaign_edited', branchId: found.branchId ?? null, summary: `Changed the message wording of ${found.name}` }, session);
+    return { saved: true };
   });
 }

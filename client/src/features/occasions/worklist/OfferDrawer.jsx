@@ -1,10 +1,15 @@
-import { Link } from 'react-router-dom';
-import { Info } from 'lucide-react';
-import { useOffer } from '../../../api/occasions';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { CalendarPlus, Phone, Send } from 'lucide-react';
+import { useOffer, useSendPreview } from '../../../api/occasions';
 import { CHANNEL_LABEL, CONSENT_STATUS, OFFER_EVENT_LABEL, occasionLine, taskLabel } from '../../../lib/occasions';
 import { formatDate, formatDateTime } from '../../../lib/time';
-import { Badge, Drawer, EmptyState, Spinner } from '../../../components/ui';
+import { Badge, Button, Drawer, EmptyState, Spinner } from '../../../components/ui';
 import { OfferStatusBadge } from './OfferBits';
+import OfferNotice from '../followup/OfferNotice';
+import SendOfferModal from '../followup/SendOfferModal';
+import RecordOutcomeModal from '../followup/RecordOutcomeModal';
+import AssignSelect from '../followup/AssignSelect';
 
 function Row({ label, children }) {
   return (
@@ -15,11 +20,21 @@ function Row({ label, children }) {
   );
 }
 
-// One customer's offer: occasion, frozen terms, expiry, messaging permission, task and timeline.
-// Read-only for now; the buttons (send, record a call, assign, book) come next.
+// One customer's offer: occasion, frozen terms, expiry, messaging permission, task and timeline, with the
+// follow-up buttons: Send offer (only when allowed), Record call, Create booking, and Assign.
+// The buttons sit at the bottom of the panel (on a phone the panel fills the screen).
 export default function OfferDrawer({ offerId, zone, onClose }) {
+  const navigate = useNavigate();
   const offerQuery = useOffer(offerId);
   const data = offerQuery.data;
+  const running = data?.offer.status === 'ISSUED';
+  const previewQuery = useSendPreview(offerId, null, Boolean(running));
+  const [sending, setSending] = useState(false);
+  const [calling, setCalling] = useState(false);
+  const [fixDetails, setFixDetails] = useState(false);
+  const branchZone = data?.offer.branchTimezone ?? zone;
+  const withdrawnNotice = data?.offer.status === 'REVOKED' && data.offer.task?.state === 'OPEN';
+
   return (
     <Drawer
       open
@@ -28,9 +43,26 @@ export default function OfferDrawer({ offerId, zone, onClose }) {
       title={data ? data.offer.customerName : 'Offer'}
       footer={
         data && (
-          <Link to={`/app/customers/${data.offer.customerId}`} className="w-full rounded-lg border border-border px-4 py-2 text-center text-sm font-medium hover:bg-surface sm:w-auto">
-            Open customer profile
-          </Link>
+          <div className="flex w-full flex-wrap justify-end gap-2">
+            <Link to={`/app/customers/${data.offer.customerId}`} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-surface">
+              Profile
+            </Link>
+            {(running || withdrawnNotice) && (
+              <Button variant="secondary" onClick={() => setCalling(true)}>
+                <Phone size={16} /> Record call
+              </Button>
+            )}
+            {running && (
+              <Button variant="secondary" onClick={() => navigate(`/app/appointments/new?customerId=${data.offer.customerId}&offerId=${data.offer._id}`)}>
+                <CalendarPlus size={16} /> Create booking
+              </Button>
+            )}
+            {running && previewQuery.data?.allowed && (
+              <Button onClick={() => setSending(true)}>
+                <Send size={16} /> Send offer
+              </Button>
+            )}
+          </div>
         )
       }
     >
@@ -39,17 +71,28 @@ export default function OfferDrawer({ offerId, zone, onClose }) {
       ) : offerQuery.isError ? (
         <EmptyState title="Couldn’t open this offer" message={offerQuery.error.message} />
       ) : (
-        <Details data={data} zone={data.offer.branchTimezone ?? zone} />
+        <Details data={data} zone={branchZone} notice={running && previewQuery.data && !previewQuery.data.allowed ? previewQuery.data : null} fixDetails={fixDetails} />
       )}
+      {sending && <SendOfferModal offerId={offerId} customerName={data.offer.customerName} zone={branchZone} onClose={() => setSending(false)} />}
+      {calling && <RecordOutcomeModal offer={data.offer} zone={branchZone} onClose={() => setCalling(false)} onWrongDetails={() => setFixDetails(true)} />}
     </Drawer>
   );
 }
 
-function Details({ data, zone }) {
+function Details({ data, zone, notice, fixDetails }) {
   const { offer, permission, events } = data;
-  const canMessage = permission.some((p) => p.status === 'OPTED_IN' && p.available);
+  const running = offer.status === 'ISSUED' || (offer.status === 'REVOKED' && offer.task?.state === 'OPEN');
   return (
     <div className="flex flex-col gap-5">
+      {notice && <OfferNotice notice={notice} zone={zone} />}
+      {fixDetails && (
+        <p className="rounded-lg border border-orange bg-orange/10 p-3 text-sm">
+          The number or email looks wrong.{' '}
+          <Link to={`/app/customers/${offer.customerId}`} className="font-medium underline">
+            Fix it on the customer’s profile
+          </Link>
+        </p>
+      )}
       <section>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="font-semibold text-brown">{occasionLine(offer)}</h3>
@@ -78,12 +121,6 @@ function Details({ data, zone }) {
             </li>
           ))}
         </ul>
-        {!canMessage && (
-          <p className="mt-2 flex items-start gap-2 rounded-lg bg-surface p-3 text-sm text-muted">
-            <Info size={16} className="mt-0.5 shrink-0" />
-            Offer available in salon. Promotional message disabled: permission not recorded. Ask for permission at the next visit.
-          </p>
-        )}
       </section>
 
       <section>
@@ -91,7 +128,8 @@ function Details({ data, zone }) {
         <dl>
           <Row label="Step">{taskLabel(offer)}</Row>
           {offer.task?.dueAt && offer.task.state === 'OPEN' && <Row label="Due">{formatDateTime(offer.task.dueAt, zone)}</Row>}
-          <Row label="Assigned to">{offer.task?.assigneeName ?? 'Anyone at the branch'}</Row>
+          {offer.task?.attempts > 0 && <Row label="Calls with no answer">{offer.task.attempts}</Row>}
+          <Row label="Assigned to">{running ? <AssignSelect offer={offer} /> : (offer.task?.assigneeName ?? 'Anyone at the branch')}</Row>
           {offer.nextAction && <Row label="Next action">{offer.nextAction}</Row>}
         </dl>
       </section>

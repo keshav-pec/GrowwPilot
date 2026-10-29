@@ -12,7 +12,8 @@ const taskSchema = new mongoose.Schema(
     assigneeId: ref('User', { default: null }),
     attempts: { type: Number, default: 0 }, // calls with no answer (Phase 4)
     outcome: { type: String, default: null }, // the last call outcome (Phase 4)
-    contactedAt: { type: Date, default: null }, // when the customer was first reached or messaged (Phase 4)
+    contactedAt: { type: Date, default: null }, // when the customer was first reached or messaged
+    sentAt: { type: Date, default: null }, // the last offer message sent for this offer
     closedReason: { type: String, default: null }, // EXPIRED, REDEEMED, WITHDRAWN, REPLACED, ...
     closedAt: { type: Date, default: null },
   },
