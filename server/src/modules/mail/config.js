@@ -12,6 +12,7 @@ function fromEnv() {
     timeoutMs: env.MAIL_SCRIPT_TIMEOUT_MS,
     smtp: { host: env.EMAIL_HOST, port: env.EMAIL_PORT, user: env.EMAIL_USER ?? null, pass: env.EMAIL_PASS ?? null },
     dailyLimit: env.MAIL_DAILY_LIMIT,
+    mode: null,
   };
 }
 
@@ -45,6 +46,7 @@ export function scriptUrlFor(kind) {
 // live = really sends; log = development/tests: printed (development) and kept in memory, marked "Logged";
 // off = production with nothing set up: nothing can be sent
 export function mailMode() {
+  if (settings.mode) return settings.mode; // tests only: configureMail({ mode: 'off' })
   if (mailConfigured()) return 'live';
   return env.NODE_ENV === 'production' ? 'off' : 'log';
 }

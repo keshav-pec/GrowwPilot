@@ -166,6 +166,15 @@ export const OFFER_EVENT_LABEL = {
   REVOKED: 'Withdrawn',
   SUPERSEDED: 'Replaced (date corrected)',
   MOVED: 'Moved to another branch',
+  EMAIL_SENT: 'Email sent',
+  EMAIL_FAILED: 'Email not sent',
+};
+
+// An offer email sent by the app: waiting to go out, sent, or not sent (the reason is on the task)
+export const EMAIL_STATUS = {
+  QUEUED: { label: 'Email queued', tone: 'yellow' },
+  SENT: { label: 'Email sent', tone: 'gold' },
+  FAILED: { label: 'Email not sent', tone: 'danger' },
 };
 
 // "Birthday · 5 November", "Anniversary · November"

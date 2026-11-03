@@ -34,6 +34,7 @@ import notificationRoutes from './modules/notifications/notifications.routes.js'
 import inventoryRoutes from './modules/inventory/inventory.routes.js';
 import occasionRoutes from './modules/occasions/occasions.routes.js';
 import mailRoutes from './modules/mail/mail.routes.js';
+import unsubscribeRoutes from './modules/occasions/outreach/unsubscribe.routes.js';
 
 const app = express();
 
@@ -73,6 +74,7 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/advances', advanceRoutes);
 app.use('/api/refunds', refundRoutes);
 app.use('/api/cash-sessions', cashRoutes);
+app.use('/api/public/unsubscribe', unsubscribeRoutes); // no login: the unsubscribe link in offer emails
 app.use('/api/public', publicRoutes); // no login: shared bill links
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/dashboard', dashboardRoutes);

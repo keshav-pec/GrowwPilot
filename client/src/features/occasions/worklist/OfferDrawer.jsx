@@ -5,7 +5,7 @@ import { useOffer, useSendPreview } from '../../../api/occasions';
 import { CHANNEL_LABEL, CONSENT_STATUS, OFFER_EVENT_LABEL, occasionLine, taskLabel } from '../../../lib/occasions';
 import { formatDate, formatDateTime } from '../../../lib/time';
 import { Badge, Button, Drawer, EmptyState, Spinner } from '../../../components/ui';
-import { OfferStatusBadge } from './OfferBits';
+import { EmailStatusBadge, OfferStatusBadge } from './OfferBits';
 import OfferNotice from '../followup/OfferNotice';
 import SendOfferModal from '../followup/SendOfferModal';
 import RecordOutcomeModal from '../followup/RecordOutcomeModal';
@@ -129,6 +129,12 @@ function Details({ data, zone, notice, fixDetails }) {
           <Row label="Step">{taskLabel(offer)}</Row>
           {offer.task?.dueAt && offer.task.state === 'OPEN' && <Row label="Due">{formatDateTime(offer.task.dueAt, zone)}</Row>}
           {offer.task?.attempts > 0 && <Row label="Calls with no answer">{offer.task.attempts}</Row>}
+          {offer.task?.emailStatus && (
+            <Row label="Email">
+              <EmailStatusBadge task={offer.task} />
+              {offer.task.emailStatus === 'FAILED' && offer.task.emailError && <span className="mt-1 block text-xs text-danger">{offer.task.emailError} You can send it again.</span>}
+            </Row>
+          )}
           <Row label="Assigned to">{running ? <AssignSelect offer={offer} /> : (offer.task?.assigneeName ?? 'Anyone at the branch')}</Row>
           {offer.nextAction && <Row label="Next action">{offer.nextAction}</Row>}
         </dl>

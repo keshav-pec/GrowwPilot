@@ -137,8 +137,14 @@ export function useOfferSummary(filters = {}, enabled = true) {
 }
 
 // The side drawer: { offer, permission, events }
+// While its email is waiting to go out, it asks again every 5 seconds (Queued -> Sent / Failed)
 export function useOffer(id) {
-  return useQuery({ queryKey: ['occasions', 'offers', id], queryFn: () => api.get(`/occasions/offers/${id}`).then((res) => res.data), enabled: Boolean(id) });
+  return useQuery({
+    queryKey: ['occasions', 'offers', id],
+    queryFn: () => api.get(`/occasions/offers/${id}`).then((res) => res.data),
+    enabled: Boolean(id),
+    refetchInterval: (query) => (query.state.data?.offer.task?.emailStatus === 'QUEUED' ? 5000 : false),
+  });
 }
 
 // A customer's offers (this year and last), for their profile

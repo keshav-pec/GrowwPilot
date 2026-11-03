@@ -1,4 +1,4 @@
-import { CHANNEL_LABEL, OFFER_STATUS, taskLabel } from '../../../lib/occasions';
+import { CHANNEL_LABEL, EMAIL_STATUS, OFFER_STATUS, taskLabel } from '../../../lib/occasions';
 import { formatDate } from '../../../lib/time';
 import { Badge } from '../../../components/ui';
 
@@ -28,6 +28,17 @@ export function TaskLine({ offer }) {
     <span>
       {taskLabel(offer)}
       {offer.task?.assigneeName && <span className="block text-xs text-muted">{offer.task.assigneeName}</span>}
+      {offer.task?.emailStatus && (
+        <span className="mt-1 block">
+          <EmailStatusBadge task={offer.task} />
+        </span>
+      )}
     </span>
   );
+}
+
+// Queued / Sent / Not sent, for offer emails the app sends
+export function EmailStatusBadge({ task }) {
+  const status = EMAIL_STATUS[task.emailStatus];
+  return status ? <Badge tone={status.tone}>{status.label}</Badge> : null;
 }

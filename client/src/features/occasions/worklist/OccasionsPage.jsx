@@ -41,7 +41,7 @@ function monthOptions(zone) {
 export default function OccasionsPage() {
   const { user, activeBranch } = useAuth();
   const [params, setParams] = useSearchParams();
-  const [openId, setOpenId] = useState(null);
+  const [openId, setOpenId] = useState(() => params.get('offer')); // a bell message can open one offer
   const [search, setSearch] = useState(params.get('search') ?? '');
   const debounced = useDebounce(search, 300);
   const zone = activeBranch.timezone;
@@ -139,7 +139,16 @@ export default function OccasionsPage() {
         </>
       )}
 
-      {openId && <OfferDrawer offerId={openId} zone={zone} onClose={() => setOpenId(null)} />}
+      {openId && (
+        <OfferDrawer
+          offerId={openId}
+          zone={zone}
+          onClose={() => {
+            setOpenId(null);
+            if (params.get('offer')) set('offer')('');
+          }}
+        />
+      )}
     </>
   );
 }

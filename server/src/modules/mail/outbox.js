@@ -26,9 +26,15 @@ export const DEFAULT_PRIORITY = { PASSWORD: 1, TEST: 2, BILL: 3, OCCASION_OFFER:
 const beforeSendChecks = new Map(); // kind -> async (row) => ({ skip: true, reason }) or nothing
 const resultHooks = new Map(); // kind -> async (row) after SENT / FAILED / SKIPPED
 const attachmentBuilders = new Map(); // attachment type -> async (row) => { fileName, mimeType, content: Buffer }
-export const onBeforeSend = (kind, check) => beforeSendChecks.set(kind, check);
-export const onResult = (kind, hook) => resultHooks.set(kind, hook);
-export const onAttachment = (type, build) => attachmentBuilders.set(type, build);
+// Each returns the hook it replaced (tests put it back afterwards)
+const register = (map) => (key, hook) => {
+  const previous = map.get(key);
+  map.set(key, hook);
+  return previous;
+};
+export const onBeforeSend = register(beforeSendChecks);
+export const onResult = register(resultHooks);
+export const onAttachment = register(attachmentBuilders);
 
 // email: { dedupeKey, kind, to, subject, html, text, fromName, replyTo?, branchId?, priority?, headers?, attachment?, ref? }
 // Queueing the same dedupeKey again does nothing. Call kickMailer() once the transaction has committed.
@@ -66,8 +72,14 @@ let running = false;
 let runAgain = false;
 let pausedUntil = 0; // Gmail's quota was hit with no backup: nothing goes out until then
 
+let held = false; // tests: nothing is sent in the background, only by calling processOutbox()
+
 export function kickMailer() {
-  setImmediate(runMailer);
+  if (!held) setImmediate(runMailer);
+}
+
+export function holdMailer(on = true) {
+  held = on;
 }
 
 async function runMailer() {

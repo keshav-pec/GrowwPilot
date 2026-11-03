@@ -46,7 +46,9 @@ export const OFFER_STATUSES = ['ISSUED', 'REDEEMED', 'EXPIRED', 'REVOKED', 'SUPE
 export const TASK_STATES = ['OPEN', 'CONTACTED', 'CLOSED'];
 // CONTACT: get in touch about the offer. WITHDRAWN_NOTICE: tell a contacted customer the offer was withdrawn.
 export const TASK_KINDS = ['CONTACT', 'WITHDRAWN_NOTICE'];
-export const OFFER_EVENT_KINDS = ['ISSUED', 'ASSIGNED', 'CONTACT', 'SENT', 'BOOKED', 'REDEEMED', 'RESTORED', 'EXPIRED', 'REVOKED', 'SUPERSEDED', 'MOVED'];
+export const OFFER_EVENT_KINDS = ['ISSUED', 'ASSIGNED', 'CONTACT', 'SENT', 'BOOKED', 'REDEEMED', 'RESTORED', 'EXPIRED', 'REVOKED', 'SUPERSEDED', 'MOVED', 'EMAIL_SENT', 'EMAIL_FAILED'];
+// An offer email sent by the app (EMAIL_PLAN.md Part 2): waiting in the outbox, delivered to Gmail, or not sent
+export const EMAIL_SEND_STATUSES = ['QUEUED', 'SENT', 'FAILED'];
 
 // Staff follow-up (Phase 4)
 export const CALL_OUTCOMES = ['REACHED', 'NO_ANSWER', 'NOT_INTERESTED', 'CALL_LATER', 'WRONG_DETAILS'];

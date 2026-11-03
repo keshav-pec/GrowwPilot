@@ -294,7 +294,7 @@ describe('daily limit', () => {
     await EmailOutbox.create(
       [1, 2, 3].map((i) => ({ orgId: f.ctxDesert.orgId, kind: 'TEST', priority: 2, to: `x${i}@x.org`, subject: 's', html: 'h', text: 't', fromName: 'D', dedupeKey: `old${i}`, status: 'SENT', via: 'APPS_SCRIPT', sentAt }))
     );
-    const offer = await queue({ kind: 'OCCASION_OFFER', priority: 5 });
+    const offer = await queue({ priority: 5 }); // like an automatic offer email
     const password = await queue({ kind: 'PASSWORD' });
     await processOutbox();
     expect((await row(password.id)).status).toBe('SENT');
@@ -303,7 +303,7 @@ describe('daily limit', () => {
 
   it('emails only logged (email not set up) do not count towards it', async () => {
     useMail({ scriptOn: false, smtpOn: false, dailyLimit: 1 });
-    const ids = [await queue(), await queue({ kind: 'OCCASION_OFFER', priority: 5 })];
+    const ids = [await queue(), await queue({ priority: 5 })];
     await processOutbox();
     for (const { id } of ids) expect(await row(id)).toMatchObject({ status: 'SENT', via: 'LOG' });
   });
@@ -312,8 +312,8 @@ describe('daily limit', () => {
 describe('hooks', () => {
   it('a check before sending can skip an email, and the result hook hears about it', async () => {
     const heard = [];
-    onBeforeSend('OCCASION_OFFER', async () => ({ skip: true, reason: 'Permission withdrawn' }));
-    onResult('OCCASION_OFFER', async (r) => heard.push(r.status));
+    const realCheck = onBeforeSend('OCCASION_OFFER', async () => ({ skip: true, reason: 'Permission withdrawn' }));
+    const realResult = onResult('OCCASION_OFFER', async (r) => heard.push(r.status));
     try {
       const { id } = await queue({ kind: 'OCCASION_OFFER' });
       await processOutbox();
@@ -321,8 +321,8 @@ describe('hooks', () => {
       expect(heard).toEqual(['SKIPPED']);
       expect(script.calls).toHaveLength(0);
     } finally {
-      onBeforeSend('OCCASION_OFFER', null);
-      onResult('OCCASION_OFFER', null);
+      onBeforeSend('OCCASION_OFFER', realCheck);
+      onResult('OCCASION_OFFER', realResult);
     }
   });
 });

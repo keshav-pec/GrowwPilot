@@ -11,8 +11,12 @@ import { addOfferEvents } from '../engine/events.js';
 import { campaignMessages, fillMessage, messageValues } from './templates.js';
 import { checkSend, maskedDestination, sendLink } from './gate.js';
 import { applyOutcome } from './contact.rules.js';
+import { buildOfferEmail } from './emailOffer.js';
+import { mailMode } from '../../mail/config.js';
+import { kickMailer, queueEmail } from '../../mail/outbox.js';
 
-// Staff follow-up on one offer: send the ready-made message (from their own phone), record a call, assign.
+// Staff follow-up on one offer: send the ready-made message, record a call, assign.
+// WhatsApp and SMS are sent from the staff member's own phone; email is sent by the app (when email is set up).
 // Everyone acts only on offers of customers whose home branch is one of their branches.
 
 const GAP_MS = PROMO_GAP_DAYS * 24 * 60 * 60 * 1000;
@@ -61,20 +65,27 @@ export async function sendPreview(ctx, id, { channel } = {}) {
   const sc = await sendContext(ctx, offer);
   if (!sc.gate.allowed) return { allowed: false, code: sc.gate.code, reason: sc.gate.reason, nextAllowedAt: sc.gate.nextAllowedAt ?? null };
   const chosen = channel && sc.gate.channels.includes(channel) ? channel : sc.gate.channel;
-  return { allowed: true, channels: sc.gate.channels, channel: chosen, to: maskedDestination(chosen, sc.customer), ...buildMessage({ offer, ...sc }, chosen) };
+  // appSends: the app sends it itself (email, when set up); otherwise the staff member's own app opens
+  const appSends = appSendsEmail(chosen);
+  return { allowed: true, channels: sc.gate.channels, channel: chosen, appSends, to: maskedDestination(chosen, sc.customer), ...buildMessage({ offer, ...sc }, chosen) };
 }
 
+// Email is sent by the app unless email isn't set up at all (production without settings: the old mailto: link)
+const appSendsEmail = (channel) => channel === 'EMAIL' && mailMode() !== 'off';
+
 // POST /api/occasions/offers/:id/send — { channel }. Everything is checked again here. The 7-day slot is taken with
-// one guarded update on the customer, so two desks pressing Send together count once. Returns the link that opens
-// WhatsApp / SMS / email with the message filled in; the task is marked "Contacted via ...".
+// one guarded update on the customer, so two desks pressing Send together count once. The task is marked
+// "Contacted via ...". WhatsApp / SMS: returns the link that opens the app with the message filled in.
+// Email: queued in the same transaction and sent in the background ({ queued: true }, no link); if it fails,
+// the slot is given back and the task reopens (emailOffer.js).
 export async function sendOffer(ctx, id, { channel }, key) {
   try {
-    return await runOnce(ctx, { key, operation: 'occasions.offer.send' }, async (session) => {
+    const result = await runOnce(ctx, { key, operation: 'occasions.offer.send' }, async (session) => {
       const offer = await offerToAct(ctx, id, session);
       // One read at a time inside a transaction
       const customer = await Customer.findOne(scoped(ctx, { _id: offer.customerId })).select('name phone email marketing').session(session).lean();
       const settings = await getOccasionSettings(ctx, session);
-      const org = await Organization.findById(ctx.orgId).select('name contactPhone').session(session).lean();
+      const org = await Organization.findById(ctx.orgId).select('name contactPhone contactEmail').session(session).lean();
       const campaign = await OccasionCampaign.findOne(scoped(ctx, { _id: offer.campaignId })).select('type messages').session(session).lean();
       const branch = await Branch.findOne(scoped(ctx, { _id: offer.branchId })).select('timezone').session(session).lean();
       const now = new Date();
@@ -115,9 +126,35 @@ export async function sendOffer(ctx, id, { channel }, key) {
       await addOfferEvents(ctx.orgId, [offer], 'SENT', { ctx, note: `via ${CHANNEL_LABELS[channel]}`, outcome: channel }, session);
       await logActivity(ctx, { action: 'occasions.offer_sent', branchId: offer.homeBranchId, summary: `Sent ${customer.name} the ${offer.campaignName} offer via ${CHANNEL_LABELS[channel]}` }, session);
 
-      const message = buildMessage({ offer, customer, org, campaign, zone: branch?.timezone ?? 'Asia/Kolkata' }, channel);
-      return { channel, to: maskedDestination(channel, customer), ...message, link: sendLink(channel, customer, message) };
+      const zone = branch?.timezone ?? 'Asia/Kolkata';
+      const to = maskedDestination(channel, customer);
+      if (appSendsEmail(channel)) {
+        const email = buildOfferEmail({ offer, customer, org, campaign, zone });
+        const queued = await queueEmail(
+          ctx,
+          {
+            kind: 'OCCASION_OFFER',
+            dedupeKey: `offer:${offer._id}:send:${now.getTime()}`,
+            branchId: offer.homeBranchId,
+            to: customer.email,
+            subject: email.subject,
+            text: email.text,
+            html: email.html,
+            headers: email.headers,
+            fromName: org.name,
+            replyTo: org.contactEmail,
+            ref: { offerId: offer._id },
+          },
+          session
+        );
+        await OfferIssue.updateOne({ _id: offer._id }, { $set: { 'task.emailOutboxId': queued.id, 'task.emailStatus': 'QUEUED', 'task.emailError': null } }, { session });
+        return { channel, to, subject: email.subject, body: email.body, queued: true };
+      }
+      const message = buildMessage({ offer, customer, org, campaign, zone }, channel);
+      return { channel, to, ...message, link: sendLink(channel, customer, message) };
     });
+    if (result.queued) kickMailer();
+    return result;
   } catch (err) {
     // A refused send is written to the activity log (e.g. permission withdrawn between preview and confirm)
     if (err instanceof AppError && err.status === 409 && err.code !== 'IDEMPOTENCY_KEY_REUSED') {

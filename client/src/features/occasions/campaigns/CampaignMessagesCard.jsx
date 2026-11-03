@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { DateTime } from 'luxon';
+import { useAuth } from '../../../auth/AuthContext';
 import toast from 'react-hot-toast';
 import { useSaveCampaignMessages } from '../../../api/occasions';
 import { newRequestKey } from '../../../lib/billing';
@@ -49,13 +51,14 @@ export default function CampaignMessagesCard({ campaign }) {
   return (
     <Card title="Message wording" className="mb-4">
       <p className="mb-3 text-sm text-muted">
-        Staff send these from their own phone. Keep {NEEDED.join(', ')} and the opt-out line. <code>{'{salon_phone}'}</code> is your salon’s contact number.
+        Staff send WhatsApp and SMS from their own phone; when email is set up, the app sends the email. Keep {NEEDED.join(', ')} and the opt-out line. <code>{'{salon_phone}'}</code> is your salon’s contact number.
       </p>
       <Tabs tabs={CHANNELS.map((c) => ({ ...c, label: problems[c.value] ? `${c.label} •` : c.label }))} value={tab} onChange={setTab} />
       <fieldset disabled={!editable} className="flex flex-col gap-3">
         {tab === 'EMAIL' && <Input label="Subject" value={messages.EMAIL.subject} onChange={set('subject')} />}
         <Textarea rows={tab === 'EMAIL' ? 8 : 4} value={messages[tab].body} onChange={set('body')} error={problems[tab]} />
       </fieldset>
+      {tab === 'EMAIL' && <EmailPreview campaign={campaign} email={messages.EMAIL} />}
       {editable && (
         <div className="mt-3 flex items-center justify-end gap-2">
           {firstProblem && <span className="text-xs text-danger">{firstProblem}</span>}
@@ -70,5 +73,40 @@ export default function CampaignMessagesCard({ campaign }) {
         </div>
       )}
     </Card>
+  );
+}
+
+// How the email will look, with example values. The footer and the unsubscribe link are always added by the app.
+function EmailPreview({ campaign, email }) {
+  const { user } = useAuth();
+  const salon = user.org?.name ?? 'Your salon';
+  const values = {
+    '{first_name}': 'Priya',
+    '{salon_name}': salon,
+    '{offer_summary}': campaign.offerSummary ?? 'your offer',
+    '{expiry_date}': DateTime.now().endOf('month').toFormat('d LLL yyyy'),
+    '{salon_phone}': 'your salon’s number',
+  };
+  const fill = (text) => Object.entries(values).reduce((out, [key, value]) => out.replaceAll(key, value), text ?? '');
+  return (
+    <div className="mt-4">
+      <p className="mb-2 text-xs font-medium text-muted">Preview (example customer: Priya)</p>
+      <div className="overflow-hidden rounded-xl border border-border bg-surface p-3">
+        <div className="mx-auto max-w-md overflow-hidden rounded-lg border border-border bg-bg">
+          <p className="border-b border-border px-4 py-2 text-xs text-muted">
+            <span className="font-medium text-ink">{salon}</span> · {fill(email.subject)}
+          </p>
+          <p className="border-b-[3px] border-gold px-4 py-3 font-bold text-brown">{salon}</p>
+          <p className="whitespace-pre-wrap px-4 py-4 text-sm">{fill(email.body)}</p>
+          <p className="border-t border-border px-4 py-3 text-xs text-muted">
+            {salon}
+            <br />
+            You’re getting this because you agreed to receive offers from {salon} by email.
+            <br />
+            <span className="text-brown underline">Unsubscribe</span>
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }

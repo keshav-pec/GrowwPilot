@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { money, ref } from '../fields.js';
-import { CONSENT_CHANNELS, OCCASION_TYPES, OFFER_STATUSES, TASK_KINDS, TASK_STATES } from '../../config/occasions.js';
+import { CONSENT_CHANNELS, EMAIL_SEND_STATUSES, OCCASION_TYPES, OFFER_STATUSES, TASK_KINDS, TASK_STATES } from '../../config/occasions.js';
 import { campaignRulesSchema } from './campaignRules.js';
 
 // The front desk's follow-up for one offer. Embedded, so an offer can only ever have one open task.
@@ -15,6 +15,10 @@ const taskSchema = new mongoose.Schema(
     contactedAt: { type: Date, default: null }, // when the customer was first reached or messaged
     sentAt: { type: Date, default: null }, // the last offer message sent for this offer
     sentVia: { type: String, default: null }, // its channel (WHATSAPP, SMS, EMAIL), for the reports
+    // Email sent by the app: its outbox row, and Queued / Sent / Failed (with the reason)
+    emailOutboxId: ref('EmailOutbox', { default: null }),
+    emailStatus: { type: String, enum: [...EMAIL_SEND_STATUSES, null], default: null },
+    emailError: { type: String, default: null },
     closedReason: { type: String, default: null }, // EXPIRED, REDEEMED, WITHDRAWN, REPLACED, ...
     closedAt: { type: Date, default: null },
   },

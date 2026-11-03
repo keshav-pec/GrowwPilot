@@ -7,8 +7,9 @@ import { Button, Modal, Spinner } from '../../../components/ui';
 import OfferNotice from './OfferNotice';
 
 // Send offer: the channel (first allowed in the salon's order), the recipient and the finished message.
-// "Confirm send" checks everything again on the server, then opens WhatsApp / SMS / email with the message
-// filled in. Staff press send in that app; the task is marked contacted.
+// "Confirm send" checks everything again on the server. WhatsApp / SMS (and email when email isn't set up): opens
+// that app with the message filled in, and staff press send there. Email (set up): the app sends it itself.
+// Either way the task is marked contacted.
 export default function SendOfferModal({ offerId, customerName, zone, onClose }) {
   const [channel, setChannel] = useState(null);
   const previewQuery = useSendPreview(offerId, channel);
@@ -17,6 +18,19 @@ export default function SendOfferModal({ offerId, customerName, zone, onClose })
   const p = previewQuery.data;
 
   function confirm() {
+    if (p.appSends) {
+      send.mutate(
+        { key, offerId, channel: p.channel },
+        {
+          onSuccess: (result) => {
+            toast.success(`Email is on its way to ${result.to}`);
+            onClose();
+          },
+          onError: (err) => toast.error(err.message),
+        }
+      );
+      return;
+    }
     // Open the WhatsApp tab straight from the click, so the browser doesn't block it; fill it once the server says yes
     const tab = p.channel === 'WHATSAPP' ? window.open('', '_blank') : null;
     send.mutate(
@@ -48,7 +62,7 @@ export default function SendOfferModal({ offerId, customerName, zone, onClose })
           </Button>
           {p?.allowed && (
             <Button onClick={confirm} loading={send.isPending}>
-              Confirm send
+              {p.appSends ? 'Send email' : 'Confirm send'}
             </Button>
           )}
         </>
@@ -85,6 +99,7 @@ export default function SendOfferModal({ offerId, customerName, zone, onClose })
             )}
           </dl>
           <p className="whitespace-pre-wrap rounded-lg border border-border bg-surface p-3">{p.body}</p>
+          {p.appSends && <p className="text-xs text-muted">The app sends this email for you, with an unsubscribe link at the bottom. If it can’t be sent, you’ll see why here and in your bell, and you can send it again.</p>}
           <p className="text-xs text-muted">Only one offer message per customer every 7 days. This one counts as soon as you confirm.</p>
         </div>
       )}

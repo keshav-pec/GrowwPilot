@@ -15,7 +15,7 @@ const consentEventSchema = new mongoose.Schema(
     wording: String, // opt-ins: the exact sentence the customer agreed to
     customerAsked: { type: Boolean, default: false }, // the front desk ticked "Customer asked for this"
     note: { type: String, trim: true },
-    actorId: ref('User', { required: true }),
+    actorId: ref('User', { default: null }), // null = the customer did it themselves (email unsubscribe link)
     actorName: { type: String, required: true },
     actorRole: { type: String, required: true },
   },

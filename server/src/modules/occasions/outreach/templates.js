@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
 import { describeOffer } from '../campaigns/campaign.rules.js';
 
-// The ready-made offer messages staff send from their own phone. Owners can change the wording per campaign,
+// The ready-made offer messages (WhatsApp and SMS sent by staff from their phone; email sent by the app). Owners can change the wording per campaign,
 // but it must keep the customer's name, the salon, the offer, the expiry date and the opt-out line.
 // There is no public booking page yet, so messages end with "Reply or call {salon_phone} to book".
 
@@ -18,7 +18,7 @@ export function defaultMessages(type) {
     SMS: { body: `Hi {first_name}, ${greeting.toLowerCase()} from {salon_name}! Get {offer_summary} till {expiry_date}. Reply or call {salon_phone} to book. Reply STOP to opt out` },
     EMAIL: {
       subject: `${TREAT[type] ?? 'A treat'} from {salon_name}`,
-      body: `Hi {first_name},\n\n${greeting} from all of us at {salon_name}! Enjoy {offer_summary} on your visit, valid till {expiry_date}.\n\nReply or call {salon_phone} to book.\n\nOpt-out: reply to this email with STOP and we won’t send you offers again.`,
+      body: `Hi {first_name},\n\n${greeting} from all of us at {salon_name}! Enjoy {offer_summary} on your visit, valid till {expiry_date}.\n\nReply or call {salon_phone} to book.\n\nOpt-out: use the unsubscribe link at the bottom of this email.`,
     },
   };
 }
