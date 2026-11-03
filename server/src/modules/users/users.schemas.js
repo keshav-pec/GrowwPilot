@@ -12,6 +12,7 @@ export const createUserSchema = z
     email,
     phone: optionalPhone,
     branchIds: z.array(objectId).min(1, 'Choose at least one branch'),
+    sendPasswordEmail: z.boolean().default(false), // email them a link to set their password (no temporary password)
   })
   .refine((u) => !ONE_BRANCH_ROLES.includes(u.role) || u.branchIds.length === 1, {
     message: 'This login works in exactly one branch',

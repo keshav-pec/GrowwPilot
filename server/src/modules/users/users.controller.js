@@ -11,8 +11,8 @@ export async function list(req, res) {
 }
 
 export async function create(req, res) {
-  const { user, temporaryPassword } = await usersService.createUser(req.ctx, req.valid.body);
-  res.status(201).json({ user: clean(user), temporaryPassword });
+  const { user, temporaryPassword, emailed } = await usersService.createUser(req.ctx, req.valid.body);
+  res.status(201).json(emailed ? { user: clean(user), emailed: true } : { user: clean(user), temporaryPassword });
 }
 
 export async function update(req, res) {
@@ -21,6 +21,10 @@ export async function update(req, res) {
 
 export async function resetPassword(req, res) {
   res.json(await usersService.resetPassword(req.ctx, req.params.id));
+}
+
+export async function emailPasswordLink(req, res) {
+  res.json(await usersService.sendPasswordLink(req.ctx, req.params.id));
 }
 
 export async function setStatus(req, res) {

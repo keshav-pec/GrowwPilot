@@ -15,6 +15,7 @@ router.get('/', controller.list);
 router.post('/', validate({ body: createUserSchema }), controller.create);
 router.patch('/:id', validate({ body: updateUserSchema }), controller.update);
 router.post('/:id/reset-password', controller.resetPassword);
+router.post('/:id/email-password-link', controller.emailPasswordLink);
 router.patch('/:id/status', validate({ body: userStatusSchema }), controller.setStatus);
 
 export default router;

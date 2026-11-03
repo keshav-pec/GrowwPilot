@@ -6,6 +6,8 @@ import ProtectedRoute from './ProtectedRoute';
 import AdminLayout from '../layouts/AdminLayout';
 import AppLayout from '../layouts/AppLayout';
 import LoginPage from '../features/auth/LoginPage';
+import ForgotPasswordPage from '../features/auth/ForgotPasswordPage';
+import ResetPasswordPage from '../features/auth/ResetPasswordPage';
 import SalonsPage from '../features/admin/SalonsPage';
 import NewSalonPage from '../features/admin/NewSalonPage';
 import SalonDetailPage from '../features/admin/SalonDetailPage';
@@ -55,6 +57,8 @@ function HomeRedirect() {
 export const router = createBrowserRouter([
   { path: '/', element: <HomeRedirect /> },
   { path: '/login', element: <LoginPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> }, // no login: email a reset link
+  { path: '/reset-password', element: <ResetPasswordPage /> }, // no login: the link from a password email
 
   // Super Admin area
   {

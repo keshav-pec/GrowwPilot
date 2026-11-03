@@ -21,6 +21,8 @@ const userSchema = new mongoose.Schema(
     allBranches: { type: Boolean, default: false }, // true for the primary owner
     branchIds: [ref('Branch')], // branches this user may work in (front desk and inventory: exactly one)
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+    // Set whenever the password changes: logins made before it stop working (other devices are logged out)
+    passwordChangedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

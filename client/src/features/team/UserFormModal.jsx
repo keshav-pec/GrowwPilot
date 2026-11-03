@@ -4,6 +4,7 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthContext';
 import { useResetPassword, useSaveUser, useSetUserStatus } from '../../api/users';
+import { useAuthOptions, useEmailPasswordLink } from '../../api/passwords';
 import { isValidPhone } from '../../lib/phone';
 import { Button, Input, Modal, Select } from '../../components/ui';
 import CheckboxList from '../../components/CheckboxList';
@@ -12,6 +13,7 @@ const baseSchema = z.object({
   name: z.string().trim().min(2, 'Name is required'),
   email: z.email('Enter a valid email'),
   phone: z.string().refine((v) => v.trim() === '' || isValidPhone(v), 'Enter a valid 10-digit mobile number'),
+  sendPasswordEmail: z.boolean().optional(),
 });
 
 // Front desk and inventory: one branch. Branch owner: one or more branches.
@@ -30,6 +32,8 @@ export default function UserFormModal({ role, account, onClose, onCredentials })
   const saveUser = useSaveUser();
   const setStatus = useSetUserStatus();
   const resetPassword = useResetPassword();
+  const emailLink = useEmailPasswordLink();
+  const canEmail = Boolean(useAuthOptions().data?.passwordEmails); // email is set up on the server
 
   const {
     register,
@@ -44,19 +48,23 @@ export default function UserFormModal({ role, account, onClose, onCredentials })
       phone: account?.phone ?? '',
       branchId: account?.branchIds[0]?._id ?? activeBranchId,
       branchIds: account?.branchIds.map((b) => b._id) ?? [],
+      sendPasswordEmail: true,
     },
   });
 
-  function onSubmit({ name, email, phone, branchId, branchIds }) {
+  function onSubmit({ name, email, phone, branchId, branchIds, sendPasswordEmail }) {
     const branches = role === 'OWNER' ? branchIds : [branchId];
     const values = account
       ? { _id: account._id, name, phone, branchIds: branches } // email is the login: not editable
-      : { role, name, email, phone, branchIds: branches };
+      : { role, name, email, phone, branchIds: branches, sendPasswordEmail: canEmail && sendPasswordEmail };
 
     saveUser.mutate(values, {
       onSuccess: (data) => {
         if (account) {
           toast.success('Saved');
+          onClose();
+        } else if (data.emailed) {
+          toast.success(`${name} can now log in. We’ve emailed ${data.user.email} a link to set their password.`);
           onClose();
         } else {
           onClose();
@@ -71,6 +79,16 @@ export default function UserFormModal({ role, account, onClose, onCredentials })
       onSuccess: (data) => {
         onClose();
         onCredentials({ title: `New password for ${account.name}`, ...data });
+      },
+      onError: (err) => toast.error(err.message),
+    });
+  }
+
+  function handleEmailLink() {
+    emailLink.mutate(account._id, {
+      onSuccess: (data) => {
+        toast.success(`We’ve emailed ${data.email} a link to set their password (valid 48 hours)`);
+        onClose();
       },
       onError: (err) => toast.error(err.message),
     });
@@ -102,6 +120,11 @@ export default function UserFormModal({ role, account, onClose, onCredentials })
               <Button variant="ghost" onClick={handleReset} loading={resetPassword.isPending}>
                 Reset password
               </Button>
+              {canEmail && account.status === 'active' && (
+                <Button variant="ghost" onClick={handleEmailLink} loading={emailLink.isPending}>
+                  Email a password link
+                </Button>
+              )}
               <Button variant="ghost" onClick={toggleStatus} loading={setStatus.isPending}>
                 {account.status === 'active' ? 'Deactivate' : 'Activate'}
               </Button>
@@ -153,6 +176,15 @@ export default function UserFormModal({ role, account, onClose, onCredentials })
           </div>
         )}
 
+        {!account && canEmail && (
+          <label className="flex items-start gap-2 text-sm sm:col-span-2">
+            <input type="checkbox" className="mt-0.5 h-4 w-4 accent-gold" {...register('sendPasswordEmail')} />
+            <span>
+              Email them a link to set their password
+              <span className="block text-xs text-muted">Untick to get a temporary password to share yourself instead.</span>
+            </span>
+          </label>
+        )}
         {saveUser.isError && <p className="text-sm text-danger sm:col-span-2">{saveUser.error.message}</p>}
       </form>
     </Modal>

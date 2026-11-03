@@ -64,3 +64,4 @@ export { default as OccasionEngineRun } from './occasions/OccasionEngineRun.js';
 
 // Email (EMAIL_PLAN.md)
 export { default as EmailOutbox } from './EmailOutbox.js';
+export { default as PasswordToken } from './PasswordToken.js';

@@ -1,10 +1,11 @@
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { z } from 'zod';
 import { Sparkles } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
+import { useAuthOptions } from '../../api/passwords';
 import { ROLE_HOME } from '../../lib/constants';
 import { Button, Card, Input } from '../../components/ui';
 
@@ -27,6 +28,7 @@ const loginSchema = z.object({
 export default function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
+  const options = useAuthOptions(); // "Forgot password?" only when the server can send email
 
   const {
     register,
@@ -73,6 +75,11 @@ export default function LoginPage() {
             error={errors.password?.message}
             {...register('password')}
           />
+          {options.data?.passwordEmails && (
+            <Link to="/forgot-password" className="-mt-2 self-end text-sm text-muted hover:text-ink hover:underline">
+              Forgot password?
+            </Link>
+          )}
 
           {loginMutation.isError && (
             <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{loginMutation.error.message}</p>

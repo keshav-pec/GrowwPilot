@@ -9,9 +9,13 @@ export async function requireAuth(req, res, next) {
   if (!token) throw new AppError(401, 'UNAUTHENTICATED', 'Please log in');
 
   try {
-    const { userId } = verifyToken(token);
+    const { userId, iat } = verifyToken(token);
     const user = await User.findById(userId).lean();
     if (!user) throw new AppError(401, 'UNAUTHENTICATED', 'Please log in again');
+    // The password was changed after this login (a reset): log in again with the new one
+    if (user.passwordChangedAt && iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
+      throw new AppError(401, 'PASSWORD_CHANGED', 'Your password was changed. Please log in again.');
+    }
 
     req.org = await assertCanLogIn(user);
     req.user = user;

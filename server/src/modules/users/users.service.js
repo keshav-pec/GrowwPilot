@@ -3,6 +3,7 @@ import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { generateTempPassword, hashPassword } from '../../utils/password.js';
 import { assertAllowedBranches } from '../branches/branches.service.js';
+import { emailPasswordLink, passwordEmailsAvailable } from '../auth/passwordLinks.service.js';
 import { ONE_BRANCH_ROLES } from './users.schemas.js';
 
 // Who can manage whom:
@@ -36,8 +37,12 @@ export async function listUsers(ctx) {
   return User.find(filter).populate('branchIds', 'name').sort({ role: 1, name: 1 }).lean();
 }
 
-// Creates the account with a temporary password, which is returned ONCE so the owner can share it
-export async function createUser(ctx, input) {
+// Creates the account with a temporary password, which is returned ONCE so the owner can share it.
+// With sendPasswordEmail they get an email with a link to set their own password instead (nothing is shown).
+export async function createUser(ctx, { sendPasswordEmail, ...input }) {
+  if (sendPasswordEmail && !passwordEmailsAvailable()) {
+    throw new AppError(409, 'MAIL_NOT_SET_UP', 'Email isn’t set up yet. Untick “Email them a link” to get a temporary password instead.');
+  }
   if (input.role === 'OWNER' && !ctx.isPrimaryOwner) {
     throw new AppError(403, 'FORBIDDEN', 'Only the main owner can add other owners');
   }
@@ -58,6 +63,10 @@ export async function createUser(ctx, input) {
     passwordHash: await hashPassword(temporaryPassword),
   });
 
+  if (sendPasswordEmail) {
+    await emailPasswordLink(user, { _id: ctx.userId, name: ctx.userName });
+    return { user: await user.populate('branchIds', 'name'), emailed: true };
+  }
   return { user: await user.populate('branchIds', 'name'), temporaryPassword };
 }
 
@@ -74,8 +83,15 @@ export async function resetPassword(ctx, id) {
   const user = await findManageableUser(ctx, id);
   const temporaryPassword = generateTempPassword();
   user.passwordHash = await hashPassword(temporaryPassword);
+  user.passwordChangedAt = new Date(); // logged out on their other devices
   await user.save();
   return { email: user.email, temporaryPassword };
+}
+
+// POST /api/users/:id/email-password-link — the same people an owner may reset; the link is never shown
+export async function sendPasswordLink(ctx, id) {
+  const user = await findManageableUser(ctx, id);
+  return emailPasswordLink(user, { _id: ctx.userId, name: ctx.userName });
 }
 
 // A deactivated user is logged out on their next request (requireAuth checks status every time)
