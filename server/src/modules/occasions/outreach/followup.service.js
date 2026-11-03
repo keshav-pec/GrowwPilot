@@ -30,7 +30,7 @@ async function offerToAct(ctx, id, session = null) {
 
 // With both occasions in one month the birthday message goes first: true while the customer's birthday offer
 // for the same month is still waiting to be contacted
-async function birthdayFirst(ctx, offer, session = null) {
+export async function birthdayFirst(ctx, offer, session = null) {
   if (offer.type !== 'ANNIVERSARY') return false;
   return Boolean(
     await OfferIssue.exists(

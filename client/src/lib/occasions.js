@@ -82,7 +82,7 @@ export const CAMPAIGN_STATUS = {
   DISABLED: { label: 'Turned off', tone: 'orange' },
   ARCHIVED: { label: 'Archived', tone: 'brown' },
 };
-export const DELIVERY_LABEL = { STAFF_ASSISTED: 'Staff sends offers' };
+export const DELIVERY_LABEL = { STAFF_ASSISTED: 'Staff sends offers', AUTO_EMAIL: 'Emails automatically' };
 
 const rupees = (paise) => (paise == null ? '' : String(paise / 100));
 
@@ -149,7 +149,7 @@ export const OFFER_STATUS = {
 export function taskLabel(offer) {
   const t = offer.task ?? {};
   if (t.state === 'OPEN') return t.kind === 'WITHDRAWN_NOTICE' ? 'Tell customer: withdrawn' : 'To contact';
-  if (t.state === 'CONTACTED') return 'Contacted';
+  if (t.state === 'CONTACTED') return t.sentAutomatically ? 'Emailed automatically' : 'Contacted';
   const reasons = { EXPIRED: 'Closed: expired', REDEEMED: 'Closed: used', WITHDRAWN: 'Closed: withdrawn', REPLACED: 'Closed: date corrected', UNREACHABLE: 'Unreachable' };
   return reasons[t.closedReason] ?? 'Closed';
 }

@@ -5,7 +5,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import { useOccasionSettings, useRunNow, useSaveOccasionSettings } from '../../../api/occasions';
 import { newRequestKey } from '../../../lib/billing';
 import { formatDateTime } from '../../../lib/time';
-import { Button, Card, EmptyState, PageHeader, Spinner, Textarea } from '../../../components/ui';
+import { Button, Card, EmptyState, Input, PageHeader, Spinner, Textarea } from '../../../components/ui';
 import ImportDatesModal from './ImportDatesModal';
 import CampaignList from '../campaigns/CampaignList';
 
@@ -116,6 +116,8 @@ function SettingsView({ saved }) {
           </div>
         </Card>
 
+        <AutoEmailCard saved={saved} canEdit={canEdit} onSave={submit} saving={save.isPending} />
+
         <Card title="Consent wording">
           <p className="mb-3 text-sm text-muted">
             What staff read or show to a customer before recording permission. <code>{'{salon_name}'}</code> and <code>{'{channel}'}</code> are filled in. Changing it starts a new version (now{' '}
@@ -164,5 +166,44 @@ function Count({ icon: Icon, label, value, of }) {
         {value} <span className="text-sm font-normal text-muted">of {of}</span>
       </p>
     </div>
+  );
+}
+
+// Automatic offer emails (campaigns set to "Send automatically by email"): the daily limit and send hours
+function AutoEmailCard({ saved, canEdit, onSave, saving }) {
+  const [values, setValues] = useState({ ...saved.autoEmail, dailyLimit: String(saved.autoEmail.dailyLimit) });
+  const set = (field) => (e) => setValues((v) => ({ ...v, [field]: e.target.value }));
+  const limit = Number(values.dailyLimit);
+  const errors = {
+    dailyLimit: !/^\d+$/.test(values.dailyLimit) || limit < 1 || limit > 500 ? 'A number from 1 to 500' : null,
+    sendUntil: values.sendFrom && values.sendUntil && values.sendFrom >= values.sendUntil ? 'Must be after the start time' : null,
+  };
+  const changed = limit !== saved.autoEmail.dailyLimit || values.sendFrom !== saved.autoEmail.sendFrom || values.sendUntil !== saved.autoEmail.sendUntil;
+
+  return (
+    <Card title="Automatic offer emails">
+      <p className="mb-3 text-sm text-muted">
+        For campaigns set to “Send automatically by email”. Emails go out only between these times (each branch’s own time), and at most this many a day for the whole salon; the rest go the next day.
+      </p>
+      <fieldset disabled={!canEdit} className="grid gap-3 sm:grid-cols-3">
+        <Input label="Emails a day (most)" type="number" min={1} max={500} value={values.dailyLimit} onChange={set('dailyLimit')} error={errors.dailyLimit} />
+        <Input label="From" type="time" value={values.sendFrom} onChange={set('sendFrom')} />
+        <Input label="Until" type="time" value={values.sendUntil} onChange={set('sendUntil')} error={errors.sendUntil} />
+      </fieldset>
+      {canEdit && changed && (
+        <div className="mt-3 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setValues({ ...saved.autoEmail, dailyLimit: String(saved.autoEmail.dailyLimit) })}>
+            Undo
+          </Button>
+          <Button
+            disabled={Boolean(errors.dailyLimit || errors.sendUntil)}
+            loading={saving}
+            onClick={() => onSave({ autoEmail: { dailyLimit: limit, sendFrom: values.sendFrom, sendUntil: values.sendUntil } }, 'Automatic email settings saved')}
+          >
+            Save
+          </Button>
+        </div>
+      )}
+    </Card>
   );
 }

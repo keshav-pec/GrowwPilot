@@ -4,13 +4,14 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Pencil } from 'lucide-react';
 import { useAuth } from '../../../auth/AuthContext';
 import { useServices } from '../../../api/catalog';
-import { useCampaign, useCampaignAction, useCampaignPreview, useCampaignVersions, useOccasionSettings, useRevokeOffers } from '../../../api/occasions';
+import { useCampaign, useCampaignAction, useCampaignPreview, useCampaignVersions, useOccasionSettings, useRevokeOffers, useUpdateCampaign } from '../../../api/occasions';
 import { newRequestKey } from '../../../lib/billing';
 import { CAMPAIGN_STATUS, DELIVERY_LABEL, OCCASION_LABEL, formatOccasion } from '../../../lib/occasions';
 import { formatDateTime } from '../../../lib/time';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Modal, PageHeader, Spinner, Table, Textarea } from '../../../components/ui';
 import CampaignFormModal from './CampaignFormModal';
 import CampaignMessagesCard from './CampaignMessagesCard';
+import DeliveryModeChoice from './DeliveryModeChoice';
 
 // What each button does, in the confirm popup
 const ACTIONS = {
@@ -130,6 +131,8 @@ export default function CampaignDetailPage() {
         <Rules title={c.currentVersion > 0 ? `Live terms (version ${c.currentVersion})` : 'Draft terms'} summary={c.offerSummary} rules={c.rules} serviceName={serviceName} />
         {c.hasDraft && <Rules title={`Unpublished changes (version ${c.currentVersion + 1})`} summary={c.draftSummary} rules={c.draftRules} serviceName={serviceName} highlight />}
       </div>
+
+      <DeliveryCard campaign={c} />
 
       <Card title="This month’s audience" className="mb-4">
         {!showPreview ? (
@@ -258,5 +261,36 @@ function WithdrawModal({ campaign, onClose }) {
         </label>
       </div>
     </Modal>
+  );
+}
+
+// How offers are sent. Applies straight away (no publish needed); offers already emailed stay emailed.
+function DeliveryCard({ campaign }) {
+  const update = useUpdateCampaign();
+  const settingsQuery = useOccasionSettings();
+  const auto = settingsQuery.data?.autoEmail;
+  const editable = campaign.canManage && campaign.status !== 'ARCHIVED';
+
+  function choose(mode) {
+    update.mutate(
+      { key: newRequestKey(), id: campaign._id, version: campaign.version, deliveryMode: mode },
+      { onSuccess: () => toast.success(mode === 'AUTO_EMAIL' ? 'Offers will be emailed automatically' : 'Staff will send offers'), onError: (err) => toast.error(err.message) }
+    );
+  }
+
+  return (
+    <Card title="How offers are sent" className="mb-4">
+      {campaign.deliveryWarning && <p className="mb-3 rounded-lg border border-orange/40 bg-orange/10 p-3 text-sm text-orange">{campaign.deliveryWarning}</p>}
+      <DeliveryModeChoice
+        value={campaign.deliveryMode}
+        onChange={choose}
+        disabled={!editable || update.isPending}
+        emailReady={campaign.emailReady}
+        dailyLimit={auto?.dailyLimit}
+        sendFrom={auto?.sendFrom}
+        sendUntil={auto?.sendUntil}
+      />
+      {editable && <p className="mt-2 text-xs text-muted">Send hours and the daily limit are in Occasion offers settings.</p>}
+    </Card>
   );
 }

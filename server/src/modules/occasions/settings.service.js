@@ -3,7 +3,7 @@ import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { runOnce } from '../../middleware/idempotency.js';
 import { logActivity } from '../activity/activity.service.js';
-import { CHANNEL_LABELS, CONSENT_CHANNELS } from '../../config/occasions.js';
+import { AUTO_EMAIL_DEFAULTS, CHANNEL_LABELS, CONSENT_CHANNELS } from '../../config/occasions.js';
 import { assertCan, capabilities } from './permissions.js';
 
 // The salon's settings row, made with the defaults the first time it is needed
@@ -53,6 +53,7 @@ export async function getSettingsForScreen(ctx) {
     consentText: settings.consentText,
     noticeVersion: settings.noticeVersion,
     channelOrder: settings.channelOrder,
+    autoEmail: { ...AUTO_EMAIL_DEFAULTS, ...settings.autoEmail },
     version: settings.version,
     lastRun: settings.lastRun?.at ? settings.lastRun : null,
     counts,
@@ -86,6 +87,11 @@ export async function updateSettings(ctx, input, { version, key }) {
       set.channelOrder = input.channelOrder;
       words.push(`channel order: ${input.channelOrder.map((c) => CHANNEL_LABELS[c]).join(' > ')}`);
     }
+    const auto = { ...AUTO_EMAIL_DEFAULTS, ...before.autoEmail };
+    if (input.autoEmail && ['dailyLimit', 'sendFrom', 'sendUntil'].some((k) => input.autoEmail[k] !== auto[k])) {
+      set.autoEmail = input.autoEmail;
+      words.push(`automatic offer emails: at most ${input.autoEmail.dailyLimit} a day, ${input.autoEmail.sendFrom}–${input.autoEmail.sendUntil}`);
+    }
     const wasOn = Boolean(org?.occasionOffers?.enabled);
     const switching = input.enabled !== undefined && input.enabled !== wasOn;
 
@@ -113,7 +119,7 @@ export async function updateSettings(ctx, input, { version, key }) {
     if (words.length > 0) {
       await logActivity(
         ctx,
-        { action: 'occasions.settings_changed', summary: `Changed occasion offer settings: ${words.join('; ')}`, before: { consentText: before.consentText, noticeVersion: before.noticeVersion, channelOrder: before.channelOrder }, after: set },
+        { action: 'occasions.settings_changed', summary: `Changed occasion offer settings: ${words.join('; ')}`, before: { consentText: before.consentText, noticeVersion: before.noticeVersion, channelOrder: before.channelOrder, autoEmail: before.autoEmail }, after: set },
         session
       );
     }

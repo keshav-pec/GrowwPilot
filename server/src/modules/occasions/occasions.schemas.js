@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { objectId } from '../../utils/schemas.js';
-import { CALL_OUTCOMES, CAMPAIGN_SCOPES, CONSENT_CHANNELS, CONSENT_SOURCES, DISCOUNT_TYPES, OCCASION_TYPES, dayFitsMonth } from '../../config/occasions.js';
+import { CALL_OUTCOMES, CAMPAIGN_SCOPES, CONSENT_CHANNELS, CONSENT_SOURCES, DELIVERY_MODES, DISCOUNT_TYPES, OCCASION_TYPES, dayFitsMonth } from '../../config/occasions.js';
+import { TIME_REGEX } from '../../models/fields.js';
 
 // A birthday or anniversary: { month: 11, day: 5 }, { month: 11 } (no day) or null (clear it). Never a year.
 export const occasionDate = z
@@ -42,6 +43,14 @@ export const settingsSchema = z.object({
     .length(CONSENT_CHANNELS.length)
     .refine((list) => new Set(list).size === list.length, 'Each channel once')
     .optional(),
+  autoEmail: z
+    .object({
+      dailyLimit: z.number().int('Use a whole number').min(1, 'At least 1').max(500, 'At most 500'),
+      sendFrom: z.string().regex(TIME_REGEX, 'Use a time like 10:00'),
+      sendUntil: z.string().regex(TIME_REGEX, 'Use a time like 19:00'),
+    })
+    .refine((v) => v.sendFrom < v.sendUntil, { message: 'The end time must be after the start time', path: ['sendUntil'] })
+    .optional(),
 });
 
 // If-Match: the settings version the screen loaded ("3" or "\"3\"")
@@ -79,6 +88,7 @@ export const createCampaignSchema = z.object({
   branchId: objectId.nullable().optional(),
   name: z.string().trim().min(2, 'Give the campaign a name').max(80),
   rules: rulesSchema,
+  deliveryMode: z.enum(DELIVERY_MODES).optional(),
 });
 
 export const updateCampaignSchema = createCampaignSchema.partial();

@@ -5,9 +5,10 @@ import { ArrowLeft, Check } from 'lucide-react';
 import { useServices } from '../../../api/catalog';
 import { useCampaignAction, useCampaignPreview, useCampaigns, useOccasionSettings, useSaveOccasionSettings, useStarterCampaigns, useUpdateCampaign } from '../../../api/occasions';
 import { newRequestKey } from '../../../lib/billing';
-import { OCCASION_LABEL, fromRulesForm, rulesFormErrors, toRulesForm } from '../../../lib/occasions';
+import { DELIVERY_LABEL, OCCASION_LABEL, fromRulesForm, rulesFormErrors, toRulesForm } from '../../../lib/occasions';
 import { Badge, Button, EmptyState, PageHeader, Spinner, Tabs } from '../../../components/ui';
 import CampaignForm from '../campaigns/CampaignForm';
+import DeliveryModeChoice from '../campaigns/DeliveryModeChoice';
 
 const STEPS = ['Enable', 'Configure offers', 'Communication & publish'];
 const TYPES = ['BIRTHDAY', 'ANNIVERSARY'];
@@ -52,7 +53,7 @@ export default function QuickSetup() {
       <Link to="/app/settings/occasions" className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
         <ArrowLeft size={14} /> Occasion offers
       </Link>
-      <PageHeader title="Set up Birthday & Anniversary Offers" subtitle="Three short steps. Nothing is sent to customers." />
+      <PageHeader title="Set up Birthday & Anniversary Offers" subtitle="Three short steps. Nothing is sent to customers unless you choose automatic emails and publish." />
 
       <ol className="mb-6 grid gap-2 sm:grid-cols-3">
         {STEPS.map((label, i) => {
@@ -194,11 +195,29 @@ function CampaignEditor({ campaign, services, onDirty }) {
 
 function PublishStep({ onBack, onDone }) {
   const campaignsQuery = useCampaigns();
+  const settingsQuery = useOccasionSettings();
   const publish = useCampaignAction();
+  const update = useUpdateCampaign();
   const [publishing, setPublishing] = useState(false);
+  const [changingMode, setChangingMode] = useState(false);
   if (campaignsQuery.isPending) return <Spinner />;
   const picked = TYPES.map((type) => salonCampaigns(campaignsQuery.data.campaigns)[type]).filter(Boolean);
   const toPublish = picked.filter(needsPublish);
+  const mode = picked.length > 0 && picked.every((c) => c.deliveryMode === 'AUTO_EMAIL') ? 'AUTO_EMAIL' : 'STAFF_ASSISTED';
+  const auto = settingsQuery.data?.autoEmail;
+
+  // The choice is saved on both offers straight away
+  async function chooseMode(next) {
+    setChangingMode(true);
+    try {
+      for (const c of picked.filter((p) => p.deliveryMode !== next)) await update.mutateAsync({ key: newRequestKey(), id: c._id, version: c.version, deliveryMode: next });
+      toast.success(next === 'AUTO_EMAIL' ? 'Offers will be emailed automatically' : 'Staff will send offers');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setChangingMode(false);
+    }
+  }
 
   async function publishAll() {
     setPublishing(true);
@@ -216,21 +235,15 @@ function PublishStep({ onBack, onDone }) {
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold text-brown">3. Communication & publish</h2>
-      <div className="flex flex-col gap-2 text-sm">
-        <label className="flex items-start gap-2 rounded-lg border border-gold bg-gold/10 p-3">
-          <input type="radio" className="mt-1 accent-gold" checked readOnly />
-          <span>
-            <span className="font-medium">Staff sends offers</span>
-            <span className="block text-muted">The front desk sees who to contact and sends the ready-made message from their phone (WhatsApp, SMS or email).</span>
-          </span>
-        </label>
-        <label className="flex items-start gap-2 rounded-lg border border-border p-3 opacity-60">
-          <input type="radio" className="mt-1" disabled />
-          <span>
-            <span className="font-medium">Send automatically</span> <Badge>Coming later</Badge>
-          </span>
-        </label>
-      </div>
+      <DeliveryModeChoice
+        value={mode}
+        onChange={chooseMode}
+        disabled={changingMode || picked.length === 0}
+        emailReady={campaignsQuery.data.delivery?.emailReady !== false}
+        dailyLimit={auto?.dailyLimit}
+        sendFrom={auto?.sendFrom}
+        sendUntil={auto?.sendUntil}
+      />
 
       <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-left text-sm">
@@ -284,7 +297,7 @@ function SummaryRow({ campaign }) {
       <td className="px-4 py-3">Whole {OCCASION_LABEL[campaign.type].toLowerCase()} month</td>
       <td className="px-4 py-3">{preview.data?.eligible ?? '…'}</td>
       <td className="px-4 py-3">{preview.data?.canMessage ?? '…'}</td>
-      <td className="px-4 py-3">Staff sends offers</td>
+      <td className="px-4 py-3">{DELIVERY_LABEL[campaign.deliveryMode]}</td>
     </tr>
   );
 }

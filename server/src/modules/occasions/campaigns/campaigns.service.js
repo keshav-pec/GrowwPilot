@@ -4,7 +4,8 @@ import { scoped } from '../../../utils/scoped.js';
 import { escapeRegex } from '../../../utils/regex.js';
 import { runOnce } from '../../../middleware/idempotency.js';
 import { logActivity } from '../../activity/activity.service.js';
-import { OCCASION_LABELS, OCCASION_TYPES } from '../../../config/occasions.js';
+import { DELIVERY_LABELS, OCCASION_LABELS, OCCASION_TYPES } from '../../../config/occasions.js';
+import { mailMode } from '../../mail/config.js';
 import { assertCan, assertCanOrLog, can, refuseAndLog } from '../permissions.js';
 import { STARTER_CAMPAIGNS, checkRules, cleanRules, describeOffer, sameRules } from './campaign.rules.js';
 import { campaignAudience } from './audience.js';
@@ -91,6 +92,9 @@ function toView(ctx, campaign, { published, branchName }) {
     scopeLabel: campaign.scope === 'BRANCH_ONLY' ? `${branchName ?? 'Branch'} only` : 'All branches',
     status: campaign.status,
     deliveryMode: campaign.deliveryMode,
+    // Set to send automatically, but the server can't send email: nothing goes out, offers stay on the staff list
+    deliveryWarning: campaign.deliveryMode === 'AUTO_EMAIL' && mailMode() === 'off' ? 'Email isn’t set up on the server, so nothing is sent automatically. These offers stay on the staff list.' : null,
+    emailReady: mailMode() !== 'off', // the server can send email (or log it, in development)
     currentVersion: campaign.currentVersion,
     version: campaign.version,
     rules: liveRules ?? campaign.draftRules, // what it gives now (or would give, while a draft)
@@ -134,7 +138,7 @@ export async function listCampaigns(ctx, { includeArchived = false } = {}) {
   return {
     campaigns: await viewsOf(ctx, campaigns),
     audience: { ...audience, toDo: null }, // "still to do" comes with the front desk list (Phase 3)
-    delivery: { mode: 'STAFF_ASSISTED', ready: true },
+    delivery: { modes: ['STAFF_ASSISTED', 'AUTO_EMAIL'], emailReady: mailMode() !== 'off' },
     can: {
       createSalonCampaign: can(ctx, 'occasions.manageSalonCampaigns'),
       createBranchCampaign: can(ctx, 'occasions.manageCampaigns'),
@@ -162,7 +166,7 @@ export async function createCampaign(ctx, input, key) {
     await assertNameFree(ctx, fields, null, session);
     const rules = cleanRules(input.rules);
     await assertRules(ctx, rules, session);
-    const [campaign] = await OccasionCampaign.create([{ orgId: ctx.orgId, ...fields, draftRules: rules, createdBy: ctx.userId, updatedBy: ctx.userId }], { session });
+    const [campaign] = await OccasionCampaign.create([{ orgId: ctx.orgId, ...fields, draftRules: rules, deliveryMode: input.deliveryMode ?? 'STAFF_ASSISTED', createdBy: ctx.userId, updatedBy: ctx.userId }], { session });
     await logActivity(
       ctx,
       { action: 'occasions.campaign_created', branchId: branch?._id ?? null, summary: `Created the draft campaign ${fields.name} (${OCCASION_LABELS[fields.type]}, ${scopeWords(fields, branch?.name)}): ${describeOffer(rules)}` },
@@ -222,6 +226,13 @@ export async function updateCampaign(ctx, id, input, { version, key }) {
           words.push(next ? `changes for version ${campaign.currentVersion + 1}: ${describeOffer(next)} (not published yet)` : 'changes back to the live terms');
         }
       }
+    }
+
+    // How offers are sent applies straight away (turning automatic emails off must not wait for a publish).
+    // Offers already emailed stay emailed; the rest follow the new choice.
+    if (input.deliveryMode !== undefined && input.deliveryMode !== campaign.deliveryMode) {
+      set.deliveryMode = input.deliveryMode;
+      words.push(`now ${DELIVERY_LABELS[input.deliveryMode]}`);
     }
 
     if (words.length === 0) return { changed: false };

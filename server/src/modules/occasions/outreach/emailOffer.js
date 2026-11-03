@@ -77,6 +77,7 @@ export async function offerEmailResult(row) {
             'task.outcome': { $cond: [{ $eq: ['$task.outcome', 'SENT_EMAIL'] }, null, '$task.outcome'] },
             'task.sentAt': null,
             'task.sentVia': null,
+            'task.sentAutomatically': false, // back on the staff list: never emailed automatically again
           },
         },
       ],

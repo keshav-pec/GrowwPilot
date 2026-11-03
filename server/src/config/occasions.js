@@ -38,7 +38,12 @@ export function maskPhone(phone) {
 export const CAMPAIGN_SCOPES = ['BUSINESS_DEFAULT', 'BRANCH_ONLY']; // all branches, or one branch (overrides the salon-wide one)
 export const CAMPAIGN_STATUSES = ['DRAFT', 'PUBLISHED', 'DISABLED', 'ARCHIVED'];
 export const DISCOUNT_TYPES = ['PERCENT', 'FLAT'];
-export const DELIVERY_MODES = ['STAFF_ASSISTED']; // automatic sending comes later
+// STAFF_ASSISTED: staff send every message. AUTO_EMAIL: the app emails customers who allow email (within the send
+// hours and a daily limit); customers who allow only WhatsApp / SMS stay on the staff list.
+export const DELIVERY_MODES = ['STAFF_ASSISTED', 'AUTO_EMAIL'];
+export const DELIVERY_LABELS = { STAFF_ASSISTED: 'staff sends offers', AUTO_EMAIL: 'offer emails are sent automatically' };
+// Automatic offer emails: at most this many per salon per 24 hours, only between these hours (branch time)
+export const AUTO_EMAIL_DEFAULTS = { dailyLimit: 30, sendFrom: '10:00', sendUntil: '19:00' };
 export const OCCASION_LABELS = { BIRTHDAY: 'Birthday', ANNIVERSARY: 'Anniversary' };
 
 // Offers given to customers (Phase 3)

@@ -551,7 +551,7 @@ export const KNOWLEDGE = [
     audiences: EVERYONE,
     keywords: ['occasion list', 'customer occasions', 'who to contact', 'send birthday offer', 'send anniversary offer', 'birthday list', 'birthday this month', 'birthday whatsapp', 'call birthday customer', 'no answer'],
     answer:
-      'Open **Occasion offers** in the menu. **Action required** lists who to contact this month. Click a customer: **Send offer** (only if they allowed messages) opens WhatsApp, SMS or email with the message ready; one offer message per customer every 7 days. **Record call** for calls (no answer twice closes it as unreachable), **Create booking** to book them, and **Assigned to** to share the work.',
+      'Open **Occasion offers** in the menu. **Action required** lists who to contact this month. Click a customer: **Send offer** (only if they allowed messages) opens WhatsApp or SMS with the message ready, or the app sends the email for you (*Email queued*, then *Email sent*, or *Email not sent* with the reason, and you can send again). Campaigns set to **Send automatically by email** email customers on their own (they show *Emailed automatically*); customers who allow only WhatsApp or SMS stay on your list. One offer message per customer every 7 days. **Record call** for calls (no answer twice closes it as unreachable), **Create booking** to book them, and **Assigned to** to share the work.',
     link: { label: 'Occasion offers', to: '/app/occasions' },
   },
   {

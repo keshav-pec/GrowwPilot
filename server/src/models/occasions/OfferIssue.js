@@ -19,6 +19,7 @@ const taskSchema = new mongoose.Schema(
     emailOutboxId: ref('EmailOutbox', { default: null }),
     emailStatus: { type: String, enum: [...EMAIL_SEND_STATUSES, null], default: null },
     emailError: { type: String, default: null },
+    sentAutomatically: { type: Boolean, default: false }, // emailed by the app on its own (AUTO_EMAIL campaign)
     closedReason: { type: String, default: null }, // EXPIRED, REDEEMED, WITHDRAWN, REPLACED, ...
     closedAt: { type: Date, default: null },
   },

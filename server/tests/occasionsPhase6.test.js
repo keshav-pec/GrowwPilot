@@ -176,9 +176,9 @@ describe('the occasion offers report', () => {
     const csv = await call('business', 'GET', '/occasions/reports?format=csv');
     expect(csv.status).toBe(200);
     const lines = csv.text.replace(/^﻿/, '').split('\n');
-    expect(lines[0]).toBe('Customer,Mobile,Occasion,Month,Campaign,Version,Home branch,Offer,Can be messaged,Contacted,Message via,Linked bookings,Bill,Offer discount,Associated sale (net)');
+    expect(lines[0]).toBe('Customer,Mobile,Occasion,Month,Campaign,Version,Home branch,Offer,Can be messaged,Contacted,Message via,Emailed automatically,Linked bookings,Bill,Offer discount,Associated sale (net)');
     expect(lines).toHaveLength(7);
-    expect(lines[1]).toMatch(/^Asha,97\*\*\*\*\*\*01,Birthday,.*,Birthday Month,1,Andheri,Used,Yes,Yes,WhatsApp,1,/);
+    expect(lines[1]).toMatch(/^Asha,97\*\*\*\*\*\*01,Birthday,.*,Birthday Month,1,Andheri,Used,Yes,Yes,WhatsApp,No,1,/);
     expect(csv.text).not.toContain('9700000701');
     expect(await ActivityLog.exists({ action: 'occasions.report_exported', actorName: 'Anita' })).toBeTruthy();
   });

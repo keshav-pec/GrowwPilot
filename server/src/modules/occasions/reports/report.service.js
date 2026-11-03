@@ -61,7 +61,7 @@ async function offersFor(ctx, query) {
   if (query.canMessage) filter.canMessage = query.canMessage === 'yes';
   const offers = branches.length
     ? await OfferIssue.find(filter)
-        .select('customerId customerName customerPhone type year month day campaignId campaignName campaignVersionId homeBranchId status canMessage task.contactedAt task.sentVia invoiceId discountGiven')
+        .select('customerId customerName customerPhone type year month day campaignId campaignName campaignVersionId homeBranchId status canMessage task.contactedAt task.sentVia task.sentAutomatically invoiceId discountGiven')
         .lean()
     : [];
   return { branches, period, offers };
@@ -94,6 +94,7 @@ function measure(offers, { bookingsOf, billOf }) {
     issued: offers.length,
     contacted: contacted.length,
     customersContacted: new Set(contacted.map((o) => String(o.customerId))).size,
+    emailedAutomatically: offers.filter((o) => o.task?.sentAutomatically).length,
     booked: booked.length,
     linkedBookings: offers.reduce((sum, o) => sum + (bookingsOf.get(String(o._id)) ?? 0), 0),
     used: used.length,
@@ -175,6 +176,7 @@ export async function occasionReportCsv(ctx, query) {
         canMessage: o.canMessage ? 'Yes' : 'No',
         contacted: o.task?.contactedAt ? 'Yes' : 'No',
         via: o.task?.sentVia ? CHANNEL_LABELS[o.task.sentVia] : '',
+        automatic: o.task?.sentAutomatically ? 'Yes' : 'No',
         bookings: facts.bookingsOf.get(String(o._id)) ?? 0,
         bill: used ? bill.invoiceNumber : '',
         discount: used ? bill.occasionDiscountTotal : null,
@@ -201,6 +203,7 @@ export async function occasionReportCsv(ctx, query) {
       { key: 'canMessage', label: 'Can be messaged' },
       { key: 'contacted', label: 'Contacted' },
       { key: 'via', label: 'Message via' },
+      { key: 'automatic', label: 'Emailed automatically' },
       { key: 'bookings', label: 'Linked bookings' },
       { key: 'bill', label: 'Bill' },
       { key: 'discount', label: 'Offer discount', money: true },
