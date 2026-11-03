@@ -33,6 +33,7 @@ import activityRoutes from './modules/activity/activity.routes.js';
 import notificationRoutes from './modules/notifications/notifications.routes.js';
 import inventoryRoutes from './modules/inventory/inventory.routes.js';
 import occasionRoutes from './modules/occasions/occasions.routes.js';
+import mailRoutes from './modules/mail/mail.routes.js';
 
 const app = express();
 
@@ -82,6 +83,7 @@ app.use('/api/activity', activityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/inventory', inventoryRoutes); // Inventory add-on
 app.use('/api/occasions', occasionRoutes); // Birthday & Anniversary Offers
+app.use('/api/mail', mailRoutes); // Email: status and test email (business owner)
 
 // --- Errors (must come after all routes) ---
 app.use(notFound);

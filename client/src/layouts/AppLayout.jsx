@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   Gift,
   LayoutDashboard,
+  Mail,
   Package,
   Receipt,
   Scissors,
@@ -22,7 +23,8 @@ import NotificationBell from '../components/NotificationBell';
 import { useAuth } from '../auth/AuthContext';
 import { hasAddon } from '../lib/constants';
 
-// Sidebar menu. `roles` says who sees each item; `addon` hides it unless the salon has that add-on.
+// Sidebar menu. `roles` says who sees each item; `addon` hides it unless the salon has that add-on;
+// `businessOwner` shows it only to the owner who sees every branch.
 const APP_NAV = [
   { to: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['OWNER'] },
   { to: '/app/today', label: 'Day board', icon: CalendarClock, roles: ['OWNER', 'FRONT_DESK'] },
@@ -43,13 +45,14 @@ const APP_NAV = [
   // Same screen: owners get all of payroll, the front desk only pay setup and requests
   { to: '/app/payroll', label: 'Payroll', icon: Wallet, roles: ['OWNER'] },
   { to: '/app/payroll', label: 'Staff pay', icon: Wallet, roles: ['FRONT_DESK'] },
+  { to: '/app/settings/email', label: 'Email', icon: Mail, roles: ['OWNER'], businessOwner: true },
 ];
 
 export default function AppLayout() {
   const { user } = useAuth();
   const occasionsOn = Boolean(user.org?.occasionOffers?.enabled);
   const navItems = APP_NAV.filter(
-    (item) => item.roles.includes(user.role) && (!item.addon || hasAddon(user, item.addon)) && (item.occasions === undefined || item.occasions === occasionsOn)
+    (item) => item.roles.includes(user.role) && (!item.addon || hasAddon(user, item.addon)) && (item.occasions === undefined || item.occasions === occasionsOn) && (!item.businessOwner || user.allBranches)
   );
 
   return (

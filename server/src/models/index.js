@@ -61,3 +61,6 @@ export { default as OccasionCampaignVersion } from './occasions/OccasionCampaign
 export { default as OfferIssue } from './occasions/OfferIssue.js';
 export { default as OfferEvent } from './occasions/OfferEvent.js';
 export { default as OccasionEngineRun } from './occasions/OccasionEngineRun.js';
+
+// Email (EMAIL_PLAN.md)
+export { default as EmailOutbox } from './EmailOutbox.js';

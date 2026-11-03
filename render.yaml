@@ -22,3 +22,16 @@ services:
         value: 2
       - key: IMAGE_STORAGE # where product photos are kept: MongoDB GridFS (stored in Atlas)
         value: gridfs
+      # Email (optional, see "Setting up email" in the README). Apps Script is the main route.
+      - key: MAIL_SCRIPT # the Apps Script /exec link
+        sync: false
+      - key: MAIL_SCRIPT_SECRET # same value as MAIL_SECRET in the script's properties (24+ characters)
+        sync: false
+      - key: MAIL_FORGOT_PASSWORD # optional: a second script for password emails
+        sync: false
+      - key: EMAIL_USER # optional SMTP backup: blocked on Render's free plan, works on paid plans
+        sync: false
+      - key: EMAIL_PASS # a Gmail app password
+        sync: false
+      - key: MAIL_DAILY_LIMIT # most emails per 24 hours for the whole app (Gmail allows about 100)
+        value: 90

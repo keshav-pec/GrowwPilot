@@ -280,7 +280,7 @@ npm run dev
 
 ```bash
 cd server
-npm test                  # 700 Vitest tests, on a temporary in-memory MongoDB replica set (never your real data)
+npm test                  # 727 Vitest tests, on a temporary in-memory MongoDB replica set (never your real data)
 npm run smoke:isolation   # tenant isolation check against a running API with the demo seed (see section 12)
 ```
 
@@ -294,6 +294,7 @@ The tests cover the parts where a bug would cost money or trust:
 - **Payroll:** each way of paying; mid-month pay changes; absences not cutting salary; the PRD's commission example (₹2,500 service, ₹200 off, 10% = ₹230); combos and two stylists on one bill; a rate change never changing past commission; commission and payments never counted twice (including two identical requests at the same moment); locking refused while something must be fixed, and a locked month refusing every change; part payments, overpayment rules, cancelled payments, staff who have left; advances; and that branch owners, the front desk and another salon only reach what they're allowed to. **Front desk pay:** never booked, no commission, moving a stylist to the front desk only once their pay fits, the separate front desk totals, and an API test that logs in as each role and tries every front desk pay action (owners only; front desk logins can't reach any of it).
 - **Inventory:** every PRD acceptance test that applies (map below), plus: stock never going below zero when five people take the last bottles at once, the same request sent twice changing stock once, approval limits for write-offs and orders, CSV import duplicates, recipe versions never overlapping, the add-on switch, photo uploads (type and 2 MB limits, at most 4, another salon's photo not found, the front desk can view but not upload, bulk matching by code), and an API test that logs in as the business owner, a branch owner of another branch, an inventory login and the front desk and tries **every inventory action** (and cost visibility in screens and CSV exports).
 - **Birthday & Anniversary Offers:** every PRD acceptance test that applies (map below), plus the start-up migration run twice, consent history that can't be edited, campaign versions that never change, branch time zones, date corrections, the send check and 7-day limit, bill maths with GST, an API test that logs in as each role and tries **every occasion action**, and a speed test with **100,000 customers** (monthly run ~1.5 s against a 15-minute target; the list ~5 ms per 50 rows against 2 s; the checkout offer preview ~3 ms against 700 ms).
+- **Email:** the Apps Script reply rules (an HTML page = script down, an empty reply = sent, only `status: "error"` fails), moving to SMTP only on Gmail's quota or a dead script, PDFs going by SMTP first, retries after 1, 5, 15 and 60 minutes then *Failed*, a quota pause with no backup, batches of 40 with a quota stop halfway, two mailers never sending the same email, the daily limit letting password emails through, escaped names and one-line subjects, and that only the business owner reaches the Email page and never sees another salon's emails.
 - **Help assistant:** 48 typical questions land on the right topic; answers are limited to the asker's role (front desk vs owner, main owner vs branch owner); unknown questions get an honest "not sure" with suggestions.
 
 **Inventory acceptance tests (PRD AC01–AC30)** — all in `server/tests/`:
@@ -395,6 +396,34 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 6. **Inventory add-on (per salon):** log in as Super Admin, open the salon and click **Switch on** next to Inventory. The owner then creates the first inventory login in **Team → Inventory logins** (one branch each, temporary password shown once). Completed services take stock in a background job inside the API process; it also retries every 3 minutes, so no extra service is needed.
 7. **Billing:** nothing to switch on. When the API starts, it moves any older bills onto the new bill records and updates two indexes (it does nothing once that's done; `npm run migrate:billing` does the same by hand). Salons start as **Not GST registered**, so bills look as before until the business owner fills in **Bills → Billing settings**. Shared bill links use the web app's own address (`/api/public/bills/...`, forwarded to the API by `vercel.json`).
 8. **Product photos** are stored in MongoDB GridFS (`IMAGE_STORAGE=gridfs`, already set in `render.yaml`): up to 4 per product, 2 MB each before resizing, kept as WebP at 1000 px and 240 px (usually 50–150 kB per product). They count towards your Atlas storage (the free tier has 512 MB), so a salon with 1,000 products and photos uses roughly 100 MB. The screens upload one photo per request, so they stay well under proxy size limits.
+9. **Email:** optional. Without it the app works as before (staff send offer emails from their own device). See below.
+
+### Setting up email
+
+The app sends email through a small **Google Apps Script** web app running on a Gmail account (free, over HTTPS). **Gmail SMTP** can be added as a backup. Every email goes into an outbox and is sent in the background, with retries; nothing waits for it.
+
+1. **Deploy the script:** follow [`server/mail-script/README.md`](server/mail-script/README.md) (about 10 minutes). You end up with an `/exec` link and a secret.
+2. **Set on Render** (Environment):
+   - `MAIL_SCRIPT` = the `/exec` link
+   - `MAIL_SCRIPT_SECRET` = the same secret as the script's `MAIL_SECRET` (at least 24 characters). The script refuses calls without it.
+3. **Check it:** log in as the business owner → **Email** in the menu. It should say *Set up* and *The mail script is answering*. Press **Send test email** and look in your inbox (and spam folder).
+
+| Variable | What it is | Default |
+|---|---|---|
+| `MAIL_SCRIPT` | Apps Script `/exec` link for all emails | not set |
+| `MAIL_SCRIPT_SECRET` | Secret the script checks (needed with `MAIL_SCRIPT`) | not set |
+| `MAIL_FORGOT_PASSWORD` | A second script for password emails (only useful on a **second** Gmail account, which has its own limit) | `MAIL_SCRIPT` |
+| `MAIL_SCRIPT_TIMEOUT_MS` | How long to wait for the script | 30000 |
+| `EMAIL_HOST` / `EMAIL_PORT` | SMTP backup server | `smtp.gmail.com` / 587 |
+| `EMAIL_USER` / `EMAIL_PASS` | Gmail address and a Gmail **app password** (Google Account → Security → 2-Step Verification → App passwords). SMTP is on only when both are real values. | not set |
+| `MAIL_DAILY_LIMIT` | Most emails per 24 hours for the whole app | 90 |
+
+- **Use the same Gmail account** for the script and SMTP, so emails look the same either way. Emails show the **salon's name** as the sender, and replies go to the salon's contact email.
+- **SMTP on Render's free plan doesn't work:** Render blocks outgoing SMTP ports (25, 465, 587) on free services. The app gives up on SMTP within 10 seconds and keeps using the script. SMTP only helps on a paid Render plan or another host.
+- **When each route is used:** emails without an attachment go through the script; SMTP is used only if the script hits Gmail's daily limit or is down. Emails with a PDF go through SMTP first (the script is slow with big bodies), then the script.
+- **Limits:** a free Gmail account sends about **100 emails a day** through Apps Script (about 500 through SMTP; Google Workspace accounts more). The app stops at `MAIL_DAILY_LIMIT` (90) for the whole platform; the rest wait for the next day, except password and test emails. If Gmail's limit is hit with no backup, sending pauses for an hour. For real volume, move to a paid sender (Resend, Brevo, Amazon SES) — only `server/src/modules/mail/transport/` changes — and use a proper sending domain before sending many salons' offers.
+- **Without any of these set:** in development emails are printed in the API's terminal and marked *Logged*; in production the Email page says *Not set up*.
+- Sent emails are kept in the outbox for 180 days, then removed automatically.
 
 ---
 

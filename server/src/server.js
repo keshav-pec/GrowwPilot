@@ -5,6 +5,7 @@ import { startInventoryAutomation } from './modules/inventory/automation/outbox.
 import { migrateBilling } from './scripts/migrate-billing-v2.js';
 import { migrateOccasions } from './scripts/migrate-occasions-v1.js';
 import { startOccasionAutomation } from './modules/occasions/engine/scheduler.js';
+import { startMailer } from './modules/mail/outbox.js';
 
 // Connect to the database first, then start accepting requests
 try {
@@ -16,6 +17,7 @@ try {
   });
   startInventoryAutomation(); // stock used by completed services, and retries
   startOccasionAutomation(); // monthly birthday and anniversary offers, and expiry
+  startMailer(); // emails waiting in the outbox, and retries
 } catch (err) {
   console.error('Could not connect to MongoDB:', err.message);
   process.exit(1);

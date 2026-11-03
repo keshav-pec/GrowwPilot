@@ -24,6 +24,7 @@ import InvoicePage from '../features/checkout/InvoicePage';
 import BillsListPage from '../features/billing/BillsListPage';
 import BillingSettingsPage from '../features/billing/BillingSettingsPage';
 import OccasionSettingsPage from '../features/occasions/settings/OccasionSettingsPage';
+import EmailSettingsPage from '../features/mail/EmailSettingsPage';
 import CampaignDetailPage from '../features/occasions/campaigns/CampaignDetailPage';
 import QuickSetup from '../features/occasions/setup/QuickSetup';
 import OccasionsPage from '../features/occasions/worklist/OccasionsPage';
@@ -136,6 +137,7 @@ export const router = createBrowserRouter([
               { path: 'settings/billing', element: <BillingSettingsPage /> },
               { path: 'settings/occasions', element: <OccasionSettingsPage /> }, // Birthday & Anniversary Offers
               { path: 'settings/occasions/setup', element: <QuickSetup /> },
+              { path: 'settings/email', element: <EmailSettingsPage /> }, // business owner: is email set up, test email
               { path: 'occasions/reports', element: <OccasionReportsPage /> }, // Reports → Occasion offers
               { path: 'settings/occasions/campaigns/:id', element: <CampaignDetailPage /> },
               { path: 'settings/salary', element: <Navigate to="/app/payroll" replace /> }, // old link
