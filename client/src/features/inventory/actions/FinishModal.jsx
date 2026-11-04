@@ -3,11 +3,12 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../../auth/AuthContext';
 import { useFinish, useHandouts } from '../../../api/inventory/allocations';
 import { useLocations } from '../../../api/inventory/locations';
-import { formatQty, isMeasured, newRequestKey, recipientFromValue, recipientValue, rememberedChoice } from '../../../lib/inventory';
+import { formatQty, isMeasured, recipientFromValue, recipientValue, rememberedChoice } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { Button, Input, Modal, Spinner } from '../../../components/ui';
 import { QtyField, RecipientSelect, StoreSelect } from './fields';
 
-// Finish & replace (INV-07) in one step: mark what is used up and, if ticked, hand out a new one.
+// Finish & replace in one step: mark what is used up and, if ticked, hand out a new one.
 // The finish is always saved; if the store has nothing left to replace it, you are told and it shows on Need to order.
 export default function FinishModal({ handout: presetHandout, canReplace, onClose }) {
   const [handout, setHandout] = useState(presetHandout ?? null);

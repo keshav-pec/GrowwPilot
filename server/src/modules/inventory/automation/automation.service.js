@@ -3,10 +3,8 @@ import { isMeasured } from '../../../config/inventory.js';
 import { AppError } from '../../../utils/AppError.js';
 import { scoped } from '../../../utils/scoped.js';
 import { runOnce } from '../../../middleware/idempotency.js';
-import { actorRole } from '../../activity/activity.service.js';
-import { assertCan } from '../permissions.js';
-import { getBranchSettings } from '../settings/settings.service.js';
-import { recordInventoryAction } from '../activity.js';
+import { logActivity, personOf } from '../../activity/activity.service.js';
+import { assertCanHere } from '../settings/settings.service.js';
 import { ensureBranchLocations } from '../locations/locations.service.js';
 import { describeQty } from '../units.js';
 import { giveBackServiceUse, pickUse, postServiceUse } from './serviceUse.js';
@@ -15,15 +13,10 @@ import { processSoon } from './outbox.js';
 // Exceptions list, failed events and corrections for automatic use by services.
 
 const SKU_FIELDS = 'name code stockUnit wayOfUse baseUnit unitsPerStockUnit';
-const me = (ctx) => ({ id: ctx.userId, name: ctx.userName, role: actorRole(ctx) });
-
-async function allow(ctx, action) {
-  assertCan(ctx, action, { settings: await getBranchSettings(ctx, ctx.activeBranchId) });
-}
 
 // What is waiting at the selected branch: uses that couldn't be posted, and events that failed
 export async function listAutomation(ctx) {
-  await allow(ctx, 'inventory.resolveExceptions');
+  await assertCanHere(ctx, 'inventory.resolveExceptions');
   const branchId = ctx.activeBranchId;
   const [exceptions, failedEvents] = await Promise.all([
     InventoryException.find(scoped(ctx, { branchId, status: 'OPEN' })).sort({ completedAt: 1 }).lean(),
@@ -43,14 +36,14 @@ export async function listAutomation(ctx) {
 
 // After restocking: post a use that couldn't be taken, with the amount the recipe said then
 export async function postException(ctx, id, key) {
-  await allow(ctx, 'inventory.resolveExceptions');
+  await assertCanHere(ctx, 'inventory.resolveExceptions');
   const exception = await InventoryException.findOne(scoped(ctx, { _id: id, branchId: ctx.activeBranchId })).lean();
   if (!exception) throw new AppError(404, 'NOT_FOUND', 'Exception not found');
   if (exception.status !== 'OPEN') throw new AppError(409, 'ALREADY_DECIDED', 'This has already been dealt with');
   await ensureBranchLocations(ctx, exception.branchId);
 
   return runOnce(ctx, { key, operation: 'inventory.exception.post' }, async (session) => {
-    const { transaction } = await postServiceUse(ctx, { ...pickUse(exception), key: exception.key }, { actor: me(ctx) }, session);
+    const { transaction } = await postServiceUse(ctx, { ...pickUse(exception), key: exception.key }, { actor: personOf(ctx) }, session);
     const marked = await InventoryException.updateOne(
       scoped(ctx, { _id: exception._id, status: 'OPEN' }),
       { $set: { status: 'POSTED', resolvedBy: { id: ctx.userId, name: ctx.userName }, resolvedAt: new Date(), transactionId: transaction._id } },
@@ -63,7 +56,7 @@ export async function postException(ctx, id, key) {
 
 // An owner decides it should not be taken at all (e.g. the recipe was wrong for that visit)
 export async function dismissException(ctx, id, { note }, key) {
-  await allow(ctx, 'inventory.dismissExceptions');
+  await assertCanHere(ctx, 'inventory.dismissExceptions');
   const exception = await InventoryException.findOne(scoped(ctx, { _id: id, branchId: ctx.activeBranchId })).lean();
   if (!exception) throw new AppError(404, 'NOT_FOUND', 'Exception not found');
 
@@ -74,7 +67,7 @@ export async function dismissException(ctx, id, { note }, key) {
       { session }
     );
     if (marked.modifiedCount === 0) throw new AppError(409, 'ALREADY_DECIDED', 'This has already been dealt with');
-    await recordInventoryAction(
+    await logActivity(
       ctx,
       { action: 'inventory.exception_dismissed', branchId: exception.branchId, summary: `Dismissed ${exception.skuName} for ${exception.serviceName} (${exception.staffName}): ${note}` },
       session
@@ -85,7 +78,7 @@ export async function dismissException(ctx, id, { note }, key) {
 
 // Try a failed event again now (it can't use stock twice: every line has its own key)
 export async function retryEvent(ctx, id) {
-  await allow(ctx, 'inventory.resolveExceptions');
+  await assertCanHere(ctx, 'inventory.resolveExceptions');
   const retried = await InventoryOutbox.updateOne(
     scoped(ctx, { _id: id, branchId: ctx.activeBranchId, status: 'FAILED' }),
     { $set: { status: 'PENDING', attempts: 0, nextAttemptAt: new Date(), lastError: null } }
@@ -97,7 +90,7 @@ export async function retryEvent(ctx, id) {
 
 // "Used 110 ml, not 90": posts only the difference, linked to the original (measured products only)
 export async function correctServiceUse(ctx, id, { actualQty, note }, key) {
-  await allow(ctx, 'inventory.correctServiceUse');
+  await assertCanHere(ctx, 'inventory.correctServiceUse');
   const original = await InventoryConsumptionEvent.findOne(scoped(ctx, { _id: id, branchId: ctx.activeBranchId, correctsId: null })).lean();
   if (!original) throw new AppError(404, 'NOT_FOUND', 'Service use not found');
   const sku = await InventorySku.findOne(scoped(ctx, { _id: original.skuId })).select(SKU_FIELDS).lean();
@@ -113,18 +106,17 @@ export async function correctServiceUse(ctx, id, { actualQty, note }, key) {
   await ensureBranchLocations(ctx, original.branchId);
 
   return runOnce(ctx, { key, operation: 'inventory.serviceUse.correct' }, async (session) => {
-    const options = { actor: me(ctx), note, correctsTransactionId };
+    const options = { actor: personOf(ctx), note, correctsTransactionId };
     const { transaction } =
       delta > 0
         ? await postServiceUse(ctx, { ...pickUse(original), key: fixKey, qty: delta }, { ...options, correctsConsumptionId: original._id }, session)
         : await giveBackServiceUse(ctx, original, -delta, { ...options, key: fixKey }, session);
-    await recordInventoryAction(
+    await logActivity(
       ctx,
       {
         action: 'inventory.service_use_corrected',
         branchId: original.branchId,
         summary: `Corrected ${sku.name} used for ${original.serviceName} (${original.staffName}): ${describeQty(current, sku)} → ${describeQty(actualQty, sku)}${note ? `. ${note}` : ''}`,
-        link: `/app/inventory?tab=products&product=${sku._id}`,
       },
       session
     );

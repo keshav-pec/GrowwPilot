@@ -74,7 +74,7 @@ export const importSchema = z.object({
 
 // Campaign terms. PERCENT: value in basis points (1500 = 15%). FLAT: value in paise. Checked fully in campaign.rules.js.
 const whole = z.number().int('Use a whole number');
-export const rulesSchema = z.object({
+const rulesSchema = z.object({
   discountType: z.enum(DISCOUNT_TYPES, { message: 'Choose % off or ₹ off' }),
   value: whole,
   maxDiscount: whole.nullable().optional(),

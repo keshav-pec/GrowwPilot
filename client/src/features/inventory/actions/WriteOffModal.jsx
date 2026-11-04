@@ -2,11 +2,12 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useWriteOff } from '../../../api/inventory/movements';
 import { useLocations } from '../../../api/inventory/locations';
-import { WRITE_OFF_REASONS, formatQty, isMeasured, newRequestKey } from '../../../lib/inventory';
-import { Button, Input, Modal, Select } from '../../../components/ui';
+import { WRITE_OFF_REASONS, formatQty, isMeasured } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
+import { Input, Modal, ModalFooter, Select } from '../../../components/ui';
 import { ProductPicker, QtyField, StoreSelect } from './fields';
 
-// Use / write off / adjust stock (INV-08): a product, where it is (a store or a hand-out), how many and why.
+// Use / write off / adjust stock: a product, where it is (a store or a hand-out), how many and why.
 // Within your limit it is saved at once; above it, add a note and it waits for an owner.
 // `report`: a problem the front desk reported, closed by this write-off.
 export default function WriteOffModal({ sku: presetSku, handout, report, onClose }) {
@@ -53,14 +54,9 @@ export default function WriteOffModal({ sku: presetSku, handout, report, onClose
       title={sku ? `Use or write off: ${sku.name}` : 'Use or write off stock'}
       footer={
         sku && (
-          <>
-            <Button variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={save} loading={writeOff.isPending} disabled={qty < 1 || (fromHandout && qty > fromHandout.remainingQty)}>
+          <ModalFooter onClose={onClose} onClick={save} loading={writeOff.isPending} disabled={qty < 1 || (fromHandout && qty > fromHandout.remainingQty)}>
               Save
-            </Button>
-          </>
+            </ModalFooter>
         )
       }
     >

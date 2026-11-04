@@ -11,26 +11,22 @@ import { AppError } from '../../../utils/AppError.js';
 import { scoped } from '../../../utils/scoped.js';
 import { runOnce } from '../../../middleware/idempotency.js';
 import { branchApproverIds, notify } from '../../notifications/notifications.service.js';
-import { assertCan, can } from '../permissions.js';
-import { getBranchSettings } from '../settings/settings.service.js';
-import { recordInventoryAction } from '../activity.js';
+import { can } from '../permissions.js';
+import { assertCanHere, getBranchSettings } from '../settings/settings.service.js';
+import { logActivity, personOf } from '../../activity/activity.service.js';
 import { postMovement } from '../stock/stock.engine.js';
 import { takeFromHandout } from '../allocations/allocations.service.js';
 import { ensureBranchLocations } from '../locations/locations.service.js';
+import { plural } from '../../../utils/text.js';
 
 // ---------------------------------------------------------------------------
 // Stock count: start it (the records at that moment become "expected"), count the stores and each hand-out
 // in use, submit, and an owner approves. Approved differences are posted as COUNT_CORRECTION movements,
-// never by overwriting a balance (AC22). The count keeps who counted, who reviewed and why each line differs.
+// never by overwriting a balance. The count keeps who counted, who reviewed and why each line differs.
 // ---------------------------------------------------------------------------
 
 const SKU_FIELDS = 'name code stockUnit wayOfUse baseUnit unitsPerStockUnit';
-const me = (ctx) => ({ id: ctx.userId, name: ctx.userName });
 const countLink = '/app/inventory?tab=count';
-
-async function allow(ctx, action) {
-  assertCan(ctx, action, { settings: await getBranchSettings(ctx, ctx.activeBranchId) });
-}
 
 const differs = (line) => line.counted != null && line.counted !== line.expected;
 
@@ -43,7 +39,7 @@ async function withSkus(ctx, count) {
 
 // The count in progress at the selected branch (if any), and the last few finished ones
 export async function getCounts(ctx) {
-  await allow(ctx, 'inventory.countStock');
+  await assertCanHere(ctx, 'inventory.countStock');
   const branchId = ctx.activeBranchId;
   const [current, past] = await Promise.all([
     InventoryStockCount.findOne(scoped(ctx, { branchId, status: { $in: ['COUNTING', 'SUBMITTED'] } })).lean(),
@@ -66,7 +62,7 @@ async function findCount(ctx, id) {
 // Start a count. Every product used here gets a line for its main store (and any other store holding it),
 // and every open hand-out gets its own line, so store and in use are counted separately.
 export async function startCount(ctx, key) {
-  await allow(ctx, 'inventory.countStock');
+  await assertCanHere(ctx, 'inventory.countStock');
   const branchId = ctx.activeBranchId;
   await ensureBranchLocations(ctx, branchId);
 
@@ -94,7 +90,7 @@ export async function startCount(ctx, key) {
     }
 
     try {
-      const [count] = await InventoryStockCount.create([{ orgId: ctx.orgId, branchId, cutoffAt: new Date(), lines, startedBy: me(ctx) }], { session });
+      const [count] = await InventoryStockCount.create([{ orgId: ctx.orgId, branchId, cutoffAt: new Date(), lines, startedBy: personOf(ctx) }], { session });
       return { count: count.toObject() };
     } catch (err) {
       if (err.code === 11000) throw new AppError(409, 'COUNT_IN_PROGRESS', 'A stock count is already in progress at this branch');
@@ -105,7 +101,7 @@ export async function startCount(ctx, key) {
 
 // Save counted quantities (and reasons) as you go. lines: [{ lineId, counted (null = not counted), reason? }]
 export async function saveCounts(ctx, id, { lines }) {
-  await allow(ctx, 'inventory.countStock');
+  await assertCanHere(ctx, 'inventory.countStock');
   const count = await findCount(ctx, id);
   if (count.status !== 'COUNTING') throw new AppError(409, 'INVALID_STATUS', 'This count has been sent for review. Ask an owner to send it back to change it.');
   for (const change of lines) {
@@ -114,14 +110,14 @@ export async function saveCounts(ctx, id, { lines }) {
     line.counted = change.counted;
     if (change.reason !== undefined) line.reason = change.reason;
   }
-  count.countedBy = me(ctx);
+  count.countedBy = personOf(ctx);
   await count.save();
   return { count: await withSkus(ctx, count.toObject()) };
 }
 
 // Done counting: every difference needs a reason, then an owner reviews it
 export async function submitCount(ctx, id, key) {
-  await allow(ctx, 'inventory.countStock');
+  await assertCanHere(ctx, 'inventory.countStock');
   const count = await findCount(ctx, id);
   if (count.status !== 'COUNTING') throw new AppError(409, 'INVALID_STATUS', 'This count has already been sent for review');
   const missing = count.lines.filter((l) => differs(l) && !l.reason?.trim());
@@ -132,7 +128,7 @@ export async function submitCount(ctx, id, key) {
   return runOnce(ctx, { key, operation: 'inventory.count.submit' }, async (session) => {
     const marked = await InventoryStockCount.updateOne(
       scoped(ctx, { _id: count._id, status: 'COUNTING' }),
-      { $set: { status: 'SUBMITTED', submittedAt: new Date(), countedBy: me(ctx) } },
+      { $set: { status: 'SUBMITTED', submittedAt: new Date(), countedBy: personOf(ctx) } },
       { session }
     );
     if (marked.modifiedCount === 0) throw new AppError(409, 'INVALID_STATUS', 'This count was just changed');
@@ -140,7 +136,7 @@ export async function submitCount(ctx, id, key) {
     await notify(
       ctx,
       await branchApproverIds(ctx, count.branchId),
-      { message: `${ctx.userName} finished a stock count (${differences === 0 ? 'no differences' : `${differences} difference${differences === 1 ? '' : 's'}`}). Please review it.`, link: countLink },
+      { message: `${ctx.userName} finished a stock count (${differences === 0 ? 'no differences' : `${plural(differences, 'difference')}`}). Please review it.`, link: countLink },
       session
     );
     return { status: 'SUBMITTED' };
@@ -150,7 +146,7 @@ export async function submitCount(ctx, id, key) {
 // An owner approves: each difference becomes a count-correction movement. Movements since the count started
 // are real and stay; only the difference found is added (or taken away).
 export async function approveCount(ctx, id, { note }, key) {
-  await allow(ctx, 'inventory.approveStockCount');
+  await assertCanHere(ctx, 'inventory.approveStockCount');
   const count = await findCount(ctx, id);
   if (count.status !== 'SUBMITTED') throw new AppError(409, 'INVALID_STATUS', 'Only a count sent for review can be approved');
   const changed = count.lines.filter(differs);
@@ -159,7 +155,7 @@ export async function approveCount(ctx, id, { note }, key) {
   return runOnce(ctx, { key, operation: 'inventory.count.approve' }, async (session) => {
     const marked = await InventoryStockCount.updateOne(
       scoped(ctx, { _id: count._id, status: 'SUBMITTED' }),
-      { $set: { status: 'APPROVED', reviewedBy: me(ctx), reviewedAt: new Date(), reviewNote: note } },
+      { $set: { status: 'APPROVED', reviewedBy: personOf(ctx), reviewedAt: new Date(), reviewNote: note } },
       { session }
     );
     if (marked.modifiedCount === 0) throw new AppError(409, 'INVALID_STATUS', 'This count was just changed');
@@ -197,8 +193,8 @@ export async function approveCount(ctx, id, { note }, key) {
       }
       await InventoryStockCount.updateOne(scoped(ctx, { _id: count._id }), { $set: { transactionIds } }, { session });
     }
-    const words = changed.length === 0 ? 'no differences' : `${changed.length} difference${changed.length === 1 ? '' : 's'} corrected`;
-    await recordInventoryAction(ctx, { action: 'inventory.count_approved', branchId: count.branchId, summary: `Approved the stock count (${words})`, after: { differences: changed.map((l) => ({ sku: l.skuName, expected: l.expected, counted: l.counted, reason: l.reason })) }, link: countLink }, session);
+    const words = changed.length === 0 ? 'no differences' : `${plural(changed.length, 'difference')} corrected`;
+    await logActivity(ctx, { action: 'inventory.count_approved', branchId: count.branchId, summary: `Approved the stock count (${words})`, after: { differences: changed.map((l) => ({ sku: l.skuName, expected: l.expected, counted: l.counted, reason: l.reason })) } }, session);
     if (count.countedBy) await notify(ctx, [count.countedBy.id], { message: `${ctx.userName} approved your stock count (${words})`, link: countLink }, session);
     return { status: 'APPROVED', transactionIds };
   });
@@ -206,7 +202,7 @@ export async function approveCount(ctx, id, { note }, key) {
 
 // An owner sends it back to be counted again (with a note), or it is cancelled
 export async function sendBackCount(ctx, id, { note }, key) {
-  await allow(ctx, 'inventory.approveStockCount');
+  await assertCanHere(ctx, 'inventory.approveStockCount');
   const count = await findCount(ctx, id);
   return runOnce(ctx, { key, operation: 'inventory.count.sendBack' }, async (session) => {
     const marked = await InventoryStockCount.updateOne(scoped(ctx, { _id: count._id, status: 'SUBMITTED' }), { $set: { status: 'COUNTING', reviewNote: note } }, { session });
@@ -217,7 +213,7 @@ export async function sendBackCount(ctx, id, { note }, key) {
 }
 
 export async function cancelCount(ctx, id, key) {
-  await allow(ctx, 'inventory.countStock');
+  await assertCanHere(ctx, 'inventory.countStock');
   const count = await findCount(ctx, id);
   const isOwner = can(ctx, 'inventory.approveStockCount', { settings: await getBranchSettings(ctx, ctx.activeBranchId) }).allowed;
   if (!isOwner && String(count.startedBy?.id) !== ctx.userId) throw new AppError(403, 'PERMISSION_DENIED', 'Only an owner or the person who started it can cancel this count');

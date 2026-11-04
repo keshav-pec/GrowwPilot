@@ -1,13 +1,14 @@
 // The owner's dashboard: "Is my salon doing fine, and what needs my attention?"
 // Everything is calculated live from the database for the selected branch. Nothing is stored or hard-coded.
 import { DateTime } from 'luxon';
-import { Appointment, Attendance, Branch, Invoice, Lead, Staff } from '../../models/index.js';
+import { Appointment, Attendance, Lead, Staff } from '../../models/index.js';
 import { OPEN_APPOINTMENT_STATUSES, SERVICE_STAFF } from '../../config/constants.js';
 import { scoped } from '../../utils/scoped.js';
 import { formatMoney } from '../../utils/money.js';
 import { dayRangeUTC, formatTime } from '../../utils/time.js';
 import { getAppointmentAlert } from '../../utils/appointmentAlerts.js';
 import { moneyByBranch } from '../billing/reports.service.js';
+import { activeBranch } from '../branches/activeBranch.js';
 
 const OPEN_LEAD_STATUSES = ['NEW', 'CONTACTED', 'INTERESTED'];
 const AWAY = ['absent', 'leave'];
@@ -17,7 +18,6 @@ const AWAY = ['absent', 'leave'];
 async function moneyBetween(ctx, branchId, from, to) {
   return (await moneyByBranch(ctx.orgId, [{ branchId, start: from, end: to }]))[String(branchId)];
 }
-const revenueBetween = async (ctx, branchId, from, to) => (await moneyBetween(ctx, branchId, from, to)).netSales;
 
 // "5h 15m"
 function hoursAndMinutes(minutes) {
@@ -27,34 +27,7 @@ function hoursAndMinutes(minutes) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. KPIs
-// ---------------------------------------------------------------------------
-async function getKpis(ctx, branch, today, todayAppointments) {
-  const since30Days = DateTime.now().minus({ days: 30 }).toJSDate();
-  const base = scoped(ctx, { branchId: branch._id });
-
-  const [money, openLeads, leads30, converted30] = await Promise.all([
-    moneyBetween(ctx, branch._id, today.start, today.end),
-    Lead.countDocuments({ ...base, status: { $in: OPEN_LEAD_STATUSES } }),
-    Lead.countDocuments({ ...base, createdAt: { $gte: since30Days } }),
-    Lead.countDocuments({ ...base, createdAt: { $gte: since30Days }, status: 'APPOINTMENT_BOOKED' }),
-  ]);
-
-  const booked = todayAppointments.filter((a) => a.status !== 'CANCELLED');
-  const served = new Set(todayAppointments.filter((a) => a.status === 'COMPLETED').map((a) => String(a.customerId)));
-
-  return {
-    todayRevenue: money.netSales, // net sales: after discounts and refunds, without GST
-    todayCollected: money.collected,
-    todayAppointments: booked.length,
-    customersServed: served.size,
-    openLeads,
-    leadConversion: { converted: converted30, total: leads30, rate: leads30 ? Math.round((converted30 / leads30) * 100) : null },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// 2. Requires attention: a to-do list, most urgent first, each with a one-click action
+// Requires attention: a to-do list, most urgent first, each with a one-click action
 // ---------------------------------------------------------------------------
 async function getAttention(ctx, branch, now, todayAppointments) {
   const zone = branch.timezone;
@@ -62,7 +35,7 @@ async function getAttention(ctx, branch, now, todayAppointments) {
   const when = (date) => DateTime.fromJSDate(date, { zone }).toFormat('d LLL, h:mm a');
   const items = [];
 
-  // a) Today's appointments that are late, waiting, or might be a no-show
+  // Today's appointments that are late, waiting, or might be a no-show
   const alertText = {
     NO_SHOW: (a) => ({ severity: 'high', title: `${a.customerSnapshot.name} hasn't arrived`, detail: `Booked for ${formatTime(a.startAt, zone)} with ${a.items[0].staffName}` }),
     WAITING: (a) => ({ severity: 'high', title: `${a.customerSnapshot.name} is waiting`, detail: `Arrived for ${formatTime(a.startAt, zone)}, service hasn't started` }),
@@ -73,24 +46,12 @@ async function getAttention(ctx, branch, now, todayAppointments) {
     if (alert) items.push({ id: `${alert}-${a._id}`, kind: alert, at: a.startAt, ...alertText[alert](a), action: { label: 'Open', to: `/app/today?open=${a._id}` } });
   }
 
-  const [unbilled, dues, overdueLeads, uncontacted, upcoming, staff, absences] = await Promise.all([
-    // b) Finished but not billed yet: money not collected
+  const [unbilled, overdueLeads, upcoming, staff, absences] = await Promise.all([
+    // Finished but not billed yet: money not collected
     Appointment.find({ ...base, status: 'COMPLETED', invoiceId: null }).sort({ startAt: -1 }).limit(20).lean(),
-    // c) Bills with something still due (part paid or unpaid)
-    Invoice.find({ ...base, status: 'ISSUED', balanceDue: { $gt: 0 } }).sort({ issuedAt: 1 }).limit(20).lean(),
-    // d) Lead follow-ups that are overdue
+    // Lead follow-ups that are overdue
     Lead.find({ ...base, status: { $in: OPEN_LEAD_STATUSES }, nextFollowUpAt: { $lt: now } }).sort({ nextFollowUpAt: 1 }).limit(20).lean(),
-    // e) New leads nobody has contacted for more than 24 hours (not already listed as overdue)
-    Lead.find({
-      ...base,
-      status: 'NEW',
-      createdAt: { $lt: new Date(now - 24 * 3600 * 1000) },
-      $or: [{ nextFollowUpAt: null }, { nextFollowUpAt: { $gte: now } }],
-    })
-      .sort({ createdAt: 1 })
-      .limit(20)
-      .lean(),
-    // f) Upcoming bookings (next 14 days) whose stylist is inactive, absent or on leave
+    // Upcoming bookings (next 14 days) whose stylist is inactive, absent or on leave
     Appointment.find({ ...base, status: { $in: OPEN_APPOINTMENT_STATUSES }, startAt: { $gte: now, $lt: new Date(+now + 14 * 86400 * 1000) } }).lean(),
     Staff.find(base).select('name status').lean(),
     Attendance.find({ ...base, status: { $in: AWAY }, date: { $gte: DateTime.fromJSDate(now, { zone }).toISODate() } }).lean(),
@@ -99,14 +60,8 @@ async function getAttention(ctx, branch, now, todayAppointments) {
   for (const a of unbilled) {
     items.push({ id: `UNPAID-${a._id}`, kind: 'UNPAID', severity: 'high', at: a.startAt, title: `${a.customerSnapshot.name} hasn't paid`, detail: `Completed ${when(a.startAt)} · ${formatMoney(a.totalPrice)}`, action: { label: 'Checkout', to: `/app/checkout/${a._id}` } });
   }
-  for (const bill of dues) {
-    items.push({ id: `DUE-${bill._id}`, kind: 'DUE', severity: 'medium', at: bill.issuedAt, title: `${bill.customerSnapshot?.name} owes ${formatMoney(bill.balanceDue)}`, detail: `Bill ${bill.invoiceNumber} · issued ${when(bill.issuedAt)} · ${formatMoney(bill.amountPaid)} of ${formatMoney(bill.grandTotal)} paid`, action: { label: 'Record payment', to: `/app/invoices/${bill._id}` } });
-  }
   for (const l of overdueLeads) {
     items.push({ id: `FOLLOW_UP-${l._id}`, kind: 'FOLLOW_UP', severity: 'medium', at: l.nextFollowUpAt, title: `Follow up with ${l.name}`, detail: `Follow-up was due ${when(l.nextFollowUpAt)} · ${l.source} lead`, action: { label: 'Open lead', to: `/app/leads?open=${l._id}` } });
-  }
-  for (const l of uncontacted) {
-    items.push({ id: `NEW_LEAD-${l._id}`, kind: 'NEW_LEAD', severity: 'medium', at: l.createdAt, title: `${l.name} hasn't been contacted`, detail: `New ${l.source} lead from ${when(l.createdAt)}`, action: { label: 'Open lead', to: `/app/leads?open=${l._id}` } });
   }
 
   const staffById = Object.fromEntries(staff.map((s) => [s._id, s]));
@@ -131,34 +86,33 @@ async function getAttention(ctx, branch, now, todayAppointments) {
 }
 
 // ---------------------------------------------------------------------------
-// 3. Salon Pulse: one verdict from 3 simple signals, each with a one-line reason
-//    status: 'good' | 'watch' | 'action' | 'neutral' (not enough data, doesn't affect the verdict)
+// Salon Pulse: 2 simple signals, each with a one-line reason
+//    status: 'good' | 'watch' | 'action' | 'neutral' (not enough data)
 // ---------------------------------------------------------------------------
-async function getPulse(ctx, branch, now, today, todayAppointments, attention) {
+async function getSignals(ctx, branch, now, today, todaySoFar, todayAppointments) {
   const zone = branch.timezone;
   const nowLocal = DateTime.fromJSDate(now, { zone });
   const weekday = nowLocal.toFormat('cccc'); // "Monday"
 
-  // Signal 1: revenue so far today vs the average of the same weekday in the last 4 weeks, up to the same time of day
+  // Net sales so far today vs the average of the same weekday in the last 4 weeks, up to the same time of day
   const elapsed = now - today.start;
-  const todaySoFar = await revenueBetween(ctx, branch._id, today.start, now);
   const pastWeeks = await Promise.all(
-    [1, 2, 3, 4].map((weeks) => {
+    [1, 2, 3, 4].map(async (weeks) => {
       const dayStart = DateTime.fromJSDate(today.start, { zone }).minus({ weeks }).toJSDate();
-      return revenueBetween(ctx, branch._id, dayStart, new Date(+dayStart + elapsed));
+      return (await moneyBetween(ctx, branch._id, dayStart, new Date(+dayStart + elapsed))).netSales;
     })
   );
   const usual = Math.round(pastWeeks.reduce((sum, x) => sum + x, 0) / 4);
   let revenue;
   if (usual === 0) {
-    revenue = { status: 'neutral', reason: `Not enough history yet to compare with a usual ${weekday}.` };
+    revenue = { status: 'neutral', reason: `Not enough history to compare with a usual ${weekday}.` };
   } else {
     const change = Math.round(((todaySoFar - usual) / usual) * 100);
     const status = change >= -10 ? 'good' : change >= -30 ? 'watch' : 'action';
     revenue = { status, reason: `Net sales are ${Math.abs(change)}% ${change >= 0 ? 'above' : 'below'} a usual ${weekday} by this time (${formatMoney(todaySoFar)} vs ${formatMoney(usual)}).` };
   }
 
-  // Signal 2: chairs filled = booked stylist-minutes / available stylist-minutes today
+  // Chairs filled = booked stylist-minutes / available stylist-minutes today
   const [workingStaff, awayToday] = await Promise.all([
     Staff.find(scoped(ctx, { branchId: branch._id, status: 'active', ...SERVICE_STAFF })).select('_id').lean(),
     Attendance.find(scoped(ctx, { branchId: branch._id, date: nowLocal.toISODate(), status: { $in: AWAY } })).select('staffId').lean(),
@@ -179,36 +133,35 @@ async function getPulse(ctx, branch, now, today, todayAppointments, attention) {
     };
   }
 
-  // Signal 3: how many urgent items need someone right now
-  const urgent = attention.filter((i) => i.severity === 'high').length;
-  const attentionSignal = {
-    status: urgent === 0 ? 'good' : urgent <= 3 ? 'watch' : 'action',
-    reason: urgent === 0 ? 'Nothing urgent needs you right now.' : `${urgent} urgent item${urgent === 1 ? '' : 's'} need${urgent === 1 ? 's' : ''} attention below.`,
-  };
-
-  const signals = [
+  return [
     { key: 'revenue', label: 'Revenue vs usual', ...revenue },
     { key: 'chairs', label: 'Chairs filled', ...chairs },
-    { key: 'attention', label: 'Attention', ...attentionSignal },
   ];
-
-  // Verdict: any "action" -> Needs action; any "watch" -> Keep an eye; otherwise Doing well
-  const statuses = signals.map((s) => s.status);
-  const verdict = statuses.includes('action') ? 'action' : statuses.includes('watch') ? 'watch' : 'good';
-  return { verdict, signals };
 }
 
 export async function getDashboard(ctx) {
-  const branch = await Branch.findOne(scoped(ctx, { _id: ctx.activeBranchId })).lean();
+  const branch = await activeBranch(ctx);
   const now = new Date();
   const todayDate = DateTime.fromJSDate(now, { zone: branch.timezone }).toISODate(); // "today" at the branch
   const today = dayRangeUTC(todayDate, branch.timezone);
 
-  const todayAppointments = await Appointment.find(scoped(ctx, { branchId: branch._id, startAt: { $gte: today.start, $lt: today.end } })).lean();
+  const [todayAppointments, money, soFar, openLeads] = await Promise.all([
+    Appointment.find(scoped(ctx, { branchId: branch._id, startAt: { $gte: today.start, $lt: today.end } })).lean(),
+    moneyBetween(ctx, branch._id, today.start, today.end),
+    moneyBetween(ctx, branch._id, today.start, now),
+    Lead.countDocuments(scoped(ctx, { branchId: branch._id, status: { $in: OPEN_LEAD_STATUSES } })),
+  ]);
 
-  const kpis = await getKpis(ctx, branch, today, todayAppointments);
-  const attention = await getAttention(ctx, branch, now, todayAppointments);
-  const pulse = await getPulse(ctx, branch, now, today, todayAppointments, attention);
+  const kpis = {
+    todayRevenue: money.netSales, // net sales: after discounts and refunds, without GST
+    todayCollected: money.collected,
+    todayAppointments: todayAppointments.filter((a) => a.status !== 'CANCELLED').length,
+    openLeads,
+  };
+  const [signals, attention] = await Promise.all([
+    getSignals(ctx, branch, now, today, soFar.netSales, todayAppointments),
+    getAttention(ctx, branch, now, todayAppointments),
+  ]);
 
-  return { branch: { _id: branch._id, name: branch.name, timezone: branch.timezone }, date: todayDate, generatedAt: now, kpis, pulse, attention };
+  return { branch: { _id: branch._id, name: branch.name, timezone: branch.timezone }, date: todayDate, generatedAt: now, kpis, signals, attention };
 }

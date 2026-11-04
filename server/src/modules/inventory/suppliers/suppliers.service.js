@@ -3,15 +3,10 @@ import { AppError } from '../../../utils/AppError.js';
 import { scoped } from '../../../utils/scoped.js';
 import { escapeRegex } from '../../../utils/regex.js';
 import { runOnce } from '../../../middleware/idempotency.js';
-import { assertCan } from '../permissions.js';
-import { getBranchSettings } from '../settings/settings.service.js';
-import { recordInventoryAction } from '../activity.js';
+import { assertCanHere } from '../settings/settings.service.js';
+import { logActivity } from '../../activity/activity.service.js';
 
-// Suppliers (INV-10), for the whole salon. Prices live on purchase orders, so nothing here is a cost.
-
-async function allow(ctx) {
-  assertCan(ctx, 'inventory.manageSuppliers', { settings: await getBranchSettings(ctx, ctx.activeBranchId) });
-}
+// Suppliers, for the whole salon. Prices live on purchase orders, so nothing here is a cost.
 
 export async function listSuppliers(ctx, { includeInactive } = {}) {
   const filter = scoped(ctx);
@@ -32,24 +27,24 @@ async function assertNameFree(ctx, name, exceptId) {
 }
 
 export async function createSupplier(ctx, input, key) {
-  await allow(ctx);
+  await assertCanHere(ctx, 'inventory.manageSuppliers');
   await assertNameFree(ctx, input.name);
   return runOnce(ctx, { key, operation: 'inventory.supplier.create' }, async (session) => {
     const [supplier] = await InventorySupplier.create([{ ...input, orgId: ctx.orgId }], { session });
-    await recordInventoryAction(ctx, { action: 'inventory.supplier_added', branchId: ctx.activeBranchId, summary: `Added the supplier ${supplier.name}`, link: '/app/inventory?tab=purchasing' }, session);
+    await logActivity(ctx, { action: 'inventory.supplier_added', branchId: ctx.activeBranchId, summary: `Added the supplier ${supplier.name}` }, session);
     return { supplier };
   });
 }
 
 export async function updateSupplier(ctx, id, input, key) {
-  await allow(ctx);
+  await assertCanHere(ctx, 'inventory.manageSuppliers');
   const supplier = await findSupplier(ctx, id);
   if (input.name) await assertNameFree(ctx, input.name, supplier._id);
   return runOnce(ctx, { key, operation: 'inventory.supplier.update' }, async (session) => {
     const updated = await InventorySupplier.findOneAndUpdate(scoped(ctx, { _id: supplier._id }), { $set: input }, { returnDocument: 'after', session, runValidators: true }).lean();
-    await recordInventoryAction(
+    await logActivity(
       ctx,
-      { action: 'inventory.supplier_changed', branchId: ctx.activeBranchId, summary: `Changed the supplier ${updated.name}`, before: supplier, after: input, link: '/app/inventory?tab=purchasing' },
+      { action: 'inventory.supplier_changed', branchId: ctx.activeBranchId, summary: `Changed the supplier ${updated.name}`, before: supplier, after: input },
       session
     );
     return { supplier: updated };

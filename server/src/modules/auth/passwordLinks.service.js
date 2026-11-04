@@ -8,7 +8,7 @@ import { mailMode } from '../mail/config.js';
 import { escapeHtml, layout, textToHtml } from '../mail/html.js';
 import { kickMailer, onResult, queueEmail } from '../mail/outbox.js';
 
-// One-time links to choose a password (EMAIL_PLAN.md Part 4):
+// One-time links to choose a password:
 //   RESET  — "Forgot password?" on the login page, valid 1 hour
 //   INVITE — an owner emails a team member a link to set their password, valid 48 hours
 // The link holds a random token; only its hash is stored. A new link cancels the person's older ones.
@@ -103,7 +103,7 @@ export async function sendResetIfAllowed(email) {
 
 // An owner emails a team member a set-password link (same people they may reset today)
 export async function emailPasswordLink(user, by) {
-  if (!passwordEmailsAvailable()) throw new AppError(409, 'MAIL_NOT_SET_UP', 'Email isn’t set up yet. Use Reset password and share the temporary password instead.');
+  if (!passwordEmailsAvailable()) throw new AppError(409, 'MAIL_OFF', 'Email is off. Use Reset password and share the temporary password instead.');
   if (user.status !== 'active') throw new AppError(409, 'USER_INACTIVE', 'Activate this login first');
   await issueLink(user, 'INVITE', { by });
   return { email: user.email, emailed: true };

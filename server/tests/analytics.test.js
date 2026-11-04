@@ -29,7 +29,7 @@ function booking(branch, staff, start, minutes, status = 'COMPLETED') {
 }
 
 describe('Analytics', () => {
-  it('counts bookings, revenue, payment mix and busy times in branch time', async () => {
+  it('counts bookings, revenue and busy times in branch time', async () => {
     const paid = await booking(f.andheri, f.rahul, '2026-10-01T05:00:00Z', 60); // Thu 1 Oct, 10:30 AM in Mumbai
     await booking(f.andheri, f.rahul, '2026-10-02T13:30:00Z', 45, 'BOOKED'); // Fri 2 Oct, 7:00 PM
     await booking(f.bandra, f.arjun, '2026-10-01T09:00:00Z', 60, 'CANCELLED'); // never counts
@@ -45,7 +45,6 @@ describe('Analytics', () => {
     const report = await getAnalytics(f.ctxGlamour, { from: '2026-10-01', to: '2026-10-02', branchId: 'all' });
     expect(report.totals).toEqual({ revenue: 50000, collected: 50000, bookings: 2, invoices: 1, avgTicket: 50000 });
     expect(report.branchDemand.map((b) => [b.name, b.bookings])).toEqual([['Andheri', 2], ['Bandra', 0]]);
-    expect(report.paymentMix.map((m) => [m.method, m.share])).toEqual([['CASH', 0], ['UPI', 40], ['CARD', 60], ['OTHER', 0]]);
     expect(report.slotDemand.slots.filter((s) => s.count > 0)).toEqual([{ day: 4, hour: 10, count: 1 }, { day: 5, hour: 19, count: 1 }]);
     // 105 booked minutes out of one working day (the other is leave) of 11 open hours
     expect(report.stylistDemand).toMatchObject([{ name: 'Rahul', bookings: 2, bookedMinutes: 105, serviceValue: 50000, utilisation: 16 }]);

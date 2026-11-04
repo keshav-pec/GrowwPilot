@@ -4,17 +4,8 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Package } from 'lucide-react';
 import { useOrg, useSetOrgAddon, useSetOrgStatus } from '../../api/admin';
 import { formatDate } from '../../lib/time';
-import { Badge, Button, Card, ConfirmDialog, EmptyState, PageHeader, Spinner } from '../../components/ui';
+import { Badge, Button, Card, ConfirmDialog, Detail, EmptyState, PageHeader, PageSpinner } from '../../components/ui';
 import SalonStatusBadge from './SalonStatusBadge';
-
-function Detail({ label, value }) {
-  return (
-    <div>
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className="text-sm">{value || '—'}</dd>
-    </div>
-  );
-}
 
 // Paid add-ons the Super Admin can switch on per salon
 const ADDONS = [
@@ -37,11 +28,7 @@ export default function SalonDetailPage() {
   const [addonToSwitchOff, setAddonToSwitchOff] = useState(null);
 
   if (orgQuery.isPending) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner size={28} />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   if (orgQuery.isError) {
@@ -93,12 +80,12 @@ export default function SalonDetailPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Details" className="lg:col-span-2">
           <dl className="grid gap-4 sm:grid-cols-2">
-            <Detail label="Owner" value={org.ownerName} />
-            <Detail label="Owner email" value={org.contactEmail} />
-            <Detail label="Owner phone" value={org.contactPhone} />
-            <Detail label="City" value={org.city} />
-            <Detail label="Plan" value={<span className="capitalize">{org.plan}</span>} />
-            <Detail label="Onboarded" value={formatDate(org.createdAt)} />
+            <Detail label="Owner">{org.ownerName}</Detail>
+            <Detail label="Owner email">{org.contactEmail}</Detail>
+            <Detail label="Owner phone">{org.contactPhone}</Detail>
+            <Detail label="City">{org.city}</Detail>
+            <Detail label="Plan">{<span className="capitalize">{org.plan}</span>}</Detail>
+            <Detail label="Onboarded">{formatDate(org.createdAt)}</Detail>
           </dl>
         </Card>
 

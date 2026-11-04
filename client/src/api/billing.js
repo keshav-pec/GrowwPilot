@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
+import { keyed } from './request';
 
 // Billing settings (owners): salon GST details, per-branch GSTIN and bill prefix, front desk discount limit
 export function useBillingSettings(enabled = true) {
@@ -10,7 +11,7 @@ export function useBillingSettings(enabled = true) {
 export function useSaveBillingSettings() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ key, ...values }) => api.patch('/billing/settings', values, { headers: { 'Idempotency-Key': key } }).then((res) => res.data),
+    mutationFn: ({ key, ...values }) => api.patch('/billing/settings', values, keyed(key)).then((res) => res.data),
     onSuccess: (settings) => queryClient.setQueryData(['billing-settings'], settings),
   });
 }

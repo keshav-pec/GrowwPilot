@@ -5,11 +5,11 @@ import { formatMoney } from '../../utils/money.js';
 import { dayRangeUTC, todayInZone } from '../../utils/time.js';
 import { runOnce } from '../../middleware/idempotency.js';
 import { logActivity } from '../activity/activity.service.js';
-import { branchApproverIds, notify } from '../notifications/notifications.service.js';
 import { billingPermissions, getBillingSettings } from '../billing/settings.service.js';
+import { activeBranch } from '../branches/activeBranch.js';
 
 // ---------------------------------------------------------------------------
-// Daily cash closing (BILLING_PLAN.md, Phase 3), for the branch picked in the branch switcher.
+// Daily cash closing, for the branch picked in the branch switcher.
 //   Open the day with a float -> cash payments and cash refunds of that day are counted automatically,
 //   petty cash in/out is added by hand with a reason -> count the drawer -> the gap is shown -> close.
 //   expected = float + cash in - cash out + petty in - petty out;  difference = counted - expected
@@ -17,14 +17,7 @@ import { billingPermissions, getBillingSettings } from '../billing/settings.serv
 // Cash belongs to the branch-local day it was received; cash taken after closing shows as a warning.
 // ---------------------------------------------------------------------------
 
-const LINK = '/app/cash';
 const sum = (rows, test) => rows.filter(test).reduce((total, r) => total + r.amount, 0);
-
-async function activeBranch(ctx, session = null) {
-  const branch = await Branch.findOne(scoped(ctx, { _id: ctx.activeBranchId })).select('name timezone').session(session).lean();
-  if (!branch) throw new AppError(404, 'NOT_FOUND', 'Branch not found');
-  return branch;
-}
 
 async function loadDay(ctx, id, session = null) {
   const day = await CashSession.findOne(scoped(ctx, { _id: id })).session(session).lean();
@@ -171,7 +164,6 @@ export async function closeCashDay(ctx, id, { countedCash, note, version }, key)
     const gap = difference === 0 ? 'matches' : `${formatMoney(Math.abs(difference))} ${difference < 0 ? 'short' : 'over'}`;
     const summary = `Closed the cash day ${day.day} at ${branch.name}: expected ${formatMoney(live.expectedCash)}, counted ${formatMoney(countedCash)} (${gap})${note?.trim() ? `. Note: ${note.trim()}` : ''}`;
     await logActivity(ctx, { action: 'billing.cash_closed', branchId: day.branchId, summary, after: { expectedCash: live.expectedCash, countedCash, difference } }, session);
-    if (difference !== 0) await notify(ctx, await branchApproverIds(ctx, day.branchId), { message: `${ctx.userName}: ${summary}`, link: LINK }, session);
     return withFigures(closed, branch.timezone, session);
   });
 }

@@ -16,6 +16,9 @@ export function isValidRupees(text) {
 }
 
 // 2000000 -> "₹20,000", 2000050 -> "₹20,000.50" (no ".00" in sentences)
+// Rupees typed in a box -> paise (fallback when it isn't an amount)
+export const paiseOf = (text, fallback = 0) => (isValidRupees(text) ? toPaise(text) : fallback);
+
 export function formatAmount(paise) {
   const digits = (paise || 0) % 100 === 0 ? 0 : 2;
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: digits, maximumFractionDigits: digits }).format((paise || 0) / 100);

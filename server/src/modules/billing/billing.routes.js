@@ -9,7 +9,7 @@ import { objectId } from '../../utils/schemas.js';
 import { GST_RATES_BPS, PREFIX_REGEX } from '../../config/billing.js';
 import { getSettingsForScreen, updateSettings } from './settings.service.js';
 import { REPORTS, duesOverview, runReport } from './reports.service.js';
-import { toCsv } from '../../utils/csv.js';
+import { sendCsv } from '../../utils/csv.js';
 
 // /api/billing — billing settings (owners), reports (owners; the front desk only today's collections) and dues
 const router = Router();
@@ -60,9 +60,7 @@ router.get('/reports', (req, res) => {
 router.get('/reports/:name', validate({ query: reportQuery }), async (req, res) => {
   const report = await runReport(req.ctx, req.params.name, req.valid.query);
   if (req.valid.query.format === 'csv') {
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${report.name}-${report.from}-to-${report.to}.csv"`);
-    return res.send(`\uFEFF${toCsv(report)}`);
+    return sendCsv(res, `${report.name}-${report.from}-to-${report.to}.csv`, report);
   }
   res.json(report);
 });

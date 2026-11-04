@@ -2,7 +2,6 @@
 // expire, other devices logged out after a reset, owners emailing a link only to the people they manage.
 // Email is in "log" mode (development): emails are kept in memory, so the tests can read the link.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import mongoose from 'mongoose';
 import { EmailOutbox, PasswordToken, User } from '../src/models/index.js';
 import { hashPassword } from '../src/utils/password.js';
 import { configureMail } from '../src/modules/mail/config.js';
@@ -222,11 +221,11 @@ describe('owners emailing a set-password link', () => {
     await User.updateOne({ _id: users.dev._id }, { $set: { passwordHash: await hashPassword(PASSWORD) } });
   });
 
-  it('with email not set up: no link button, a clear refusal, and forgot password sends nothing', async () => {
+  it('with email off: no link button, a clear refusal, and forgot password sends nothing', async () => {
     configureMail({ mode: 'off' });
     expect((await call(null, 'GET', '/auth/options')).json).toEqual({ passwordEmails: false, passwordRule: 'At least 8 characters, with a letter and a number' });
     const res = await call('business', 'POST', `/users/${users.kavya._id}/email-password-link`);
-    expect(res).toMatchObject({ status: 409, json: { error: { code: 'MAIL_NOT_SET_UP' } } });
+    expect(res).toMatchObject({ status: 409, json: { error: { code: 'MAIL_OFF' } } });
     expect(await sendResetIfAllowed('kavya@g.com')).toBe(false);
     const create = await call('business', 'POST', '/users', { role: 'FRONT_DESK', name: 'Nope', email: 'nope@g.com', branchIds: [String(f.andheri._id)], sendPasswordEmail: true });
     expect(create.status).toBe(409);

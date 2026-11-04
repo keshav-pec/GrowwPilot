@@ -4,7 +4,7 @@ import { scoped } from '../../../utils/scoped.js';
 import { formatAmount } from '../../../utils/money.js';
 import { runOnce } from '../../../middleware/idempotency.js';
 import { assertCan } from '../permissions.js';
-import { recordInventoryAction } from '../activity.js';
+import { logActivity } from '../../activity/activity.service.js';
 import { reconcile } from '../stock/stock.engine.js';
 
 // The inventory rules for one branch. A branch nobody has changed yet gets the defaults
@@ -15,11 +15,16 @@ export async function getBranchSettings(ctx, branchId) {
 }
 
 // ---------------------------------------------------------------------------
-// Settings screen (INV-15) for the selected branch: what the front desk may do, approval limits and
+// Settings screen for the selected branch: what the front desk may do, approval limits and
 // whether branch owners see costs. Owners only. A branch owner may change the front desk switches and the
 // inventory login's limit, but not their own limits or cost visibility (the business owner decides those).
 // ---------------------------------------------------------------------------
 const OWNER_ONLY = ['limits.branchOwnerWriteOff', 'limits.branchOwnerPoApproval', 'branchOwnerSeesCosts'];
+
+// Checks the person may do this at the selected branch, under that branch's rules
+export async function assertCanHere(ctx, action) {
+  assertCan(ctx, action, { settings: await getBranchSettings(ctx, ctx.activeBranchId) });
+}
 
 export async function getSettingsForScreen(ctx) {
   const settings = await getBranchSettings(ctx, ctx.activeBranchId);
@@ -47,7 +52,7 @@ export async function updateSettings(ctx, changes, key) {
 
   return runOnce(ctx, { key, operation: 'inventory.settings.update' }, async (session) => {
     await InventorySettings.updateOne(scoped(ctx, { branchId }), { $set: set }, { upsert: true, session, runValidators: true });
-    await recordInventoryAction(ctx, { action: 'inventory.settings_changed', branchId, summary: `Changed inventory settings: ${words.join(', ')}`, after: set, link: '/app/inventory?tab=settings' }, session);
+    await logActivity(ctx, { action: 'inventory.settings_changed', branchId, summary: `Changed inventory settings: ${words.join(', ')}`, after: set }, session);
     const saved = await InventorySettings.findOne(scoped(ctx, { branchId })).session(session).lean();
     return { frontDesk: saved.frontDesk, limits: saved.limits, branchOwnerSeesCosts: saved.branchOwnerSeesCosts };
   });

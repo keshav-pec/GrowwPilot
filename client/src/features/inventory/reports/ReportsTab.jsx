@@ -7,8 +7,9 @@ import { downloadReportCsv, useReport } from '../../../api/inventory/reports';
 import { formatQty } from '../../../lib/inventory';
 import { formatAmount } from '../../../lib/money';
 import { Button, EmptyState, Input, Select, Spinner } from '../../../components/ui';
+import ReportTable from '../../../components/ReportTable';
 
-// The reports (INV-14). Costs-only reports are hidden from people who can't see costs (the server refuses them too).
+// The reports. Costs-only reports are hidden from people who can't see costs (the server refuses them too).
 const REPORTS = [
   { value: 'stock-summary', label: 'Stock summary' },
   { value: 'low-stock', label: 'Low stock' },
@@ -102,30 +103,7 @@ export default function ReportsTab({ can }) {
           {report.rows.length === 0 ? (
             <EmptyState title="Nothing to show" message="There is nothing for these dates and branches." />
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-surface text-muted">
-                  <tr>
-                    {report.columns.map((c) => (
-                      <th key={c.key} className="whitespace-nowrap px-3 py-2 font-medium">
-                        {c.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.rows.map((row, i) => (
-                    <tr key={i} className="border-t border-border">
-                      {report.columns.map((c) => (
-                        <td key={c.key} className="whitespace-nowrap px-3 py-2">
-                          {show(c, row)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ReportTable columns={report.columns} rows={report.rows} cell={show} />
           )}
         </>
       )}

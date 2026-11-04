@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { DateTime } from 'luxon';
 import toast from 'react-hot-toast';
 import { useAutomation, useDismissException, usePostException, useRetryEvent } from '../../../api/inventory/automation';
-import { EXCEPTION_REASON_LABEL, formatQty, newRequestKey } from '../../../lib/inventory';
-import { Badge, Button, Card, Input, Modal } from '../../../components/ui';
+import { EXCEPTION_REASON_LABEL, formatQty } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
+import { Badge, Button, Card } from '../../../components/ui';
+import ReasonModal from '../../../components/ReasonModal';
 
 // Services that couldn't take their stock automatically (nothing went below zero), and events that failed.
 // After restocking, Post now takes what the recipe said at the time. Owners can dismiss with a reason.
@@ -78,38 +80,28 @@ export default function AutomationCard({ can }) {
 function DismissModal({ exception, onClose }) {
   const dismiss = useDismissException();
   const [key] = useState(newRequestKey);
-  const [note, setNote] = useState('');
-
-  function save() {
-    dismiss.mutate(
-      { key, id: exception._id, note },
-      {
-        onSuccess: () => {
-          toast.success('Dismissed');
-          onClose();
-        },
-      }
-    );
-  }
-
   return (
-    <Modal
-      open
-      onClose={onClose}
+    <ReasonModal
+      singleLine
+      danger={false}
       title={`Don’t take ${exception.skuName} for this ${exception.serviceName}?`}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={save} loading={dismiss.isPending} disabled={note.trim().length < 3}>
-            Dismiss
-          </Button>
-        </>
+      label="Why"
+      placeholder="e.g. Used a sample instead"
+      confirmLabel="Dismiss"
+      loading={dismiss.isPending}
+      error={dismiss.error?.message}
+      onClose={onClose}
+      onConfirm={(note) =>
+        dismiss.mutate(
+          { key, id: exception._id, note },
+          {
+            onSuccess: () => {
+              toast.success('Dismissed');
+              onClose();
+            },
+          }
+        )
       }
-    >
-      <Input id="dismiss-reason" label="Why" autoFocus placeholder="e.g. Used a sample instead" value={note} onChange={(e) => setNote(e.target.value)} />
-      {dismiss.isError && <p className="mt-2 text-sm text-danger">{dismiss.error.message}</p>}
-    </Modal>
+    />
   );
 }

@@ -1,4 +1,4 @@
-// Fixed lists and small helpers for billing (BILLING_PLAN.md).
+// Fixed lists and small helpers for billing.
 import { DateTime } from 'luxon';
 
 export const INVOICE_STATUSES = ['DRAFT', 'ISSUED', 'VOID'];

@@ -98,11 +98,12 @@ describe('Owners change pay directly', () => {
     expect(await Notification.countDocuments()).toBe(0);
   });
 
-  it('branch owner: changes pay at their branch and the business owner is notified', async () => {
+  it('branch owner: changes pay at their branch; it goes in the activity log, not the bell', async () => {
     await payroll.createPlan(ctx.bandraOwner, f.arjun._id, fixed(18000, thisMonth));
-    const bell = await bellOf(users.business);
-    expect(bell).toHaveLength(1);
-    expect(bell[0].message).toContain('Vikram (Branch owner): Set Arjun\'s pay: ₹18,000/month');
+    const log = await ActivityLog.findOne({ action: 'pay_plan.created' }).lean();
+    expect(log.actorRole).toBe('Branch owner');
+    expect(log.summary).toContain('Set Arjun\'s pay: ₹18,000/month');
+    expect(await bellOf(users.business)).toHaveLength(0);
   });
 
   it('branch owner: cannot see or change pay at another branch', async () => {
@@ -155,7 +156,7 @@ describe('Front desk requests a change, an owner approves', () => {
     expect(pay.history).toBeUndefined();
   });
 
-  it('request → approvers notified → approve → new setup, requester and business owner notified', async () => {
+  it('request → approvers notified → approve → new setup, requester notified', async () => {
     await payroll.createPlan(ctx.business, f.arjun._id, fixed(18000, thisMonth));
     const bandraDesk = { ...ctx.andheriDesk, allowedBranchIds: [String(f.bandra._id)], activeBranchId: String(f.bandra._id) };
 
@@ -174,7 +175,6 @@ describe('Front desk requests a change, an owner approves', () => {
     expect(String(plans[1].requestId)).toBe(String(request._id));
     expect(await PayChangeRequest.findById(request._id).lean()).toMatchObject({ status: 'approved', decidedByName: 'Vikram' });
     expect((await bellOf(users.andheriDesk))[0].message).toContain('Vikram approved your pay change for Arjun');
-    expect((await bellOf(users.business))[0].message).toContain('Vikram (Branch owner): Approved');
 
     // Can't be answered twice
     await expect(payroll.approveRequest(ctx.business, request._id, {})).rejects.toMatchObject({ code: 'REQUEST_CLOSED' });

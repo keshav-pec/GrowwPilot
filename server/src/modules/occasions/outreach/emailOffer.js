@@ -9,7 +9,21 @@ import { campaignMessages, fillMessage, messageValues } from './templates.js';
 import { maskedDestination } from './gate.js';
 import { unsubscribeUrl } from './unsubscribe.js';
 
-// Offer emails sent by the app (EMAIL_PLAN.md Part 2). WhatsApp and SMS are still sent by staff from their phone.
+// Offer emails sent by the app. WhatsApp and SMS are still sent by staff from their phone.
+
+// What goes in the outbox for an offer email (the caller adds its own dedupeKey)
+export const offerEmailFields = ({ offer, customer, org, email }) => ({
+  kind: 'OCCASION_OFFER',
+  branchId: offer.homeBranchId,
+  to: customer.email,
+  subject: email.subject,
+  text: email.text,
+  html: email.html,
+  headers: email.headers,
+  fromName: org.name,
+  replyTo: org.contactEmail,
+  ref: { offerId: offer._id },
+});
 
 // The campaign's EMAIL wording, filled in, as an email: plain text and HTML, with the salon's details, why the
 // customer gets it, and the unsubscribe link (always added, even with custom wording)
@@ -48,7 +62,7 @@ async function checkBeforeSending(row) {
 }
 
 // After the mailer is done with it: Sent, or Failed / Skipped (the 7-day slot is given back and the task reopens)
-export async function offerEmailResult(row) {
+async function offerEmailResult(row) {
   if (!row.ref?.offerId) return;
   await mongoose.connection.transaction(async (session) => {
     // Only the latest send of this offer counts (a newer one may have replaced it)

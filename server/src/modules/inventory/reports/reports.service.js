@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
 import {
   Appointment,
@@ -17,23 +16,22 @@ import {
 } from '../../../models/index.js';
 import { OPEN_PO_STATUSES } from '../../../models/inventory/InventoryPurchaseOrder.js';
 import { AppError } from '../../../utils/AppError.js';
-import { scoped } from '../../../utils/scoped.js';
+import { oid, scoped } from '../../../utils/scoped.js';
 import { dayRangeUTC, todayInZone } from '../../../utils/time.js';
 import { assertCan, can } from '../permissions.js';
 import { getBranchSettings } from '../settings/settings.service.js';
 import { countingUnit } from '../units.js';
 
 // ---------------------------------------------------------------------------
-// Reports (INV-14). Every report is a plain table: { title, note?, columns, rows }.
+// Reports. Every report is a plain table: { title, note?, columns, rows }.
 // Columns marked `cost` are removed on the server for people who may not see costs, so neither the screen
-// nor the CSV export (AC27) ever gets them. Columns marked `qty` hold whole numbers in the product's
+// nor the CSV export ever gets them. Columns marked `qty` hold whole numbers in the product's
 // counting unit; each row carries the product (`_sku`) so the screen can write "3 bottles + 400 ml".
 // ---------------------------------------------------------------------------
 
 const SKU_FIELDS = 'name code category stockUnit wayOfUse baseUnit unitsPerStockUnit status';
 const WAY_WORDS = { FINISH: 'Finish', SERVICE_UNITS: 'Per service, units', SERVICE_MEASURED: 'Per service, by measure', MANUAL: 'By hand' };
 const REASON_WORDS = { DAMAGE: 'Damaged', EXPIRY: 'Expired', LOSS: 'Lost', SPILLAGE: 'Spilled', STOCK_COUNT_CORRECTION: 'Count correction' };
-const oid = (id) => new mongoose.Types.ObjectId(String(id));
 const paise = (n) => (n == null ? null : Math.round(n));
 
 const PRODUCT = { key: 'product', label: 'Product' };
@@ -363,6 +361,3 @@ export async function runReport(ctx, name, { from, to, branches }) {
   });
   return { name, title: result.title, note: result.note, from: fromDate, to: toDate, branches: branchDocs.map((b) => b.name), columns, rows };
 }
-
-// The same report as CSV: quantities as plain numbers (with the unit column), money in rupees
-export { toCsv } from '../../../utils/csv.js';

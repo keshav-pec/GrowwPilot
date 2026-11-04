@@ -2,8 +2,7 @@
 // Everything is a MongoDB aggregation over the chosen date range and branches.
 import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
-import { Appointment, Attendance, Branch, Lead, Organization, Payment, Staff } from '../../models/index.js';
-import { LEAD_SOURCES, PAYMENT_METHODS } from '../../config/constants.js';
+import { Appointment, Attendance, Branch, Organization, Staff } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { dayRangeUTC } from '../../utils/time.js';
@@ -36,11 +35,9 @@ export async function getAnalytics(ctx, { from, to, branchId }) {
   const branches = await loadBranches(ctx, branchId);
   const orgId = new mongoose.Types.ObjectId(ctx.orgId); // aggregate() doesn't convert ids for us
   const bookingsMatch = { orgId, status: { $ne: 'CANCELLED' }, ...dateRangeFilter(branches, 'startAt', from, to) };
-  const paymentsMatch = { orgId, kind: { $ne: 'REFUND' }, status: 'VALID', ...dateRangeFilter(branches, 'receivedAt', from, to) };
-  const leadsMatch = { orgId, ...dateRangeFilter(branches, 'createdAt', from, to) };
   const days = Math.round(DateTime.fromISO(to).diff(DateTime.fromISO(from), 'days').days) + 1;
 
-  const [bookingsByBranch, revenueByBranch, byStylist, byService, bySource, byMethod, slotGroups] = await Promise.all([
+  const [bookingsByBranch, revenueByBranch, byStylist, byService, slotGroups] = await Promise.all([
     // Branch demand: bookings (not cancelled) and revenue (issued bills) per branch
     Appointment.aggregate([{ $match: bookingsMatch }, { $group: { _id: '$branchId', bookings: { $sum: 1 } } }]),
     // Net sales (after discounts and refunds, without GST), bills and money collected, per branch
@@ -77,15 +74,6 @@ export async function getAnalytics(ctx, { from, to, branchId }) {
       },
       { $sort: { bookings: -1, name: 1 } }, // ties in name order, so rows don't swap between loads
     ]),
-
-    // Lead sources: leads created in the range, and how many became appointments
-    Lead.aggregate([
-      { $match: leadsMatch },
-      { $group: { _id: '$source', leads: { $sum: 1 }, converted: { $sum: { $cond: [{ $eq: ['$status', 'APPOINTMENT_BOOKED'] }, 1, 0] } } } },
-    ]),
-
-    // Payment mix: money received in the period by method (₹1,000 card + ₹500 UPI count in each method)
-    Payment.aggregate([{ $match: paymentsMatch }, { $group: { _id: '$method', amount: { $sum: '$amount' }, payments: { $sum: 1 } } }]),
 
     // Slot demand: bookings by weekday x hour, in each branch's LOCAL time (one aggregation per branch)
     Promise.all(
@@ -141,7 +129,6 @@ export async function getAnalytics(ctx, { from, to, branchId }) {
   // ----- Totals -----
   const revenue = branchRows.reduce((sum, b) => sum + b.revenue, 0);
   const invoices = branchRows.reduce((sum, b) => sum + b.invoices, 0);
-  const paid = byMethod.reduce((sum, m) => sum + m.amount, 0);
 
   return {
     from,
@@ -153,14 +140,6 @@ export async function getAnalytics(ctx, { from, to, branchId }) {
     slotDemand: { hours, slots },
     stylistDemand: stylists,
     serviceDemand: byService.map((s) => ({ serviceId: s._id, name: s.name, bookings: s.bookings, serviceValue: s.serviceValue })),
-    leadSources: LEAD_SOURCES.map((source) => {
-      const row = bySource.find((x) => x._id === source);
-      return { source, leads: row?.leads ?? 0, converted: row?.converted ?? 0, rate: percent(row?.converted ?? 0, row?.leads ?? 0) };
-    }).filter((r) => r.leads > 0),
-    paymentMix: PAYMENT_METHODS.map((method) => {
-      const row = byMethod.find((x) => x._id === method);
-      return { method, amount: row?.amount ?? 0, payments: row?.payments ?? 0, share: percent(row?.amount ?? 0, paid) };
-    }),
   };
 }
 

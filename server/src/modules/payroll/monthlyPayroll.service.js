@@ -1,36 +1,23 @@
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
-import { Appointment, Attendance, Branch, CommissionEntry, EmployeeAdvance, Invoice, PayPlan, PayrollAdjustment, PayrollItem, PayrollPayment, PayrollRun, Staff } from '../../models/index.js';
+import { Appointment, Attendance, CommissionEntry, EmployeeAdvance, Invoice, PayPlan, PayrollAdjustment, PayrollItem, PayrollPayment, PayrollRun, Staff } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { formatAmount } from '../../utils/money.js';
 import { dayRangeUTC, todayInZone } from '../../utils/time.js';
 import { findStaff } from '../staff/staff.service.js';
-import { actorRole, logActivity } from '../activity/activity.service.js';
-import { businessOwnerIds, notify } from '../notifications/notifications.service.js';
+import { logActivity } from '../activity/activity.service.js';
 import { paidBillsBetween, syncCommissions } from './commission.service.js';
 import { advanceRepayment, calculateMonthlyPay, monthBounds, monthName } from './monthlyPay.rules.js';
+import { activeBranch } from '../branches/activeBranch.js';
 
 // Monthly payroll for the branch picked in the branch switcher. Owners only (branch owners: their branches).
 // A draft month is worked out again when opened (if it's a few minutes old) or on "Recalculate".
 // Locking freezes it; after that, corrections go into a later month as bonuses or deductions with a reason.
 
 const STALE_AFTER_MINUTES = 5;
-const MONTH_LINK = (month) => `/app/payroll?tab=month&month=${month}`;
 
-
-async function activeBranch(ctx) {
-  const branch = await Branch.findOne(scoped(ctx, { _id: ctx.activeBranchId })).select('name timezone').lean();
-  if (!branch) throw new AppError(404, 'NOT_FOUND', 'Branch not found');
-  return branch;
-}
-
-// Log a payroll action and tell the business owner(s) (unless they did it themselves)
-export async function recordPayrollAction(ctx, { action, branchId, staffId, summary, before, after }, session) {
-  await logActivity(ctx, { action, branchId, staffId, summary, before, after }, session);
-  await notify(ctx, await businessOwnerIds(ctx), { message: `${ctx.userName} (${actorRole(ctx)}): ${summary}`, link: MONTH_LINK(after?.month ?? before?.month) }, session);
-}
 
 // Completed visits in a period whose bill isn't fully paid yet (or that have no bill at all)
 async function unpaidVisits(ctx, branchId, startAt) {
@@ -217,7 +204,7 @@ export async function lockRun(ctx, month) {
 
     const people = items.length === 1 ? '1 person' : `${items.length} people`;
     const summary = `Locked ${monthName(month)} payroll for ${branch.name}: ${people}, ${formatAmount(run.totals.net)} to pay.`;
-    await recordPayrollAction(ctx, { action: 'payroll.locked', branchId: branch._id, summary, after: { month, net: run.totals.net, count: items.length } }, session);
+    await logActivity(ctx, { action: 'payroll.locked', branchId: branch._id, summary, after: { month, net: run.totals.net, count: items.length } }, session);
     return locked;
   });
 }
@@ -255,7 +242,7 @@ export async function addAdjustment(ctx, input) {
     const what = input.kind === 'bonus' ? 'a bonus' : 'a deduction';
     const fixes = input.correctsMonth ? `, correcting ${monthName(input.correctsMonth)}` : '';
     const summary = `Added ${what} of ${formatAmount(input.amount)} for ${staff.name} in ${monthName(input.month)}${fixes}. Reason: ${input.reason}`;
-    await recordPayrollAction(ctx, { action: `payroll.${input.kind}_added`, branchId: staff.branchId, staffId: staff._id, summary, after: { month: input.month, kind: input.kind, amount: input.amount } }, session);
+    await logActivity(ctx, { action: `payroll.${input.kind}_added`, branchId: staff.branchId, staffId: staff._id, summary, after: { month: input.month, kind: input.kind, amount: input.amount } }, session);
     return adjustment;
   });
 
@@ -272,7 +259,7 @@ export async function removeAdjustment(ctx, id) {
   await mongoose.connection.transaction(async (session) => {
     await PayrollAdjustment.deleteOne({ _id: adjustment._id }, { session });
     const summary = `Removed ${staff.name}'s ${adjustment.kind} of ${formatAmount(adjustment.amount)} in ${monthName(adjustment.month)} (“${adjustment.reason}”).`;
-    await recordPayrollAction(ctx, { action: `payroll.${adjustment.kind}_removed`, branchId: adjustment.branchId, staffId: staff._id, summary, before: { month: adjustment.month, kind: adjustment.kind, amount: adjustment.amount } }, session);
+    await logActivity(ctx, { action: `payroll.${adjustment.kind}_removed`, branchId: adjustment.branchId, staffId: staff._id, summary, before: { month: adjustment.month, kind: adjustment.kind, amount: adjustment.amount } }, session);
   });
 
   await refreshIfOpened(ctx, run, adjustment.month);

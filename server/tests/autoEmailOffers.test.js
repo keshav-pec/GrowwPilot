@@ -215,13 +215,13 @@ describe('sending automatically', () => {
     expect(await EmailOutbox.countDocuments({ 'ref.offerId': offer._id })).toBe(1);
   });
 
-  it('with email not set up, nothing is queued and the campaign shows a warning', async () => {
+  it('with email off, nothing is queued and the campaign shows a warning', async () => {
     configureMail({ mode: 'off' });
     await customerWithOffer('Nobody Emails');
     expect(await autoEmailCampaignIds(g)).toEqual([]);
     expect((await runBranch()).queued).toBe(0);
     const view = await call('business', 'GET', `/occasions/campaigns/${campaign._id}`);
-    expect((view.json.campaign ?? view.json).deliveryWarning).toMatch(/Email isn’t set up/);
+    expect((view.json.campaign ?? view.json).deliveryWarning).toMatch(/Email is off/);
   });
 
   it('the offer engine’s run sends them, and the report shows who was emailed automatically', async () => {

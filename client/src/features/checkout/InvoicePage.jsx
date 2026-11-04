@@ -7,11 +7,12 @@ import { downloadInvoicePdf, useBillEmails, useInvoice, useInvoiceHistory, useRe
 import { useApproveRefund, useRejectRefund } from '../../api/refunds';
 import { formatMoney } from '../../lib/money';
 import { formatDateTime } from '../../lib/time';
-import { METHOD_LABEL, billBadge, newRequestKey, percentLabel } from '../../lib/billing';
-import { Badge, Button, EmptyState, Spinner } from '../../components/ui';
+import { METHOD_LABEL, billBadge, percentLabel } from '../../lib/billing';
+import { newRequestKey } from '../../lib/requestKey';
+import { Badge, Button, EmptyState, PageSpinner, Spinner, SummaryRow } from '../../components/ui';
 import RecordPaymentModal from '../billing/RecordPaymentModal';
 import RefundModal from '../billing/RefundModal';
-import ReasonModal from '../billing/ReasonModal';
+import ReasonModal from '../../components/ReasonModal';
 import ShareBillModal from '../billing/ShareBillModal';
 import EmailBillModal from '../billing/EmailBillModal';
 
@@ -37,11 +38,7 @@ export default function InvoicePage() {
   const rejectRefund = useRejectRefund();
 
   if (invoiceQuery.isPending) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner size={28} />
-      </div>
-    );
+    return <PageSpinner />;
   }
   if (invoiceQuery.isError) return <EmptyState title="Bill not found" message={invoiceQuery.error.message} />;
 
@@ -192,18 +189,18 @@ export default function InvoicePage() {
         </div>
 
         <dl className="ml-auto flex max-w-xs flex-col gap-1 text-sm">
-          <Row label="Subtotal" value={formatMoney(invoice.subtotal)} />
-          {invoice.comboDiscountTotal > 0 && <Row label="Combo price" value={`−${formatMoney(invoice.comboDiscountTotal)}`} muted />}
-          {invoice.occasionDiscountTotal > 0 && <Row label={`${invoice.offer?.type === 'ANNIVERSARY' ? 'Anniversary' : 'Birthday'} offer`} value={`−${formatMoney(invoice.occasionDiscountTotal)}`} muted />}
-          {lineDiscounts > 0 && <Row label="Line discounts" value={`−${formatMoney(lineDiscounts)}`} muted />}
-          {billDiscount > 0 && <Row label="Bill discount" value={`−${formatMoney(billDiscount)}`} muted />}
+          <SummaryRow label="Subtotal" value={formatMoney(invoice.subtotal)} />
+          {invoice.comboDiscountTotal > 0 && <SummaryRow label="Combo price" value={`−${formatMoney(invoice.comboDiscountTotal)}`} muted />}
+          {invoice.occasionDiscountTotal > 0 && <SummaryRow label={`${invoice.offer?.type === 'ANNIVERSARY' ? 'Anniversary' : 'Birthday'} offer`} value={`−${formatMoney(invoice.occasionDiscountTotal)}`} muted />}
+          {lineDiscounts > 0 && <SummaryRow label="Line discounts" value={`−${formatMoney(lineDiscounts)}`} muted />}
+          {billDiscount > 0 && <SummaryRow label="Bill discount" value={`−${formatMoney(billDiscount)}`} muted />}
           {gst && (
             <>
-              <Row label="Taxable value" value={formatMoney(invoice.taxableTotal)} muted />
+              <SummaryRow label="Taxable value" value={formatMoney(invoice.taxableTotal)} muted />
               {invoice.taxSummary.map((t) => (
                 <div key={t.rateBps}>
-                  <Row label={`CGST ${percentLabel(t.rateBps / 2)}`} value={formatMoney(t.cgst)} muted />
-                  <Row label={`SGST ${percentLabel(t.rateBps / 2)}`} value={formatMoney(t.sgst)} muted />
+                  <SummaryRow label={`CGST ${percentLabel(t.rateBps / 2)}`} value={formatMoney(t.cgst)} muted />
+                  <SummaryRow label={`SGST ${percentLabel(t.rateBps / 2)}`} value={formatMoney(t.sgst)} muted />
                 </div>
               ))}
             </>
@@ -212,9 +209,9 @@ export default function InvoicePage() {
             <dt>Total</dt>
             <dd>{formatMoney(invoice.grandTotal)}</dd>
           </div>
-          {invoice.creditedTotal > 0 && <Row label="Refunded items" value={`−${formatMoney(invoice.creditedTotal)}`} muted />}
-          {invoice.amountPaid > 0 && (invoice.balanceDue > 0 || invoice.refundedTotal > 0) && <Row label="Paid" value={formatMoney(invoice.amountPaid)} />}
-          {invoice.refundedTotal > 0 && <Row label="Given back" value={`−${formatMoney(invoice.refundedTotal)}`} muted />}
+          {invoice.creditedTotal > 0 && <SummaryRow label="Refunded items" value={`−${formatMoney(invoice.creditedTotal)}`} muted />}
+          {invoice.amountPaid > 0 && (invoice.balanceDue > 0 || invoice.refundedTotal > 0) && <SummaryRow label="Paid" value={formatMoney(invoice.amountPaid)} />}
+          {invoice.refundedTotal > 0 && <SummaryRow label="Given back" value={`−${formatMoney(invoice.refundedTotal)}`} muted />}
           {invoice.balanceDue > 0 && (
             <div className="flex justify-between font-semibold text-orange">
               <dt>Balance due</dt>
@@ -335,15 +332,6 @@ export default function InvoicePage() {
         />
       )}
     </>
-  );
-}
-
-function Row({ label, value, muted = false }) {
-  return (
-    <div className={`flex justify-between ${muted ? 'text-muted' : ''}`}>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
   );
 }
 

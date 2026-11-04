@@ -1,20 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { api } from './client';
+import { keyed, useChange } from './request';
 
 // The cash drawer at the selected branch: { today, session, suggestedFloat, cashSoFar, recent, permissions }
 export const useCashDay = () => useQuery({ queryKey: ['cash-day'], queryFn: () => api.get('/cash-sessions/current').then((res) => res.data) });
 
-function useCashMutation(mutationFn) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cash-day'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    },
-  });
-}
-const post = (url, key, body) => api.post(url, body, { headers: { 'Idempotency-Key': key } }).then((res) => res.data.session);
+const useCashMutation = (mutationFn) => useChange(mutationFn, ['cash-day']);
+const post = (url, key, body) => api.post(url, body, keyed(key)).then((res) => res.data.session);
 
 // { key, openingFloat }
 export const useOpenCashDay = () => useCashMutation(({ key, ...body }) => post('/cash-sessions', key, body));

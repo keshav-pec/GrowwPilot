@@ -8,9 +8,11 @@ import { useLockMonth, usePayrollMonth, useRecalculateMonth } from '../../api/pa
 import { formatAmount } from '../../lib/money';
 import { formatMonth } from '../../lib/payroll';
 import { formatDateTime } from '../../lib/time';
-import { Badge, Button, Card, EmptyState, Modal, Spinner, Table } from '../../components/ui';
+import { Badge, Button, Card, EmptyState, HEADLINE_TILE, Modal, ModalFooter, Spinner, StatTile, Table } from '../../components/ui';
 import PayrollItemDrawer from './PayrollItemDrawer';
 import GroupSwitch, { GROUPS, groupOf } from './GroupSwitch';
+
+const Stat = (props) => <StatTile {...HEADLINE_TILE} valueClass="mt-1 text-xl font-semibold" className="rounded-xl border border-border p-4" {...props} />;
 
 // Where to go to sort out each kind of "thing to check"
 function fixLink(issue, item, onOpenPaySetup) {
@@ -62,16 +64,6 @@ function addUp(items) {
 
 const people = (n) => `${n} ${n === 1 ? 'person' : 'people'}`;
 
-function Stat({ label, value, hint }) {
-  return (
-    <div className="rounded-xl border border-border p-4">
-      <p className="text-sm text-muted">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-ink">{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
-    </div>
-  );
-}
-
 function LockDialog({ month, run, items, onClose }) {
   const lock = useLockMonth();
   const [checked, setChecked] = useState(false);
@@ -81,11 +73,7 @@ function LockDialog({ month, run, items, onClose }) {
       onClose={onClose}
       title={`Lock ${formatMonth(month)}?`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
+        <ModalFooter onClose={onClose}
             disabled={!checked}
             loading={lock.isPending}
             onClick={() =>
@@ -98,8 +86,7 @@ function LockDialog({ month, run, items, onClose }) {
             }
           >
             <Lock size={16} /> Lock month
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="space-y-3 text-sm">

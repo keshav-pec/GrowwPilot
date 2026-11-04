@@ -82,7 +82,7 @@ async function loadBookingRefs(ctx, payload) {
 // Step 2: turn the lines into appointment items, back to back, in UTC,
 // with a copy (snapshot) of the service name, stylist name and price.
 // ---------------------------------------------------------------------------
-export function buildItems(branch, lines, startAt) {
+function buildItems(branch, lines, startAt) {
   let cursor = startAt;
 
   return lines.map(({ service, staff, durationMinutes }) => {
@@ -108,7 +108,7 @@ export function buildItems(branch, lines, startAt) {
 // ---------------------------------------------------------------------------
 
 // The whole booking must fit inside the branch's opening hours (in the branch's own timezone)
-export function assertWithinOpeningHours(branch, items) {
+function assertWithinOpeningHours(branch, items) {
   const zone = branch.timezone;
   const start = toBranchTime(items[0].startAt, zone);
   const end = toBranchTime(items.at(-1).endAt, zone);
@@ -125,7 +125,7 @@ export function assertWithinOpeningHours(branch, items) {
 }
 
 // Each stylist must be active, work at this branch, and not be marked absent or on leave that day
-export async function assertStaffBookable(branch, lines, items) {
+async function assertStaffBookable(branch, lines, items) {
   const date = toBranchTime(items[0].startAt, branch.timezone).toISODate();
 
   for (const { staff } of lines) {
@@ -154,7 +154,7 @@ export async function assertStaffBookable(branch, lines, items) {
 // Overlap rule: existing.start < new.end AND existing.end > new.start
 // (so 2:00–2:45 and 2:45–3:30 do NOT clash: back to back is fine)
 // ---------------------------------------------------------------------------
-export async function findConflicts(ctx, items, { session, excludeAppointmentId } = {}) {
+async function findConflicts(ctx, items, { session, excludeAppointmentId } = {}) {
   const filter = scoped(ctx, {
     status: { $in: OPEN_APPOINTMENT_STATUSES }, // cancelled or completed bookings don't block anyone
     $or: items.map((item) => ({

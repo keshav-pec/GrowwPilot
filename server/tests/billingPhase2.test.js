@@ -7,7 +7,7 @@ import {
   InventoryTransaction, Invoice, Notification, Payment, PaymentAllocation, PayPlan, Refund, User,
 } from '../src/models/index.js';
 import {
-  addProduct, createSaleDraft, discardDraft, getInvoice, issueInvoice, listSellableProducts, openDraft, quoteDraft, removeLine, saveDraft, voidInvoice,
+  addProduct, createSaleDraft, discardDraft, getInvoice, issueInvoice, listSellableProducts, openDraft, removeLine, saveDraft, voidInvoice,
 } from '../src/modules/invoices/invoices.service.js';
 import { customerAdvances, recordPayments, reversePayment, takeAdvance } from '../src/modules/payments/payments.service.js';
 import { approveRefund, createRefund, quoteRefund, rejectRefund } from '../src/modules/refunds/refunds.service.js';

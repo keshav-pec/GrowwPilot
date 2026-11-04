@@ -8,7 +8,7 @@ import {
   InventoryLocation,
   InventorySku,
   InventoryTransaction,
-  Notification,
+  ActivityLog,
   Organization,
   User,
 } from '../src/models/index.js';
@@ -222,9 +222,8 @@ describe('Who sees costs and who adds products', () => {
     const foils = await addProduct('inventory', { ...shampoo, name: 'Foils', stockUnit: 'box', wayOfUse: 'MANUAL', openingQty: 2 });
     expect((await product('inventory', foils._id)).totals.inStore).toBe(2);
 
-    // Logged, and the business owner hears about it
-    const bell = await Notification.findOne({ userId: users.business._id, message: /Suresh \(Inventory\): Added the product Foils/ });
-    expect(bell).toBeTruthy();
+    // It goes in the activity log
+    expect(await ActivityLog.exists({ action: 'inventory.product_added', actorName: 'Suresh', summary: /Added the product Foils/ })).toBeTruthy();
   });
 
   it("the front desk can't add or change products", async () => {

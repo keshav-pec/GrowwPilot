@@ -24,15 +24,9 @@ export default function DeliveryModeChoice({ value, onChange, disabled = false, 
         'Send automatically by email',
         emailReady
           ? `The app emails customers who allow email, between ${sendFrom ?? '10:00'} and ${sendUntil ?? '19:00'}, at most ${dailyLimit ?? 30} a day for your salon (the rest go the next day). Customers who allow only WhatsApp or SMS stay on the staff list.`
-          : 'Email isn’t set up on the server yet, so this can’t be chosen.',
+          : 'Email is off on the server, so this can’t be chosen.',
         !emailReady && <Badge>Needs email</Badge>
       )}
-      <label className="flex items-start gap-2 rounded-lg border border-border p-3 opacity-60">
-        <input type="radio" className="mt-1" disabled />
-        <span>
-          <span className="font-medium">Send automatically by WhatsApp or SMS</span> <Badge>Coming later</Badge>
-        </span>
-      </label>
     </div>
   );
 }

@@ -5,16 +5,19 @@ import { useSetSkuStatus, useSku, useSkuMovements, useUseSkuHere } from '../../.
 import { useHandouts } from '../../../api/inventory/allocations';
 import { useCorrectFinish } from '../../../api/inventory/movements';
 import { useCorrectServiceUse } from '../../../api/inventory/automation';
-import { SKU_TYPE_LABEL, WAY_OF_USE_LABEL, costPerStockUnit, formatQty, isMeasured, movementLabel, newRequestKey } from '../../../lib/inventory';
+import { SKU_TYPE_LABEL, WAY_OF_USE_LABEL, costPerStockUnit, formatQty, isMeasured, movementLabel } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { formatAmount } from '../../../lib/money';
 import { formatDateTime } from '../../../lib/time';
-import { Badge, Button, ConfirmDialog, Drawer, Input, Modal, Pagination, Spinner } from '../../../components/ui';
+import { Badge, Button, ConfirmDialog, Drawer, Input, Modal, ModalFooter, Pagination, Spinner, StatTile } from '../../../components/ui';
 import ProductFormModal from './ProductFormModal';
 import HandoutsList from '../overview/HandoutsList';
 import IssueModal from '../actions/IssueModal';
 import WriteOffModal from '../actions/WriteOffModal';
 import ReportProblemModal from '../actions/ReportProblemModal';
 import PhotosSection from '../catalogue/PhotosSection';
+
+const Stat = (props) => <StatTile {...props} tone="text-ink" valueClass="text-sm font-semibold" className="rounded-lg bg-surface px-3 py-2" />;
 
 function Section({ title, children }) {
   return (
@@ -25,16 +28,7 @@ function Section({ title, children }) {
   );
 }
 
-function Stat({ label, value }) {
-  return (
-    <div className="rounded-lg bg-surface px-3 py-2">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="text-sm font-semibold text-ink">{value}</p>
-    </div>
-  );
-}
-
-// Product page (INV-04): stock per place at this branch, hand-outs, details and the full movement history
+// Product page: stock per place at this branch, hand-outs, details and the full movement history
 export default function ProductDrawer({ skuId, categories, can, onClose }) {
   const skuQuery = useSku(skuId);
   const handoutsQuery = useHandouts(skuId);
@@ -222,7 +216,7 @@ export default function ProductDrawer({ skuId, categories, can, onClose }) {
   );
 }
 
-// Every change to this product's stock at the branch (INV-13), newest first. Nothing here can be edited.
+// Every change to this product's stock at the branch, newest first. Nothing here can be edited.
 function MovementHistory({ sku, showCosts, canCorrect, canCorrectUse }) {
   const { activeBranch } = useAuth();
   const [page, setPage] = useState(1);
@@ -300,14 +294,9 @@ function CorrectFinishModal({ movement, sku, onClose }) {
       onClose={onClose}
       title="Undo a finish"
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={save} loading={correct.isPending} disabled={note.trim().length < 3}>
+        <ModalFooter onClose={onClose} onClick={save} loading={correct.isPending} disabled={note.trim().length < 3}>
             Undo finish
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <p className="mb-3 text-sm text-muted">
@@ -344,14 +333,9 @@ function CorrectUseModal({ movement, sku, onClose }) {
       onClose={onClose}
       title={`${sku.name} used for ${movement.serviceUse.serviceName}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={save} loading={correct.isPending} disabled={!/^\d+$/.test(actual)}>
+        <ModalFooter onClose={onClose} onClick={save} loading={correct.isPending} disabled={!/^\d+$/.test(actual)}>
             Save
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="flex flex-col gap-4">

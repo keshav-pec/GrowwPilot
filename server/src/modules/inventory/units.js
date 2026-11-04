@@ -9,7 +9,7 @@ function plural(unit, n) {
 }
 
 // 10 -> "10 bottles"
-export function describeUnits(n, unit) {
+function describeUnits(n, unit) {
   return `${n} ${plural(unit, n)}`;
 }
 

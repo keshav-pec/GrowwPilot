@@ -116,7 +116,7 @@ export default function StaffPayDrawer({ staffId, onClose }) {
                 </>
               ) : (
                 <p className="text-sm text-muted">
-                  No pay setup yet.{' '}
+                  No pay setup.{' '}
                   {isOwner ? 'Click “Set up pay” to choose how they’re paid.' : 'Click “Request a change” to ask an owner to set it up.'}
                 </p>
               )}

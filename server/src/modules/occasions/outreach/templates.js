@@ -3,10 +3,10 @@ import { describeOffer } from '../campaigns/campaign.rules.js';
 
 // The ready-made offer messages (WhatsApp and SMS sent by staff from their phone; email sent by the app). Owners can change the wording per campaign,
 // but it must keep the customer's name, the salon, the offer, the expiry date and the opt-out line.
-// There is no public booking page yet, so messages end with "Reply or call {salon_phone} to book".
+// Messages end with "Reply or call {salon_phone} to book".
 
-export const PLACEHOLDERS = ['{first_name}', '{salon_name}', '{offer_summary}', '{expiry_date}'];
-export const OPT_OUT = /opt[\s-]?out/i;
+const PLACEHOLDERS = ['{first_name}', '{salon_name}', '{offer_summary}', '{expiry_date}'];
+const OPT_OUT = /opt[\s-]?out/i;
 
 const GREETING = { BIRTHDAY: 'Happy birthday month', ANNIVERSARY: 'Happy anniversary month' };
 const TREAT = { BIRTHDAY: 'A birthday treat', ANNIVERSARY: 'An anniversary treat' };

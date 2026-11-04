@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useReportProblem } from '../../../api/inventory/requests';
-import { REPORT_REASONS, isMeasured, newRequestKey } from '../../../lib/inventory';
-import { Button, Input, Modal, Select, Textarea } from '../../../components/ui';
+import { REPORT_REASONS, isMeasured } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
+import { Input, Modal, ModalFooter, Select, Textarea } from '../../../components/ui';
 import { ProductPicker } from './fields';
 
 // The front desk can't change stock by hand; they report what happened, and an owner or the inventory login deals with it
@@ -33,14 +34,9 @@ export default function ReportProblemModal({ sku: presetSku, handout, onClose })
       title={sku ? `Report a problem: ${sku.name}` : 'Report a problem'}
       footer={
         sku && (
-          <>
-            <Button variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={save} loading={report.isPending} disabled={note.trim().length < 3 || (qty !== '' && !/^\d+$/.test(qty))}>
+          <ModalFooter onClose={onClose} onClick={save} loading={report.isPending} disabled={note.trim().length < 3 || (qty !== '' && !/^\d+$/.test(qty))}>
               Send report
-            </Button>
-          </>
+            </ModalFooter>
         )
       }
     >

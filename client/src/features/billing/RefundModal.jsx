@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useCreateRefund, useRefundQuote } from '../../api/refunds';
 import { formatMoney } from '../../lib/money';
-import { PAYMENT_METHODS, newRequestKey } from '../../lib/billing';
-import { Button, Input, Modal, Select, Spinner, Textarea } from '../../components/ui';
+import { PAYMENT_METHODS } from '../../lib/billing';
+import { newRequestKey } from '../../lib/requestKey';
+import { Input, Modal, ModalFooter, Select, Spinner, Textarea } from '../../components/ui';
 
 const RESTOCK = [
   { value: 'SELLABLE', label: 'Can be sold again' },
@@ -55,14 +56,9 @@ export default function RefundModal({ invoice, mayApprove, onClose }) {
       onClose={onClose}
       title={`Refund or return · ${invoice.invoiceNumber}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={submit} disabled={!plan || quote.isFetching || reason.trim().length < 3} loading={create.isPending}>
+        <ModalFooter onClose={onClose} onClick={submit} disabled={!plan || quote.isFetching || reason.trim().length < 3} loading={create.isPending}>
             {mayApprove ? `Refund ${plan ? formatMoney(plan.creditTotal) : ''}` : 'Ask an owner to approve'}
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <ul className="divide-y divide-border text-sm">

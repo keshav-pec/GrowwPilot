@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { DateTime } from 'luxon';
 import { AlertTriangle, ArrowRightLeft, ClipboardPen, Repeat2 } from 'lucide-react';
 import { useOverview } from '../../../api/inventory/overview';
 import { useHandouts } from '../../../api/inventory/allocations';
-import { formatQty, movementLabel } from '../../../lib/inventory';
+import { formatQty } from '../../../lib/inventory';
 import { formatAmount } from '../../../lib/money';
-import { Card, Spinner } from '../../../components/ui';
+import { Card, Spinner, StatTile } from '../../../components/ui';
 import IssueModal from '../actions/IssueModal';
 import FinishModal from '../actions/FinishModal';
 import WriteOffModal from '../actions/WriteOffModal';
@@ -14,16 +13,7 @@ import HandoutsList from './HandoutsList';
 import RequestsCard from './RequestsCard';
 import AutomationCard from './AutomationCard';
 
-function Stat({ label, value, tone = 'text-brown' }) {
-  return (
-    <div className="rounded-xl border border-border p-4">
-      <p className="text-xs text-muted">{label}</p>
-      <p className={`text-2xl font-bold ${tone}`}>{value}</p>
-    </div>
-  );
-}
-
-// Overview (INV-01): quick actions, stock health, requests waiting, hand-outs, what to order, recent activity
+// Overview: quick actions, stock health, requests waiting, hand-outs and what to order
 export default function OverviewTab({ can, onOpenProduct }) {
   const overviewQuery = useOverview();
   const handoutsQuery = useHandouts();
@@ -31,7 +21,7 @@ export default function OverviewTab({ can, onOpenProduct }) {
 
   if (overviewQuery.isPending) return <Spinner size={24} />;
   if (overviewQuery.isError) return <p className="text-sm text-danger">{overviewQuery.error.message}</p>;
-  const { totals, needToOrder, handover, recent, automationIssues } = overviewQuery.data;
+  const { totals, needToOrder, handover, automationIssues } = overviewQuery.data;
   const handlesRequests = can['inventory.writeOff'];
 
   const quickActions = [
@@ -55,11 +45,10 @@ export default function OverviewTab({ can, onOpenProduct }) {
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Products with stock in the store" value={`${totals.inStoreProducts} of ${totals.products}`} />
-        <Stat label="Handed out (in use)" value={totals.openHandouts} />
-        <Stat label="Need to order" value={totals.needToOrder} tone={totals.needToOrder > 0 ? 'text-orange' : 'text-brown'} />
-        {'stockValue' in totals && <Stat label="Stock value" value={formatAmount(totals.stockValue)} />}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <StatTile label="Products with stock in the store" value={`${totals.inStoreProducts} of ${totals.products}`} />
+        <StatTile label="Handed out (in use)" value={totals.openHandouts} />
+        {'stockValue' in totals && <StatTile label="Stock value" value={formatAmount(totals.stockValue)} />}
       </div>
 
       <RequestsCard handlesRequests={handlesRequests} />
@@ -97,39 +86,10 @@ export default function OverviewTab({ can, onOpenProduct }) {
         </Card>
       </div>
 
-      <Card title={can['inventory.writeOff'] ? 'Recent activity' : 'What you did recently'}>
-        {recent.length === 0 ? (
-          <p className="text-sm text-muted">No stock movements yet.</p>
-        ) : (
-          <ul className="divide-y divide-border text-sm">
-            {recent.map((t) => (
-              <li key={t._id} className="py-2">
-                <p>
-                  <span className="font-medium">{movementLabel(t)}</span>
-                  {' · '}
-                  {summarizeLines(t)}
-                </p>
-                <p className="text-xs text-muted">
-                  {t.actorName}
-                  {t.heldBy && ` · ${t.heldBy.name}`} · {DateTime.fromISO(t.occurredAt).toRelative()}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
       {action === 'issue' && <IssueModal onClose={() => setAction(null)} />}
       {action === 'finish' && <FinishModal canReplace={can['inventory.issue']} onClose={() => setAction(null)} />}
       {action === 'writeOff' && <WriteOffModal onClose={() => setAction(null)} />}
       {action === 'report' && <ReportProblemModal onClose={() => setAction(null)} />}
     </div>
   );
-}
-
-// "1 bottle of Shampoo": a movement's size, counted once (moves have a minus and a plus line of the same size)
-function summarizeLines(t) {
-  const line = t.lines.find((l) => l.qty > 0) ?? t.lines[0];
-  if (!line?.sku) return '';
-  return `${formatQty(Math.abs(line.qty), line.sku)} of ${line.sku.name}`;
 }

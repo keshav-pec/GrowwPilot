@@ -1,7 +1,7 @@
 import { Info } from 'lucide-react';
 import { formatDateTime } from '../../../lib/time';
 
-// Why an offer message can't be sent right now, in the words staff see (PRD section 15 states)
+// Why an offer message can't be sent right now, in the words staff see
 const WORDS = {
   NO_PERMISSION: () => ['Offer available in salon. Promotional message disabled: permission not recorded.', 'Ask for permission at the next visit.'],
   RECENTLY_CONTACTED: (n, zone) => [`Customer contacted recently; next promotional contact permitted on ${n.nextAllowedAt ? formatDateTime(n.nextAllowedAt, zone) : 'a later date'}.`, 'You can still call or tell them at their visit.'],

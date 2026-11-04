@@ -8,7 +8,7 @@ const inventorySettingsSchema = new mongoose.Schema(
     orgId: ref('Organization', { required: true }),
     branchId: ref('Branch', { required: true }),
 
-    // "Delegated" jobs the front desk may do (PRD launch defaults: only marking bottles finished).
+    // "Delegated" jobs the front desk may do (by default: only marking bottles finished).
     // Reporting a problem is always allowed and has no switch.
     frontDesk: {
       finish: { type: Boolean, default: true }, // mark finished (and replace)
@@ -24,7 +24,7 @@ const inventorySettingsSchema = new mongoose.Schema(
       branchOwnerPoApproval: money({ default: 2500000 }), // branch owner approves orders up to ₹25,000
     },
 
-    branchOwnerSeesCosts: { type: Boolean, default: true }, // PRD: "own branch; configurable"
+    branchOwnerSeesCosts: { type: Boolean, default: true },
     // First-time setup guide: when each step was done, and when it was finished
     setupSteps: { locationsAt: { type: Date, default: null } },
     setupCompletedAt: { type: Date, default: null },

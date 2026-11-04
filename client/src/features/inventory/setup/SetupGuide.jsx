@@ -2,7 +2,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { ArrowRightLeft, BellRing, Check, PackagePlus, Repeat2 } from 'lucide-react';
 import { useMarkSetupStep } from '../../../api/inventory/setup';
-import { newRequestKey } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { Button } from '../../../components/ui';
 import LocationsCard from '../settings/LocationsCard';
 import UploadCard from '../import/UploadCard';

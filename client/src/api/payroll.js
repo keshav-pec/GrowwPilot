@@ -1,6 +1,7 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { api } from './client';
+import { keyed, useChange } from './request';
 
 // { today, rows: [{ staff, current, upcoming, pendingRequest }] } for the selected branch
 export function useStaffPayList() {
@@ -47,17 +48,8 @@ export function useActivity(page) {
 }
 
 // Any pay change can affect every payroll screen and the bell, so reload them all
-function usePayMutation(mutationFn) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (values) => mutationFn(values).then((res) => res.data),
-    onSuccess: () => {
-      for (const key of ['pay-staff', 'pay-staff-detail', 'pay-commission', 'pay-requests', 'payroll-month', 'payroll-runs', 'pay-advances', 'activity', 'notifications']) {
-        queryClient.invalidateQueries({ queryKey: [key] });
-      }
-    },
-  });
-}
+const usePayMutation = (mutationFn) =>
+  useChange((values) => mutationFn(values).then((res) => res.data), ['pay-staff', 'pay-staff-detail', 'pay-commission', 'pay-requests', 'payroll-month', 'payroll-runs', 'pay-advances', 'activity', 'notifications']);
 
 // Owners. With planId: edit an upcoming change. Without: add a new pay setup for staffId.
 export const useSavePayPlan = () =>
@@ -81,15 +73,6 @@ export function usePayrollMonth(month) {
   });
 }
 
-// Months already opened for the selected branch: [{ month, status, totals }]
-export function usePayrollRuns() {
-  const { activeBranchId } = useAuth();
-  return useQuery({
-    queryKey: ['payroll-runs', activeBranchId],
-    queryFn: () => api.get('/payroll/runs').then((res) => res.data.runs),
-  });
-}
-
 export const useRecalculateMonth = () => usePayMutation((month) => api.post(`/payroll/runs/${month}/calculate`));
 
 export const useLockMonth = () => usePayMutation((month) => api.post(`/payroll/runs/${month}/lock`, { confirm: true }));
@@ -101,7 +84,7 @@ export const useRemoveAdjustment = () => usePayMutation((id) => api.delete(`/pay
 
 // Salary payments. `key` is made once per form, so a double click or retry records the payment only once.
 export const useRecordPayment = () =>
-  usePayMutation(({ itemId, key, ...values }) => api.post(`/payroll/items/${itemId}/payments`, values, { headers: { 'Idempotency-Key': key } }));
+  usePayMutation(({ itemId, key, ...values }) => api.post(`/payroll/items/${itemId}/payments`, values, keyed(key)));
 
 export const useCancelPayment = () => usePayMutation(({ id, reason }) => api.post(`/payroll/payments/${id}/cancel`, { reason }));
 
@@ -118,7 +101,7 @@ export function useAdvances(staffId) {
 }
 
 export const useGiveAdvance = () =>
-  usePayMutation(({ staffId, key, ...values }) => api.post(`/payroll/staff/${staffId}/advances`, values, { headers: { 'Idempotency-Key': key } }));
+  usePayMutation(({ staffId, key, ...values }) => api.post(`/payroll/staff/${staffId}/advances`, values, keyed(key)));
 
 export const useCloseAdvance = () => usePayMutation(({ id, ...values }) => api.post(`/payroll/advances/${id}/close`, values));
 

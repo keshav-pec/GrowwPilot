@@ -3,12 +3,12 @@ import { AppError } from '../../../utils/AppError.js';
 import { scoped } from '../../../utils/scoped.js';
 import { runOnce } from '../../../middleware/idempotency.js';
 import { assertCan } from '../permissions.js';
-import { getBranchSettings } from '../settings/settings.service.js';
-import { recordInventoryAction } from '../activity.js';
+import { assertCanHere, getBranchSettings } from '../settings/settings.service.js';
+import { logActivity } from '../../activity/activity.service.js';
 import { describeQty } from '../units.js';
 
 // ---------------------------------------------------------------------------
-// Service recipes (INV-09): which products a service uses, and how much.
+// Service recipes: which products a service uses, and how much.
 // Salon-wide, or for one branch (the branch recipe wins). Every change is a new version from a start time;
 // the previous version ends exactly there, so two versions are never in effect at once.
 // ---------------------------------------------------------------------------
@@ -67,7 +67,7 @@ export async function listRecipes(ctx) {
 
 // Every version of one service's recipe (salon-wide or this branch's), newest first
 export async function recipeHistory(ctx, { serviceId, scope }) {
-  assertCan(ctx, 'inventory.viewRecipes', { settings: await getBranchSettings(ctx, ctx.activeBranchId) });
+  await assertCanHere(ctx, 'inventory.viewRecipes');
   const branchId = scope === 'branch' ? ctx.activeBranchId : null;
   const versions = await InventoryRecipe.find(scoped(ctx, { serviceId, branchId })).sort({ version: -1 }).lean();
   return withSkus(ctx, versions);
@@ -75,7 +75,7 @@ export async function recipeHistory(ctx, { serviceId, scope }) {
 
 // Business owner: salon-wide recipes and any branch's. Branch owner: only the recipes of their own branches.
 async function assertCanEditScope(ctx, scope) {
-  assertCan(ctx, 'inventory.editRecipes', { settings: await getBranchSettings(ctx, ctx.activeBranchId) });
+  await assertCanHere(ctx, 'inventory.editRecipes');
   if (scope === 'salon' && !ctx.isPrimaryOwner) {
     throw new AppError(403, 'PERMISSION_DENIED', 'Only the business owner changes salon-wide recipes. You can set one for this branch.');
   }
@@ -141,14 +141,13 @@ export async function saveRecipe(ctx, input, key) {
         { session }
       );
       const scopeWords = branchId ? ' (this branch only)' : ' (all branches)';
-      await recordInventoryAction(
+      await logActivity(
         ctx,
         {
           action: 'inventory.recipe_changed',
           branchId: branchId ?? ctx.activeBranchId,
           summary: `Set the recipe for ${service.name}${scopeWords}, version ${recipe.version}: ${describeLines(lines, skuOf)}`,
           after: { version: recipe.version, lines },
-          link: '/app/inventory?tab=recipes',
         },
         session
       );
@@ -175,9 +174,9 @@ export async function endRecipe(ctx, { serviceId, scope }, key) {
 
   return runOnce(ctx, { key, operation: 'inventory.recipe.end' }, async (session) => {
     await InventoryRecipe.updateOne({ _id: current._id, effectiveTo: null }, { $set: { effectiveTo: now } }, { session });
-    await recordInventoryAction(
+    await logActivity(
       ctx,
-      { action: 'inventory.recipe_changed', branchId: branchId ?? ctx.activeBranchId, summary: `Stopped the ${branchId ? 'branch' : 'salon-wide'} recipe for ${service.name}`, link: '/app/inventory?tab=recipes' },
+      { action: 'inventory.recipe_changed', branchId: branchId ?? ctx.activeBranchId, summary: `Stopped the ${branchId ? 'branch' : 'salon-wide'} recipe for ${service.name}` },
       session
     );
     return { ended: true };

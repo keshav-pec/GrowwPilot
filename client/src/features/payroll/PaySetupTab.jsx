@@ -41,7 +41,7 @@ export default function PaySetupTab({ group, onGroupChange, onOpenStaff }) {
             <span className="block text-xs text-muted">{modelLabel(r.current.model)}</span>
           </div>
         ) : (
-          <Badge tone="orange">Not set up</Badge>
+          <Badge tone="orange">No pay setup</Badge>
         ),
     },
     { key: 'since', header: 'Since', render: (r) => (r.current ? formatPayDay(r.current.effectiveFrom) : '—') },
@@ -73,7 +73,7 @@ export default function PaySetupTab({ group, onGroupChange, onOpenStaff }) {
       )}
       {notSetUp > 0 && (
         <p className="mb-4 rounded-lg bg-yellow-soft px-4 py-3 text-sm text-ink">
-          {notSetUp === 1 ? '1 person doesn’t' : `${notSetUp} people don’t`} have a pay setup yet. Click a name to{' '}
+          {notSetUp === 1 ? '1 person doesn’t' : `${notSetUp} people don’t`} have a pay setup. Click a name to{' '}
           {user.role === 'OWNER' ? 'choose how they’re paid.' : 'ask an owner to set it up.'}
         </p>
       )}

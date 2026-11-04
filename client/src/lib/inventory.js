@@ -1,6 +1,6 @@
 // Words and numbers for the Inventory screens.
 
-// The four ways stock is used (see INVENTORY_PLAN.md)
+// The four ways stock is used
 export const WAYS_OF_USE = [
   { value: 'FINISH', label: 'Finish', hint: 'Whole bottles are handed out and used up when someone marks them finished. E.g. shampoo, wax jars.' },
   { value: 'SERVICE_UNITS', label: 'Per service, whole units', hint: 'A set number is used up each time the service is done. E.g. facial kits, disposable caps.' },
@@ -27,7 +27,7 @@ export const BASE_UNITS = [
   { value: 'piece', label: 'pieces' },
 ];
 
-export const MOVEMENT_LABEL = {
+const MOVEMENT_LABEL = {
   OPENING: 'Opening stock',
   RECEIPT: 'Received',
   ISSUE: 'Issued',
@@ -71,7 +71,7 @@ function plural(unit, n) {
 }
 
 // 10 -> "10 bottles"
-export function formatUnits(n, unit) {
+function formatUnits(n, unit) {
   return `${n} ${plural(unit, n)}`;
 }
 
@@ -92,10 +92,6 @@ export function formatQty(qty, sku) {
 
 // The server keeps the average cost per counting unit (per ml for measured products); people think per bottle
 export const costPerStockUnit = (avgCost, sku) => (avgCost == null ? null : Math.round(avgCost * sku.unitsPerStockUnit));
-
-// A random id made once per form, sent as the Idempotency-Key header: a double click or a retry
-// then changes stock only once
-export const newRequestKey = () => crypto.randomUUID();
 
 // Recipients travel as { kind, id } and show up in pickers as "FLOOR", "STATION:<id>" or "STAFF:<id>"
 export const recipientValue = (r) => (r.kind === 'FLOOR' ? 'FLOOR' : `${r.kind}:${r.id ?? r._id}`);

@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useSendOffer, useSendPreview } from '../../../api/occasions';
-import { newRequestKey } from '../../../lib/billing';
+import { newRequestKey } from '../../../lib/requestKey';
 import { CHANNEL_LABEL } from '../../../lib/occasions';
 import { Button, Modal, Spinner } from '../../../components/ui';
 import OfferNotice from './OfferNotice';
 
 // Send offer: the channel (first allowed in the salon's order), the recipient and the finished message.
-// "Confirm send" checks everything again on the server. WhatsApp / SMS (and email when email isn't set up): opens
-// that app with the message filled in, and staff press send there. Email (set up): the app sends it itself.
+// "Confirm send" checks everything again on the server. WhatsApp / SMS (and email when email is off): opens
+// that app with the message filled in, and staff press send there. Email (when on): the app sends it itself.
 // Either way the task is marked contacted.
 export default function SendOfferModal({ offerId, customerName, zone, onClose }) {
   const [channel, setChannel] = useState(null);

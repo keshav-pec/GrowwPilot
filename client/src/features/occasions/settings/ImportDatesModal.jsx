@@ -2,9 +2,11 @@ import { useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Download, Upload } from 'lucide-react';
 import { downloadDatesTemplate, useImportDates } from '../../../api/occasions';
-import { newRequestKey } from '../../../lib/billing';
+import { newRequestKey } from '../../../lib/requestKey';
 import { downloadRejected, readDatesFile } from '../../../lib/occasions';
-import { Button, Modal, Table } from '../../../components/ui';
+import { Button, Modal, StatTile, Table } from '../../../components/ui';
+
+const Tile = (props) => <StatTile {...props} className="rounded-lg border border-border p-3" />;
 
 const rejectedColumns = [
   { key: 'row', header: 'Row' },
@@ -114,11 +116,3 @@ export default function ImportDatesModal({ onClose }) {
   );
 }
 
-function Tile({ label, value, tone = 'text-brown' }) {
-  return (
-    <div className="rounded-lg border border-border p-3">
-      <p className="text-xs text-muted">{label}</p>
-      <p className={`text-2xl font-bold ${tone}`}>{value}</p>
-    </div>
-  );
-}

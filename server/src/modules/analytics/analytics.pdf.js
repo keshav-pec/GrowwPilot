@@ -1,37 +1,17 @@
 // Builds the sales PDF with pdfkit. The owner downloads it and emails it to the sales team.
 import PDFDocument from 'pdfkit';
 import { DateTime } from 'luxon';
-import { formatMoney } from '../../utils/money.js';
+import { BROWN, MUTED, pdfMoney as money, pdfRow } from '../../utils/pdf.js';
 
-const BROWN = '#6B4226';
-const MUTED = '#6B6B6B';
-const LINE = '#E5E5E0';
 const WEEKDAYS = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const METHOD = { CASH: 'Cash', UPI: 'UPI', CARD: 'Card', OTHER: 'Other' };
 
-// The built-in PDF fonts have no ₹ sign, so the PDF writes "Rs." instead
-const money = (paise) => formatMoney(paise).replace('₹', 'Rs. ');
 const orDash = (value, suffix = '') => (value === null || value === undefined ? '-' : `${value}${suffix}`);
 
 // A simple table: columns [{ header, width, align }], rows = arrays of text
 function table(doc, columns, rows) {
-  const left = doc.page.margins.left;
-  const drawRow = (cells, { bold = false, color = 'black' } = {}) => {
-    if (doc.y > doc.page.height - doc.page.margins.bottom - 20) doc.addPage();
-    const y = doc.y;
-    let x = left;
-    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(9).fillColor(color);
-    cells.forEach((cell, i) => {
-      doc.text(String(cell), x + 4, y + 4, { width: columns[i].width - 8, align: columns[i].align ?? 'left', lineBreak: false, ellipsis: true });
-      x += columns[i].width;
-    });
-    doc.moveTo(left, y + 18).lineTo(x, y + 18).strokeColor(LINE).lineWidth(0.5).stroke();
-    doc.y = y + 18;
-  };
-
-  drawRow(columns.map((c) => c.header), { bold: true, color: MUTED });
-  if (rows.length === 0) drawRow(['No data for this period'], { color: MUTED });
-  for (const row of rows) drawRow(row);
+  pdfRow(doc, columns, columns.map((c) => c.header), { bold: true, color: MUTED });
+  if (rows.length === 0) pdfRow(doc, columns, ['No data for this period'], { color: MUTED });
+  for (const row of rows) pdfRow(doc, columns, row);
   doc.moveDown(1);
 }
 
@@ -121,30 +101,6 @@ export function writeSalesPdf(stream, { data, salonName, stamp }) {
       { header: 'Service value', width: 140, align: 'right' },
     ],
     data.serviceDemand.slice(0, 10).map((s) => [s.name, s.bookings, money(s.serviceValue)])
-  );
-
-  heading(doc, 'Lead sources');
-  table(
-    doc,
-    [
-      { header: 'Source', width: 160 },
-      { header: 'Leads', width: 90, align: 'right' },
-      { header: 'Converted', width: 90, align: 'right' },
-      { header: 'Conversion', width: 90, align: 'right' },
-    ],
-    data.leadSources.map((l) => [l.source, l.leads, l.converted, orDash(l.rate, '%')])
-  );
-
-  heading(doc, 'Payment mix');
-  table(
-    doc,
-    [
-      { header: 'Method', width: 160 },
-      { header: 'Payments', width: 90, align: 'right' },
-      { header: 'Amount', width: 130, align: 'right' },
-      { header: 'Share', width: 80, align: 'right' },
-    ],
-    data.paymentMix.map((m) => [METHOD[m.method], m.payments, money(m.amount), orDash(m.share, '%')])
   );
 
   doc.font('Helvetica').fontSize(8).fillColor(MUTED).text('Revenue = net sales: bills issued in the period after discounts and refunds, without GST. Service value = list price of completed services (before discounts and combo prices).');

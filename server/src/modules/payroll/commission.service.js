@@ -1,7 +1,6 @@
-import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
 import { Appointment, Branch, CommissionEntry, CommissionRule, Invoice, PayPlan } from '../../models/index.js';
-import { scoped } from '../../utils/scoped.js';
+import { oid, scoped } from '../../utils/scoped.js';
 import { commissionAmount, pickRate } from './commission.rules.js';
 
 // Commission is earned when a service is completed AND its bill is fully paid (a part-paid bill earns
@@ -171,8 +170,7 @@ export async function monthCommission(ctx, staffId, month) {
 // Commission so far this month for several people: { staffId: paise }
 export async function monthTotals(ctx, staffIds, month) {
   const rows = await CommissionEntry.aggregate([
-    // aggregate() doesn't turn text ids into ObjectIds like find() does, so convert them here
-    { $match: { orgId: new mongoose.Types.ObjectId(ctx.orgId), staffId: { $in: staffIds.map((id) => new mongoose.Types.ObjectId(String(id))) }, day: { $gte: `${month}-01`, $lte: `${month}-31` } } },
+    { $match: { orgId: oid(ctx.orgId), staffId: { $in: staffIds.map(oid) }, day: { $gte: `${month}-01`, $lte: `${month}-31` } } },
     { $group: { _id: '$staffId', amount: { $sum: '$amount' } } },
   ]);
   return Object.fromEntries(rows.map((r) => [String(r._id), r.amount]));

@@ -1,7 +1,6 @@
 // Birthday & Anniversary Offers, Phase 5: offers on bookings and at checkout.
 // PRD AT-17 to AT-28, and old bills without an offer price the same.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
 import { Appointment, BillingSettings, Customer, Invoice, OfferEvent, OfferIssue, Organization, Service, User } from '../src/models/index.js';
 import { hashPassword } from '../src/utils/password.js';

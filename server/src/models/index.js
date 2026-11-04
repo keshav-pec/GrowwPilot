@@ -31,7 +31,7 @@ export { default as PayrollAdjustment } from './PayrollAdjustment.js';
 export { default as PayrollPayment } from './PayrollPayment.js';
 export { default as EmployeeAdvance } from './EmployeeAdvance.js';
 
-// Inventory add-on (INVENTORY_PLAN.md)
+// Inventory add-on
 export { default as InventorySettings } from './inventory/InventorySettings.js';
 export { default as InventorySku } from './inventory/InventorySku.js';
 export { default as InventorySkuBranch } from './inventory/InventorySkuBranch.js';
@@ -53,7 +53,7 @@ export { default as InventoryPurchaseOrder } from './inventory/InventoryPurchase
 export { default as InventoryGoodsReceipt } from './inventory/InventoryGoodsReceipt.js';
 export { default as InventoryStockCount } from './inventory/InventoryStockCount.js';
 
-// Birthday & Anniversary Offers (OCCASION_OFFERS_PLAN.md)
+// Birthday & Anniversary Offers
 export { default as OccasionSettings } from './occasions/OccasionSettings.js';
 export { default as ConsentEvent } from './occasions/ConsentEvent.js';
 export { default as OccasionCampaign } from './occasions/OccasionCampaign.js';
@@ -62,6 +62,6 @@ export { default as OfferIssue } from './occasions/OfferIssue.js';
 export { default as OfferEvent } from './occasions/OfferEvent.js';
 export { default as OccasionEngineRun } from './occasions/OccasionEngineRun.js';
 
-// Email (EMAIL_PLAN.md)
+// Email
 export { default as EmailOutbox } from './EmailOutbox.js';
 export { default as PasswordToken } from './PasswordToken.js';

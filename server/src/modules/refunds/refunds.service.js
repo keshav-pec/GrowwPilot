@@ -15,7 +15,7 @@ import { settle } from '../payments/allocations.js';
 import { runHook } from '../billing/lineKinds.js';
 
 // ---------------------------------------------------------------------------
-// Refunds and returns on an issued bill (BILLING_PLAN.md, Phase 2).
+// Refunds and returns on an issued bill.
 //   - Pick lines and how many; for products, say if they can be sold again (SELLABLE) or are DAMAGED.
 //   - The front desk can only ask (REQUESTED, owners get the bell). An owner who may approve refunds does it
 //     straight away; approving does everything in one transaction:
@@ -31,7 +31,7 @@ const MONEY = (refund) => (refund.cashRefund > 0 ? `${formatMoney(refund.cashRef
 
 // What a refund of these lines would do to the bill right now.
 // requested: [{ lineId, qty, restock }] -> { lines (with amounts), creditTotal, cashRefund, dueReduced }
-export function planRefund(invoice, requested) {
+function planRefund(invoice, requested) {
   if (requested.length === 0) throw new AppError(400, 'VALIDATION_ERROR', 'Choose what is being refunded');
   const seen = new Set();
   const lines = requested.map((r) => {

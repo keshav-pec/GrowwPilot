@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
+import { keyed } from './request';
 
 // A customer's advances: { balance, advances: [{ amount, remaining, note, uses: [{ invoiceNumber, amount }] }] }
 export function useAdvances(customerId) {
@@ -14,7 +15,7 @@ export function useAdvances(customerId) {
 export function useTakeAdvance() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ key, ...body }) => api.post('/advances', body, { headers: { 'Idempotency-Key': key } }).then((res) => res.data),
+    mutationFn: ({ key, ...body }) => api.post('/advances', body, keyed(key)).then((res) => res.data),
     onSuccess: (data, { customerId }) => queryClient.setQueryData(['advances', customerId], data),
   });
 }

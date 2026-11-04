@@ -1,12 +1,12 @@
-import { OccasionCampaign, OccasionSettings, OfferIssue, User } from '../../../models/index.js';
+import { OccasionCampaign, OccasionSettings, OfferIssue } from '../../../models/index.js';
 import { AppError } from '../../../utils/AppError.js';
 import { scoped } from '../../../utils/scoped.js';
 import { runOnce } from '../../../middleware/idempotency.js';
 import { logActivity } from '../../activity/activity.service.js';
-import { notify } from '../../notifications/notifications.service.js';
 import { assertCan } from '../permissions.js';
 import { addOfferEvents } from './events.js';
 import { runForOrg } from './scheduler.js';
+import { plural } from '../../../utils/text.js';
 
 // POST /api/occasions/settings/run-now — "Check now": this month's run for every branch again. Nothing is ever given twice.
 export async function runNow(ctx) {
@@ -58,11 +58,9 @@ export async function revokeCampaignOffers(ctx, campaignId, { year, reason }, ke
     await addOfferEvents(ctx.orgId, unused, 'REVOKED', { ctx, note: reason }, session);
     await logActivity(
       ctx,
-      { action: 'occasions.offers_revoked', branchId: campaign.branchId ?? null, summary: `Withdrew ${unused.length} unused offer${unused.length === 1 ? '' : 's'} of ${campaign.name} for ${year}. Reason: ${reason}` },
+      { action: 'occasions.offers_revoked', branchId: campaign.branchId ?? null, summary: `Withdrew ${plural(unused.length, 'unused offer')} of ${campaign.name} for ${year}. Reason: ${reason}` },
       session
     );
-    const owners = await User.find(scoped(ctx, { role: 'OWNER', status: 'active' })).distinct('_id').session(session);
-    await notify(ctx, owners, { message: `${ctx.userName} withdrew ${unused.length} unused ${campaign.name} offer${unused.length === 1 ? '' : 's'} for ${year}${contacted.length ? `; ${contacted.length} contacted customer${contacted.length === 1 ? '' : 's'} to let know` : ''}`, link: `/app/settings/occasions/campaigns/${campaign._id}` }, session);
     return { revoked: unused.length, toTell: contacted.length };
   });
 }

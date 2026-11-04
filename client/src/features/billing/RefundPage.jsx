@@ -4,18 +4,14 @@ import { useRefund } from '../../api/refunds';
 import { formatMoney } from '../../lib/money';
 import { formatDateTime } from '../../lib/time';
 import { METHOD_LABEL, percentLabel } from '../../lib/billing';
-import { Button, EmptyState, Spinner } from '../../components/ui';
+import { Button, EmptyState, PageSpinner, SummaryRow } from '../../components/ui';
 
 // A printable credit note (GST bills) or refund receipt
 export default function RefundPage() {
   const { id } = useParams();
   const refundQuery = useRefund(id);
   if (refundQuery.isPending) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner size={28} />
-      </div>
-    );
+    return <PageSpinner />;
   }
   if (refundQuery.isError) return <EmptyState title="Refund not found" message={refundQuery.error.message} />;
 
@@ -92,17 +88,17 @@ export default function RefundPage() {
         <dl className="ml-auto flex max-w-xs flex-col gap-1 text-sm">
           {note && (
             <>
-              <Row label="Taxable value" value={formatMoney(note.taxableTotal)} />
-              <Row label="CGST" value={formatMoney(note.cgstTotal)} />
-              <Row label="SGST" value={formatMoney(note.sgstTotal)} />
+              <SummaryRow label="Taxable value" value={formatMoney(note.taxableTotal)} />
+              <SummaryRow label="CGST" value={formatMoney(note.cgstTotal)} />
+              <SummaryRow label="SGST" value={formatMoney(note.sgstTotal)} />
             </>
           )}
           <div className="flex justify-between border-t border-border pt-1 text-base font-bold text-brown">
             <dt>Total</dt>
             <dd>{formatMoney(refund.creditTotal)}</dd>
           </div>
-          {refund.cashRefund > 0 && <Row label={`Paid back (${METHOD_LABEL[refund.method]})`} value={formatMoney(refund.cashRefund)} />}
-          {refund.dueReduced > 0 && <Row label="Taken off the amount owed" value={formatMoney(refund.dueReduced)} />}
+          {refund.cashRefund > 0 && <SummaryRow label={`Paid back (${METHOD_LABEL[refund.method]})`} value={formatMoney(refund.cashRefund)} />}
+          {refund.dueReduced > 0 && <SummaryRow label="Taken off the amount owed" value={formatMoney(refund.dueReduced)} />}
         </dl>
         <p className="mt-6 text-sm">
           <span className="text-xs text-muted">Reason: </span>
@@ -113,11 +109,3 @@ export default function RefundPage() {
   );
 }
 
-function Row({ label, value }) {
-  return (
-    <div className="flex justify-between">
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
-  );
-}

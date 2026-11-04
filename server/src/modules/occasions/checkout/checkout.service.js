@@ -9,7 +9,7 @@ import { loadInvoice, occasionEligible, present, priceDraft } from '../../invoic
 import { describeOffer } from '../campaigns/campaign.rules.js';
 import { addOfferEvents } from '../engine/events.js';
 
-// Occasion offers at checkout and on bookings (OCCASION_OFFERS_PLAN.md, Phase 5).
+// Occasion offers at checkout and on bookings.
 // One offer per bill; it applies only to the eligible service lines, doesn't mix with other discounts, and is
 // used up only when the bill is issued (invoices.service.js -> redeem.js).
 

@@ -19,7 +19,7 @@ const inventoryAllocationSchema = new mongoose.Schema(
     issuedQty: wholeNumber({ required: true }),
     remainingQty: wholeNumber({ required: true }),
     status: { type: String, enum: ['OPEN', 'CLOSED'], default: 'OPEN' },
-    needsHandover: { type: Boolean, default: false }, // the stylist who had it left (Phase 4)
+    needsHandover: { type: Boolean, default: false }, // the stylist who had it left
     replacesId: ref('InventoryAllocation', { default: null }), // issued to replace a finished one
     closedAt: { type: Date, default: null },
     version: { type: Number, default: 0 },

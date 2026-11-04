@@ -1,6 +1,6 @@
 import { AppError } from '../../utils/AppError.js';
 
-// Who may do what in Inventory: the "Who can do what" table in INVENTORY_PLAN.md, in one place.
+// Who may do what in Inventory, in one place.
 //
 //   const decision = can(ctx, 'inventory.writeOff', { settings, value: 150000 });
 //   // -> { allowed: true, needsApproval: false }
@@ -65,7 +65,7 @@ const RULES = {
   'inventory.manageSettings': { BUSINESS_OWNER: true, BRANCH_OWNER: true, INVENTORY: false, FRONT_DESK: false },
 };
 
-export const INVENTORY_ACTIONS = Object.keys(RULES);
+const INVENTORY_ACTIONS = Object.keys(RULES);
 
 export function can(ctx, action, { settings, ...options } = {}) {
   const rules = RULES[action];

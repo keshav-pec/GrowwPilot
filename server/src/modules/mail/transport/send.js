@@ -16,7 +16,7 @@ export { mailConfigured, smtpConfigured } from '../config.js';
 
 export const BATCH_SIZE = 40; // most emails in one call to the script
 
-// Development and tests with nothing set up: emails are kept here (and printed in development)
+// Development and tests with no email settings: emails are kept here (and printed in development)
 const logged = [];
 export function loggedEmails() {
   return logged;
@@ -26,7 +26,7 @@ function logEmail(email) {
   logged.push(email);
   if (logged.length > 200) logged.shift();
   if (env.NODE_ENV === 'development') {
-    console.log(`\n[email, not sent: email is not set up] to ${email.to}\nSubject: ${email.subject}\n${email.textBody}\n`);
+    console.log(`\n[email, not sent: email is off] to ${email.to}\nSubject: ${email.subject}\n${email.textBody}\n`);
   }
   return { via: 'LOG' };
 }
@@ -46,7 +46,7 @@ const smtpFallsBack = (err) => scriptConfigured() && err.kind !== 'BAD_ADDRESS';
 export async function sendOne(email) {
   const mode = mailMode();
   if (mode === 'log') return logEmail(email);
-  if (mode === 'off') throw new MailError('NOT_SET_UP', 'Email is not set up');
+  if (mode === 'off') throw new MailError('MAIL_OFF', 'Email is off');
 
   const viaScript = () => sendScriptOne(email);
   const viaSmtp = () => sendSmtp(email, mailSettings().smtp).then(() => ({ via: 'SMTP' }));
@@ -88,7 +88,7 @@ export async function sendBatch(emails) {
 async function sendChunk(emails) {
   const mode = mailMode();
   if (mode === 'log') return emails.map(logEmail);
-  if (mode === 'off') return emails.map(() => ({ error: new MailError('NOT_SET_UP', 'Email is not set up') }));
+  if (mode === 'off') return emails.map(() => ({ error: new MailError('MAIL_OFF', 'Email is off') }));
   if (!scriptConfigured()) return Promise.all(emails.map((email) => settle(sendOne(email))));
 
   const { scriptSecret, timeoutMs } = mailSettings();

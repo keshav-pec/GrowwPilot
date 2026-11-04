@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { Appointment, Branch, Customer, Invoice, Staff } from '../../models/index.js';
 import { OPEN_APPOINTMENT_STATUSES, SERVICE_STAFF } from '../../config/constants.js';
 import { AppError } from '../../utils/AppError.js';
-import { scoped } from '../../utils/scoped.js';
+import { oid, scoped } from '../../utils/scoped.js';
 import { escapeRegex } from '../../utils/regex.js';
 import { assertOfferChangeConfirmed, customerOccasionChanges, logCustomerChange, recheckOffers } from '../occasions/customers.service.js';
 
@@ -13,10 +13,9 @@ import { assertOfferChangeConfirmed, customerOccasionChanges, logCustomerChange,
 //   last visit = start time of the latest Completed appointment
 //   spend      = sum of issued bill totals, less refunds (cancelled bookings, drafts and voided bills never count)
 // ---------------------------------------------------------------------------
-export async function getCustomerStats(ctx, customerIds) {
-  // aggregate() doesn't convert strings to ObjectIds for us, so we do it here
-  const orgId = new mongoose.Types.ObjectId(ctx.orgId);
-  const ids = customerIds.map((id) => new mongoose.Types.ObjectId(String(id)));
+async function getCustomerStats(ctx, customerIds) {
+  const orgId = oid(ctx.orgId);
+  const ids = customerIds.map(oid);
 
   const [visits, spend] = await Promise.all([
     Appointment.aggregate([

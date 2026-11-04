@@ -3,9 +3,9 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../../auth/AuthContext';
 import { useServices } from '../../../api/catalog';
 import { useCreateCampaign, useUpdateCampaign } from '../../../api/occasions';
-import { newRequestKey } from '../../../lib/billing';
+import { newRequestKey } from '../../../lib/requestKey';
 import { fromRulesForm, rulesFormErrors, toRulesForm } from '../../../lib/occasions';
-import { Button, Modal, Select, Spinner } from '../../../components/ui';
+import { Modal, ModalFooter, Select, Spinner } from '../../../components/ui';
 import CampaignForm from './CampaignForm';
 
 // Add a campaign (campaign = null) or edit one. A live campaign's new terms are saved as a draft of its next
@@ -55,14 +55,9 @@ export default function CampaignFormModal({ campaign, canCreateSalonWide, onClos
       size="wide"
       title={campaign ? `Edit ${campaign.name}` : 'Add campaign'}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={save} disabled={!form || Object.keys(errors).length > 0} loading={saving}>
+        <ModalFooter onClose={onClose} onClick={save} disabled={!form || Object.keys(errors).length > 0} loading={saving}>
             {locked ? 'Save changes as draft' : 'Save draft'}
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       {!form ? (

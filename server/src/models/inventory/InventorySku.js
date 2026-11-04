@@ -22,7 +22,7 @@ const inventorySkuSchema = new mongoose.Schema(
     baseUnit: { type: String, enum: [...BASE_UNITS, null], default: null },
     unitsPerStockUnit: wholeNumber({ min: 1, default: 1 }),
 
-    // Up to 4 photos, one of them the main one. The files live in the image store (GridFS for now).
+    // Up to 4 photos, one of them the main one. The files live in the image store (GridFS).
     images: [
       {
         fileId: { type: mongoose.Schema.Types.ObjectId, required: true }, // 1000 px

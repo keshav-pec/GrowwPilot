@@ -3,9 +3,9 @@ import toast from 'react-hot-toast';
 import { Cake, FileSpreadsheet, Heart, Info, MessageCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../../auth/AuthContext';
 import { useOccasionSettings, useRunNow, useSaveOccasionSettings } from '../../../api/occasions';
-import { newRequestKey } from '../../../lib/billing';
+import { newRequestKey } from '../../../lib/requestKey';
 import { formatDateTime } from '../../../lib/time';
-import { Button, Card, EmptyState, Input, PageHeader, Spinner, Textarea } from '../../../components/ui';
+import { Button, Card, EmptyState, Input, PageHeader, PageSpinner, Textarea } from '../../../components/ui';
 import ImportDatesModal from './ImportDatesModal';
 import CampaignList from '../campaigns/CampaignList';
 
@@ -14,11 +14,7 @@ import CampaignList from '../campaigns/CampaignList';
 export default function OccasionSettingsPage() {
   const settingsQuery = useOccasionSettings();
   if (settingsQuery.isPending) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner size={28} />
-      </div>
-    );
+    return <PageSpinner />;
   }
   if (settingsQuery.isError) return <EmptyState title="Couldn’t load occasion offer settings" message={settingsQuery.error.message} />;
   return <SettingsView key={settingsQuery.data.version} saved={settingsQuery.data} />;
@@ -96,7 +92,7 @@ function SettingsView({ saved }) {
               Offers are given by themselves from 01:00 on the 1st of each month, in each branch’s time, and to new or corrected customers within moments.
               <span className="mt-1 block text-ink">
                 Last successful run:{' '}
-                {saved.lastRun ? `${formatDateTime(saved.lastRun.at, activeBranch.timezone)} · ${saved.lastRun.issued} new, ${saved.lastRun.expired} expired` : 'not yet'}
+                {saved.lastRun ? `${formatDateTime(saved.lastRun.at, activeBranch.timezone)} · ${saved.lastRun.issued} new, ${saved.lastRun.expired} expired` : 'none'}
               </span>
             </p>
             {canEdit && saved.enabled && (

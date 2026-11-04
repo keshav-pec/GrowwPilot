@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { Branch, EmailOutbox, Organization } from '../../models/index.js';
-import { maskEmail } from './mask.js';
+import { maskEmail } from '../../utils/mask.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { runOnce } from '../../middleware/idempotency.js';
@@ -21,7 +21,7 @@ async function scriptHealth() {
   return result;
 }
 
-// The Email card: is email set up, which routes, is the script answering, how much of the daily limit is used
+// The Email card: is email on, which routes, is the script answering, how much of the daily limit is used
 export async function mailStatus(ctx, user) {
   const since = (ms) => new Date(Date.now() - ms);
   const [script, platformSent, salonSent, salonFailed, salonWaiting] = await Promise.all([
@@ -46,14 +46,14 @@ export async function mailStatus(ctx, user) {
 }
 
 // Who an email is from: the salon's name, and replies go to the salon's contact email (not to our Gmail account)
-export async function salonSender(ctx, session = null) {
+async function salonSender(ctx, session = null) {
   const org = await Organization.findById(ctx.orgId).select('name contactEmail').session(session).lean();
   return { name: org.name, fromName: org.name, replyTo: org.contactEmail };
 }
 
 // A test email to the business owner's own login email
 export async function sendTestEmail(ctx, { user, key }) {
-  if (mailMode() === 'off') throw new AppError(409, 'MAIL_NOT_SET_UP', 'Email is not set up on the server yet. See “Setting up email” in the README.');
+  if (mailMode() === 'off') throw new AppError(409, 'MAIL_OFF', 'Email is off on the server.');
   const org = await salonSender(ctx);
   const sentOn = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' });
   const text = `Hello ${user.name},\n\nThis is a test email from ${org.name} on GrowwPilot.\nIf you can read this, email is working.\n\nSent on ${sentOn}.`;

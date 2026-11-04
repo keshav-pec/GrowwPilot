@@ -19,7 +19,7 @@ export async function getBillingSettings(ctx, session = null) {
 
 // Every branch's bill prefix. A saved prefix wins; the others come from the branch name and are made unique
 // ("Andheri" and "Andheri East" -> "AND" and "AN2"), so two branches never print the same numbers.
-export function resolvePrefixes(branches, saved) {
+function resolvePrefixes(branches, saved) {
   const savedOf = Object.fromEntries((saved ?? []).filter((b) => b.invoicePrefix).map((b) => [String(b.branchId), b.invoicePrefix]));
   const taken = new Set(Object.values(savedOf));
   const result = {};

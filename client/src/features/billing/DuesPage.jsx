@@ -6,7 +6,7 @@ import { useDues } from '../../api/billingReports';
 import { formatMoney } from '../../lib/money';
 import { formatDay } from '../../lib/time';
 import { useDebounce } from '../../lib/useDebounce';
-import { EmptyState, Input, PageHeader, Select, Spinner, Table, Tabs } from '../../components/ui';
+import { EmptyState, Input, PageHeader, PageSpinner, Select, Table, Tabs } from '../../components/ui';
 
 // Money customers still owe: by age (0–30, 31–60, 61–90, over 90 days), per customer and per bill.
 // Click a bill to take the payment.
@@ -20,11 +20,7 @@ export default function DuesPage() {
   const dues = useDues({ branches, search: debounced || undefined });
 
   if (dues.isPending) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner size={28} />
-      </div>
-    );
+    return <PageSpinner />;
   }
   if (dues.isError) return <EmptyState title="Couldn’t load dues" message={dues.error.message} />;
   const data = dues.data;

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { useSaveBranch } from '../../api/branches';
 import { TIMEZONES } from '../../lib/constants';
-import { Button, Input, Modal, Select } from '../../components/ui';
+import { Input, Modal, ModalFooter, Select } from '../../components/ui';
 
 const schema = z
   .object({
@@ -56,14 +56,9 @@ export default function BranchFormModal({ branch, onClose }) {
       onClose={onClose}
       title={branch ? `Edit ${branch.name}` : 'Add branch'}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" form="branch-form" loading={saveBranch.isPending}>
+        <ModalFooter onClose={onClose} type="submit" form="branch-form" loading={saveBranch.isPending}>
             Save
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <form id="branch-form" onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2" noValidate>

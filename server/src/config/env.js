@@ -13,10 +13,8 @@ const envSchema = z.object({
   CLIENT_ORIGIN: z.url().default('http://localhost:5173'),
   // How many proxies sit in front of the API (Vercel -> Render = 2). Needed to see the real visitor IP.
   TRUST_PROXY: z.coerce.number().int().min(0).default(1),
-  // Where product photos are kept. Only MongoDB GridFS for now; a Cloudinary store can be added later.
-  IMAGE_STORAGE: z.enum(['gridfs']).default('gridfs'),
 
-  // --- Email (EMAIL_PLAN.md). All optional: with none set, email is "not set up". ---
+  // --- Email. All optional: with none set, email is off. ---
   // Google Apps Script web app (/exec link) that sends the emails, and the secret it checks
   MAIL_SCRIPT: optional(z.url()),
   MAIL_SCRIPT_SECRET: optional(z.string().min(24, 'MAIL_SCRIPT_SECRET must be at least 24 characters')),

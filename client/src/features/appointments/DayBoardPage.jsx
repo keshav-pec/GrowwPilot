@@ -9,7 +9,7 @@ import { useServiceStaff } from '../../api/staff';
 import { useAttendance } from '../../api/attendance';
 import { NEXT_STEP, STATUS_LABEL, getAlert } from '../../lib/appointments';
 import { addDays, formatDay, formatTime, todayIn } from '../../lib/time';
-import { Button, EmptyState, PageHeader, Spinner } from '../../components/ui';
+import { Button, EmptyState, PageHeader, PageSpinner } from '../../components/ui';
 import OccasionWidget from '../occasions/worklist/OccasionWidget';
 import AppointmentDrawer from './AppointmentDrawer';
 
@@ -117,9 +117,7 @@ export default function DayBoardPage() {
       {isToday && <OccasionWidget />}
 
       {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Spinner size={28} />
-        </div>
+        <PageSpinner />
       ) : columns.length === 0 ? (
         <EmptyState
           title="No stylists at this branch yet"

@@ -1,17 +1,12 @@
-import { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useEscapeKey } from './useEscapeKey';
 
 const widths = { md: 'max-w-lg', wide: 'max-w-5xl' };
 
 // A centred popup. Closes on the X button, the Escape key, or a click on the dark background.
 // size: 'md' (forms) or 'wide' (big tables)
 export default function Modal({ open, onClose, title, footer, size = 'md', children }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  useEscapeKey(open, onClose);
 
   if (!open) return null;
 

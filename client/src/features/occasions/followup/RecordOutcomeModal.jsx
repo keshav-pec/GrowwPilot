@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useRecordContact } from '../../../api/occasions';
-import { newRequestKey } from '../../../lib/billing';
+import { newRequestKey } from '../../../lib/requestKey';
 import { CALL_OUTCOMES } from '../../../lib/occasions';
 import { fromLocalInput, toLocalInput } from '../../../lib/time';
-import { Button, Input, Modal, Textarea } from '../../../components/ui';
+import { Input, Modal, ModalFooter, Textarea } from '../../../components/ui';
 
 // Record call outcome. A call never counts as an offer message and never needs messaging permission.
 // onWrongDetails: called after "Wrong details", so the screen can point to the profile to fix the number.
@@ -38,14 +38,9 @@ export default function RecordOutcomeModal({ offer, zone, onClose, onWrongDetail
       onClose={onClose}
       title={withdrawnNotice ? 'Record call: offer withdrawn' : 'Record call outcome'}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button disabled={!ready} loading={record.isPending} onClick={save}>
+        <ModalFooter onClose={onClose} disabled={!ready} loading={record.isPending} onClick={save}>
             Save
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="flex flex-col gap-4 text-sm">

@@ -1,5 +1,5 @@
 import Modal from './Modal';
-import Button from './Button';
+import ModalFooter from './ModalFooter';
 
 // "Are you sure?" popup for actions like deactivate or cancel.
 export default function ConfirmDialog({
@@ -18,14 +18,9 @@ export default function ConfirmDialog({
       onClose={onClose}
       title={title}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={loading}>
+        <ModalFooter onClose={onClose} variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={loading}>
             {confirmLabel}
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="text-sm text-muted">{message}</div>

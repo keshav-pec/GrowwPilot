@@ -8,7 +8,7 @@ import { useServices } from '../../api/catalog';
 import { LEAD_SOURCES } from '../../lib/leads';
 import { isValidPhone } from '../../lib/phone';
 import { fromLocalInput, toLocalInput } from '../../lib/time';
-import { Button, Input, Modal, Select, Textarea } from '../../components/ui';
+import { Input, Modal, ModalFooter, Select, Textarea } from '../../components/ui';
 
 const schema = z.object({
   name: z.string().trim().min(2, 'Name is required'),
@@ -69,14 +69,9 @@ export default function LeadFormModal({ lead, onClose }) {
       onClose={onClose}
       title={lead ? `Edit ${lead.name}` : 'Add lead'}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" form="lead-form" loading={saveLead.isPending}>
+        <ModalFooter onClose={onClose} type="submit" form="lead-form" loading={saveLead.isPending}>
             Save
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <form id="lead-form" onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2" noValidate>

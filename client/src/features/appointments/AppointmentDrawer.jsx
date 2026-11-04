@@ -8,7 +8,7 @@ import { formatMoney } from '../../lib/money';
 import { SETTLEMENT } from '../../lib/billing';
 import { formatDateTime, formatTime } from '../../lib/time';
 import { Badge, Button, ConfirmDialog, Drawer, Textarea } from '../../components/ui';
-import AppointmentStatusBadge from '../../components/AppointmentStatusBadge';
+import { AppointmentStatusBadge } from '../../components/StatusBadge';
 import OfferBadges from '../occasions/checkout/OfferBadges';
 
 // Everything about one appointment, plus its actions (next step, edit, cancel, checkout)

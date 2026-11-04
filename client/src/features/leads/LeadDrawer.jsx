@@ -7,7 +7,7 @@ import { useAddLeadNote, useLead, useSaveLead, useSetLeadStatus } from '../../ap
 import { LEAD_NEXT_STATUSES, LEAD_STATUS_LABEL, OPEN_LEAD_STATUSES, isOverdue } from '../../lib/leads';
 import { formatDateTime, fromLocalInput, toLocalInput } from '../../lib/time';
 import { Badge, Button, Drawer, Input, Spinner, Textarea } from '../../components/ui';
-import LeadStatusBadge from '../../components/LeadStatusBadge';
+import { LeadStatusBadge } from '../../components/StatusBadge';
 import LeadFormModal from './LeadFormModal';
 
 // Details, status buttons, follow-up picker, notes timeline and "Convert to appointment"

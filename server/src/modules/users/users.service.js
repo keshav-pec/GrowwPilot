@@ -41,7 +41,7 @@ export async function listUsers(ctx) {
 // With sendPasswordEmail they get an email with a link to set their own password instead (nothing is shown).
 export async function createUser(ctx, { sendPasswordEmail, ...input }) {
   if (sendPasswordEmail && !passwordEmailsAvailable()) {
-    throw new AppError(409, 'MAIL_NOT_SET_UP', 'Email isn’t set up yet. Untick “Email them a link” to get a temporary password instead.');
+    throw new AppError(409, 'MAIL_OFF', 'Email is off. Untick “Email them a link” to get a temporary password instead.');
   }
   if (input.role === 'OWNER' && !ctx.isPrimaryOwner) {
     throw new AppError(403, 'FORBIDDEN', 'Only the main owner can add other owners');

@@ -6,7 +6,8 @@ import { useAuth } from '../../auth/AuthContext';
 import { downloadBillingCsv, useBillingReport, useBillingReportList } from '../../api/billingReports';
 import { formatMoney } from '../../lib/money';
 import { todayIn, addDays } from '../../lib/time';
-import { Button, Card, EmptyState, Input, PageHeader, Select, Spinner } from '../../components/ui';
+import { Button, Card, EmptyState, Input, PageHeader, PageSpinner, Select } from '../../components/ui';
+import ReportTable from '../../components/ReportTable';
 
 // Billing reports with CSV download. Owners: every report for this branch or all their branches.
 // Front desk: today's collections at their branch only.
@@ -72,9 +73,7 @@ export default function BillingReportsPage() {
       </div>
 
       {report.isPending ? (
-        <div className="flex justify-center py-12">
-          <Spinner size={28} />
-        </div>
+        <PageSpinner />
       ) : report.isError ? (
         <EmptyState title="Couldn’t run the report" message={report.error.message} />
       ) : (
@@ -83,41 +82,7 @@ export default function BillingReportsPage() {
           {data.rows.length === 0 ? (
             <EmptyState title="Nothing in this period" />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs text-muted">
-                    {data.columns.map((c) => (
-                      <th key={c.key} className={`whitespace-nowrap px-2 py-2 font-medium ${c.money ? 'text-right' : ''}`}>
-                        {c.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.rows.map((row, i) => (
-                    <tr key={i} className="border-b border-border">
-                      {data.columns.map((c) => (
-                        <td key={c.key} className={`whitespace-nowrap px-2 py-1.5 ${c.money ? 'text-right' : ''}`}>
-                          {cell(c, row[c.key])}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-                {data.totals && (
-                  <tfoot>
-                    <tr className="font-semibold text-brown">
-                      {data.columns.map((c, i) => (
-                        <td key={c.key} className={`whitespace-nowrap px-2 py-2 ${c.money ? 'text-right' : ''}`}>
-                          {i === 0 ? 'Total' : c.key in data.totals ? cell(c, data.totals[c.key]) : ''}
-                        </td>
-                      ))}
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
+            <ReportTable columns={data.columns} rows={data.rows} totals={data.totals} cell={(c, row) => cell(c, row[c.key])} />
           )}
         </Card>
       )}

@@ -1,17 +1,12 @@
-import { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useEscapeKey } from './useEscapeKey';
 
 const widths = { md: 'max-w-md', wide: 'max-w-2xl' };
 
 // A panel that slides in from the right (used for details like a lead's timeline). On a phone it fills the screen.
 // size: 'md' (default) or 'wide'
 export default function Drawer({ open, onClose, title, footer, size = 'md', children }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  useEscapeKey(open, onClose);
 
   if (!open) return null;
 

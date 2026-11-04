@@ -1,10 +1,9 @@
 import mongoose from 'mongoose';
 import { Appointment, InventoryConsumptionEvent, InventoryException, InventoryOutbox, InventorySku } from '../../../models/index.js';
 import { scoped } from '../../../utils/scoped.js';
-import { notify } from '../../notifications/notifications.service.js';
+import { notify, stockKeeperIds } from '../../notifications/notifications.service.js';
 import { findRecipeInEffect } from '../recipes/recipes.service.js';
 import { ensureBranchLocations } from '../locations/locations.service.js';
-import { stockKeeperIds } from '../stock/lowStock.js';
 import { EXCEPTION_REASON, postServiceUse } from './serviceUse.js';
 
 // ---------------------------------------------------------------------------
@@ -12,7 +11,7 @@ import { EXCEPTION_REASON, postServiceUse } from './serviceUse.js';
 // 1. Completing an appointment writes one "service completed" event, in the same transaction (the outbox).
 // 2. Right after, it is handled in the background, so the front desk never waits for it.
 // 3. A sweep every few minutes retries anything that failed (or was cut off by a restart).
-// Each service line and recipe line is posted at most once (a unique key), so replaying an event is safe (AC28).
+// Each service line and recipe line is posted at most once (a unique key), so replaying an event is safe.
 // ---------------------------------------------------------------------------
 
 const MAX_ATTEMPTS = 5;
@@ -97,7 +96,7 @@ function automationCtx(event) {
   };
 }
 
-export async function handleServiceCompleted(event) {
+async function handleServiceCompleted(event) {
   const appointment = await Appointment.findOne({ _id: event.appointmentId, orgId: event.orgId }).lean();
   if (!appointment || appointment.status !== 'COMPLETED') return; // nothing is used for cancelled visits
 

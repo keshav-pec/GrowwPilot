@@ -8,8 +8,10 @@ import { formatDateTime } from '../../lib/time';
 import { useDebounce } from '../../lib/useDebounce';
 import { billBadge } from '../../lib/billing';
 import { hasAddon } from '../../lib/constants';
-import { Badge, Button, EmptyState, Input, PageHeader, Pagination, Select, Table } from '../../components/ui';
+import { Badge, Button, EmptyState, Input, PageHeader, Pagination, Select, StatTile, Table } from '../../components/ui';
 import NewSaleModal from './NewSaleModal';
+
+const Stat = ({ highlight, ...props }) => <StatTile {...props} tone={highlight ? 'text-orange' : 'text-brown'} valueClass="text-lg font-semibold" className="rounded-xl border border-border p-3" />;
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All bills' },
@@ -129,11 +131,3 @@ export default function BillsListPage() {
   );
 }
 
-function Stat({ label, value, highlight = false }) {
-  return (
-    <div className="rounded-xl border border-border p-3">
-      <p className="text-xs text-muted">{label}</p>
-      <p className={`text-lg font-semibold ${highlight ? 'text-orange' : 'text-brown'}`}>{value}</p>
-    </div>
-  );
-}

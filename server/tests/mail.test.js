@@ -307,7 +307,7 @@ describe('daily limit', () => {
     expect((await row(offer.id)).status).toBe('PENDING');
   });
 
-  it('emails only logged (email not set up) do not count towards it', async () => {
+  it('emails only logged (email off) do not count towards it', async () => {
     useMail({ scriptOn: false, smtpOn: false, dailyLimit: 1 });
     const ids = [await queue(), await queue({ priority: 5 })];
     await processOutbox();
@@ -391,7 +391,7 @@ describe('status and test email routes', () => {
     expect(state.json.error).toMatch(/refused the secret/);
   });
 
-  it('with email not set up (development), the test email is logged, not sent', async () => {
+  it('with email off (development), the test email is logged, not sent', async () => {
     useMail({ scriptOn: false, smtpOn: false });
     expect((await call('business', 'GET', '/mail/status')).json).toMatchObject({ mode: 'log', setUp: false, script: null });
     const queued = await call('business', 'POST', '/mail/test');

@@ -6,10 +6,11 @@ import toast from 'react-hot-toast';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useSaveSku } from '../../../api/inventory/skus';
 import { useSuppliers } from '../../../api/inventory/suppliers';
-import { BASE_UNITS, SKU_TYPES, STOCK_UNITS, WAYS_OF_USE, isMeasured, newRequestKey } from '../../../lib/inventory';
+import { BASE_UNITS, SKU_TYPES, STOCK_UNITS, WAYS_OF_USE, isMeasured } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { isValidRupees, toPaise } from '../../../lib/money';
 import { GST_RATE_OPTIONS } from '../../../lib/billing';
-import { Button, Input, Modal, Select } from '../../../components/ui';
+import { Input, Modal, ModalFooter, Select } from '../../../components/ui';
 
 const whole = z.string().trim().refine((v) => v === '' || /^\d+$/.test(v), 'Use a whole number');
 const toNumber = (v) => (v === '' ? null : Number(v));
@@ -153,14 +154,9 @@ export default function ProductFormModal({ product, categories = [], canSeeCosts
       onClose={onClose}
       title={title}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" form="product-form" loading={saveSku.isPending}>
+        <ModalFooter onClose={onClose} type="submit" form="product-form" loading={saveSku.isPending}>
             Save
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <form id="product-form" onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2" noValidate>

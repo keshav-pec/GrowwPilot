@@ -3,7 +3,7 @@
 //   gross = salary + days worked + hours worked + services done + commission + bonuses
 //   net   = gross - deductions - advance repayments
 //
-// Defaults (PAYROLL_PLAN.md, Part 3), to be confirmed by the owner:
+// Defaults, to be confirmed by the owner:
 // - Monthly salary is split by calendar days when the pay setup covers only part of the month
 //   (joined, left, or pay changed mid-month). It is NOT cut for absences: an owner adds a deduction if needed.
 // - Per-day pay counts days marked present. Per-hour pay counts check-in to check-out on those days.
@@ -11,6 +11,7 @@
 import { DateTime } from 'luxon';
 import { formatAmount } from '../../utils/money.js';
 import { describePay, formatDay } from './payPlan.rules.js';
+import { plural } from '../../utils/text.js';
 
 // "2026-10" -> "October 2026"
 export const monthName = (month) => DateTime.fromISO(`${month}-01`).toFormat('LLLL yyyy');
@@ -23,7 +24,6 @@ export function monthBounds(month) {
 
 const daysBetween = (from, to) => Math.round(DateTime.fromISO(to).diff(DateTime.fromISO(from), 'days').days) + 1;
 const within = (day, from, to) => day >= from && day <= to;
-const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 // "10.5 hours", "8 hours"
 function formatHours(minutes) {

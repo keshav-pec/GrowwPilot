@@ -45,7 +45,7 @@ export function formatPercent(bps) {
 
 // "₹20,000/month + 10% commission"
 export function describePay(plan) {
-  if (!plan) return 'Not set up yet';
+  if (!plan) return 'No pay setup';
   const parts = [];
   if (plan.monthlyBase) parts.push(`${formatAmount(plan.monthlyBase)}/month`);
   if (plan.dailyRate) parts.push(`${formatAmount(plan.dailyRate)}/day`);

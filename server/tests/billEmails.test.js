@@ -147,11 +147,11 @@ describe('emailing a bill', () => {
     expect((await call('otherSalon', 'GET', `/invoices/${andheri._id}/emails`)).status).toBe(404);
   });
 
-  it('with email not set up there’s no Email bill (and a clear refusal)', async () => {
+  it('with email off there’s no Email bill (and a clear refusal)', async () => {
     configureMail({ mode: 'off' });
     const bill = await issuedBill();
     expect((await call('desk', 'GET', `/invoices/${bill._id}/emails`)).json.canEmail).toBe(false);
-    expect((await call('desk', 'POST', `/invoices/${bill._id}/email`, { body: {} })).json.error.code).toBe('MAIL_NOT_SET_UP');
+    expect((await call('desk', 'POST', `/invoices/${bill._id}/email`, { body: {} })).json.error.code).toBe('MAIL_OFF');
   });
 });
 

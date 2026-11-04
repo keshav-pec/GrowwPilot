@@ -10,12 +10,10 @@ import {
 import { AppError } from '../../../utils/AppError.js';
 import { scoped } from '../../../utils/scoped.js';
 import { runOnce } from '../../../middleware/idempotency.js';
-import { assertCan } from '../permissions.js';
-import { getBranchSettings } from '../settings/settings.service.js';
+import { assertCanHere } from '../settings/settings.service.js';
 import { postMovement } from '../stock/stock.engine.js';
 import { branchStock, availableToIssue } from '../stock/stock.queries.js';
-import { refreshLowStock, stockKeeperIds } from '../stock/lowStock.js';
-import { notify } from '../../notifications/notifications.service.js';
+import { notify, stockKeeperIds } from '../../notifications/notifications.service.js';
 import { ensureBranchLocations } from '../locations/locations.service.js';
 import { describeQty } from '../units.js';
 
@@ -26,10 +24,6 @@ import { describeQty } from '../units.js';
 // ---------------------------------------------------------------------------
 
 const FLOOR = { kind: 'FLOOR', id: null, name: 'Salon floor' };
-
-async function allow(ctx, action) {
-  assertCan(ctx, action, { settings: await getBranchSettings(ctx, ctx.activeBranchId) });
-}
 
 // A product used at this branch (deactivated products can't be handed out)
 async function findSkuHere(ctx, branchId, skuId) {
@@ -73,7 +67,7 @@ async function addEvent(ctx, allocation, event, session) {
 }
 
 // Takes qty out of an open hand-out. Only matches while it is open and has that much left, so two people
-// finishing the same bottle at the same moment can never use more than was handed out (AC07).
+// finishing the same bottle at the same moment can never use more than was handed out.
 export async function takeFromHandout(ctx, allocation, qty, session) {
   const updated = await InventoryAllocation.findOneAndUpdate(
     scoped(ctx, { _id: allocation._id, status: 'OPEN', remainingQty: { $gte: qty } }),
@@ -124,10 +118,10 @@ async function totalsFor(ctx, branchId, skuId, session) {
 }
 
 // ---------------------------------------------------------------------------
-// Issue product (INV-05): choose a product, the store, who gets it and how many
+// Issue product: choose a product, the store, who gets it and how many
 // ---------------------------------------------------------------------------
 export async function issue(ctx, input, key) {
-  await allow(ctx, 'inventory.issue');
+  await assertCanHere(ctx, 'inventory.issue');
   const branchId = ctx.activeBranchId;
   const sku = await findSkuHere(ctx, branchId, input.skuId);
   const { inUse } = await ensureBranchLocations(ctx, branchId);
@@ -141,12 +135,12 @@ export async function issue(ctx, input, key) {
 }
 
 // ---------------------------------------------------------------------------
-// Finish & replace (INV-07), in one step. The finish is always saved. A replacement is issued only if
+// Finish & replace, in one step. The finish is always saved. A replacement is issued only if
 // the store has enough; if not, the answer says UNAVAILABLE and the product is flagged as low stock.
 // ---------------------------------------------------------------------------
 export async function finish(ctx, id, { qty, note, replacement }, key) {
-  await allow(ctx, 'inventory.finish');
-  if (replacement) await allow(ctx, 'inventory.issue');
+  await assertCanHere(ctx, 'inventory.finish');
+  if (replacement) await assertCanHere(ctx, 'inventory.issue');
   const branchId = ctx.activeBranchId;
   const allocation = await findHandout(ctx, id);
   const sku = await InventorySku.findOne(scoped(ctx, { _id: allocation.skuId })).lean();
@@ -182,9 +176,8 @@ export async function finish(ctx, id, { qty, note, replacement }, key) {
         );
         replacementResult = { status: 'ISSUED', allocationId: issued._id };
       } else {
-        // Not enough in the store: the finish stays, and the low-stock alert goes out
+        // Not enough in the store: the finish stays
         replacementResult = { status: 'UNAVAILABLE', allocationId: null, available: inStore?.qty ?? 0 };
-        await refreshLowStock(ctx, branchId, [sku._id], session);
       }
     }
 
@@ -196,7 +189,7 @@ export async function finish(ctx, id, { qty, note, replacement }, key) {
 // Return unused (In use -> a store), when it can still be used
 // ---------------------------------------------------------------------------
 export async function returnUnused(ctx, id, { qty, locationId, note }, key) {
-  await allow(ctx, 'inventory.return');
+  await assertCanHere(ctx, 'inventory.return');
   const branchId = ctx.activeBranchId;
   const allocation = await findHandout(ctx, id);
   const { mainStore, inUse } = await ensureBranchLocations(ctx, branchId);
@@ -227,11 +220,11 @@ export async function returnUnused(ctx, id, { qty, locationId, note }, key) {
 
 // ---------------------------------------------------------------------------
 // Move to another stylist or station. Nothing is used up and the branch total stays the same;
-// the movement history records who had it before and after (AC08). Moving part of it splits the hand-out.
+// the movement history records who had it before and after. Moving part of it splits the hand-out.
 // Moving also settles a "needs handover" flag.
 // ---------------------------------------------------------------------------
 export async function move(ctx, id, input, key) {
-  await allow(ctx, 'inventory.transfer');
+  await assertCanHere(ctx, 'inventory.transfer');
   const branchId = ctx.activeBranchId;
   const allocation = await findHandout(ctx, id);
   const to = await findRecipient(ctx, branchId, input.recipient);
@@ -298,7 +291,7 @@ export async function listRecipients(ctx) {
 }
 
 // When a team member stops working here, their open hand-outs are flagged "needs handover"
-// and the owners and inventory logins are told (PRD AC26). Called from setStaffStatus.
+// and the owners and inventory logins are told. Called from setStaffStatus.
 export async function flagHandoverForStaff(ctx, staff) {
   const open = await InventoryAllocation.find(scoped(ctx, { 'recipient.kind': 'STAFF', 'recipient.id': staff._id, status: 'OPEN', needsHandover: false })).lean();
   if (open.length === 0) return 0;

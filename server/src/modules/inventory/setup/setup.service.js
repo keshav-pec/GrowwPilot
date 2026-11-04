@@ -3,7 +3,7 @@ import { scoped } from '../../../utils/scoped.js';
 import { runOnce } from '../../../middleware/idempotency.js';
 import { assertCan } from '../permissions.js';
 import { getBranchSettings } from '../settings/settings.service.js';
-import { recordInventoryAction } from '../activity.js';
+import { logActivity } from '../../activity/activity.service.js';
 
 // The first-time setup guide, per branch:
 // 1. where you keep stock  2. add your products  3. check before saving  4. done.
@@ -40,7 +40,7 @@ export async function markSetupStep(ctx, step, key) {
     const before = await InventorySettings.findOne(scoped(ctx, { branchId })).session(session).lean();
     await InventorySettings.updateOne(scoped(ctx, { branchId }), { $set: { [STEP_FIELD[step]]: new Date() } }, { upsert: true, session });
     if (step === 'done' && !before?.setupCompletedAt) {
-      await recordInventoryAction(ctx, { action: 'inventory.setup_finished', branchId, summary: 'Finished setting up inventory' }, session);
+      await logActivity(ctx, { action: 'inventory.setup_finished', branchId, summary: 'Finished setting up inventory' }, session);
     }
   });
   return getSetup(ctx);

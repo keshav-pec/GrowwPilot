@@ -5,10 +5,10 @@ import { ArrowLeft, Pencil } from 'lucide-react';
 import { useAuth } from '../../../auth/AuthContext';
 import { useServices } from '../../../api/catalog';
 import { useCampaign, useCampaignAction, useCampaignPreview, useCampaignVersions, useOccasionSettings, useRevokeOffers, useUpdateCampaign } from '../../../api/occasions';
-import { newRequestKey } from '../../../lib/billing';
+import { newRequestKey } from '../../../lib/requestKey';
 import { CAMPAIGN_STATUS, DELIVERY_LABEL, OCCASION_LABEL, formatOccasion } from '../../../lib/occasions';
 import { formatDateTime } from '../../../lib/time';
-import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Modal, PageHeader, Spinner, Table, Textarea } from '../../../components/ui';
+import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Modal, ModalFooter, PageHeader, PageSpinner, Spinner, Table, Textarea } from '../../../components/ui';
 import CampaignFormModal from './CampaignFormModal';
 import CampaignMessagesCard from './CampaignMessagesCard';
 import DeliveryModeChoice from './DeliveryModeChoice';
@@ -40,11 +40,7 @@ export default function CampaignDetailPage() {
   const canWithdraw = Boolean(settingsQuery.data?.can['occasions.revokeOffers']);
 
   if (campaignQuery.isPending) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner size={28} />
-      </div>
-    );
+    return <PageSpinner />;
   }
   if (campaignQuery.isError) return <EmptyState title="Campaign not found" message={campaignQuery.error.message} action={<Link to="/app/settings/occasions" className="text-sm underline">Occasion offers</Link>} />;
   const c = campaignQuery.data;
@@ -241,14 +237,9 @@ function WithdrawModal({ campaign, onClose }) {
       onClose={onClose}
       title={`Withdraw unused ${campaign.name} offers`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="danger" disabled={!ready} loading={revoke.isPending} onClick={confirm}>
+        <ModalFooter onClose={onClose} variant="danger" disabled={!ready} loading={revoke.isPending} onClick={confirm}>
             Withdraw
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="flex flex-col gap-4 text-sm">

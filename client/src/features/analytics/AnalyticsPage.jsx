@@ -6,11 +6,10 @@ import { useAuth } from '../../auth/AuthContext';
 import { analyticsPdfUrl, useAnalytics } from '../../api/analytics';
 import { formatMoney } from '../../lib/money';
 import { todayIn } from '../../lib/time';
-import { Card, EmptyState, Input, PageHeader, Select, Spinner } from '../../components/ui';
+import { Card, EmptyState, HEADLINE_TILE, Input, PageHeader, PageSpinner, Select, StatTile } from '../../components/ui';
 import { HBarChart, SlotHeatmap } from './charts';
 
 const DAY_NAMES = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const METHOD = { CASH: 'Cash', UPI: 'UPI', CARD: 'Card', OTHER: 'Other' };
 const rupees = (paise) => formatMoney(paise).replace(/\.00$/, '');
 const pct = (value) => (value === null ? '—' : `${value}%`);
 
@@ -66,16 +65,6 @@ function DateBox({ label, value, min, max, onPick }) {
       }}
       className="w-40"
     />
-  );
-}
-
-function StatTile({ label, value, note }) {
-  return (
-    <div className="rounded-xl border border-border bg-bg p-4">
-      <p className="text-sm text-muted">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
-      {note && <p className="mt-0.5 text-xs text-muted">{note}</p>}
-    </div>
   );
 }
 
@@ -140,19 +129,17 @@ export default function AnalyticsPage() {
       </div>
 
       {analyticsQuery.isPending ? (
-        <div className="flex justify-center py-12">
-          <Spinner size={28} />
-        </div>
+        <PageSpinner />
       ) : analyticsQuery.isError ? (
         <EmptyState title="Couldn’t load analytics" message={analyticsQuery.error.message} />
       ) : (
         // While new filters load, keep the old charts (dimmed) instead of flashing a spinner
         <div className={`flex flex-col gap-4 transition-opacity ${analyticsQuery.isPlaceholderData ? 'opacity-50' : ''}`}>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatTile label="Net sales" value={rupees(data.totals.revenue)} note={`Collected ${rupees(data.totals.collected ?? 0)}`} />
-            <StatTile label="Bookings" value={data.totals.bookings} />
-            <StatTile label="Invoices" value={data.totals.invoices} />
-            <StatTile label="Average ticket" value={rupees(data.totals.avgTicket)} />
+            <StatTile {...HEADLINE_TILE} label="Net sales" value={rupees(data.totals.revenue)} hint={`Collected ${rupees(data.totals.collected ?? 0)}`} />
+            <StatTile {...HEADLINE_TILE} label="Bookings" value={data.totals.bookings} />
+            <StatTile {...HEADLINE_TILE} label="Invoices" value={data.totals.invoices} />
+            <StatTile {...HEADLINE_TILE} label="Average ticket" value={rupees(data.totals.avgTicket)} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -205,31 +192,6 @@ export default function AnalyticsPage() {
               />
             </Card>
 
-            <Card title="Lead sources" className="min-w-0">
-              <HBarChart data={data.leadSources.map((l) => ({ ...l, name: l.source }))} valueKey="leads" label="Leads" />
-              <DataTable
-                rows={data.leadSources}
-                columns={[
-                  { header: 'Source', render: (l) => l.source },
-                  { header: 'Leads', right: true, render: (l) => l.leads },
-                  { header: 'Booked', right: true, render: (l) => l.converted },
-                  { header: 'Conversion', right: true, render: (l) => pct(l.rate) },
-                ]}
-              />
-            </Card>
-
-            <Card title="Payment mix" className="min-w-0">
-              <HBarChart data={data.paymentMix.filter((m) => m.amount > 0).map((m) => ({ ...m, name: METHOD[m.method] }))} valueKey="amount" label="Amount" format={rupees} />
-              <DataTable
-                rows={data.paymentMix}
-                columns={[
-                  { header: 'Method', render: (m) => METHOD[m.method] },
-                  { header: 'Payments', right: true, render: (m) => m.payments },
-                  { header: 'Amount', right: true, render: (m) => rupees(m.amount) },
-                  { header: 'Share', right: true, render: (m) => pct(m.share) },
-                ]}
-              />
-            </Card>
           </div>
 
           <p className="text-xs text-muted">

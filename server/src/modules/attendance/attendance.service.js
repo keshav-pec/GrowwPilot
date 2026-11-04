@@ -5,10 +5,7 @@ import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { dayRangeUTC, localToUTC, todayInZone } from '../../utils/time.js';
 import { markPayrollStale } from '../payroll/payrollStale.js';
-
-async function activeBranch(ctx) {
-  return Branch.findOne(scoped(ctx, { _id: ctx.activeBranchId })).select('name timezone').lean();
-}
+import { activeBranch } from '../branches/activeBranch.js';
 
 // The day's roster for the selected branch: every active stylist, with that day's record (or null = not marked yet)
 export async function listAttendance(ctx, { date }) {

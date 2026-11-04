@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
+import { keyed } from './request';
 
-// Email (business owner): is email set up, how much of the daily limit is used
+// Email (business owner): is email on, how much of the daily limit is used
 export function useMailStatus() {
   // Branch owners get 403 here (they see only the recent emails): don't ask again
   return useQuery({ queryKey: ['mail-status'], queryFn: () => api.get('/mail/status').then((res) => res.data), retry: (count, err) => err.status !== 403 && count < 2 });
@@ -11,7 +12,7 @@ export function useMailStatus() {
 export function useSendTestEmail() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ key }) => api.post('/mail/test', null, { headers: { 'Idempotency-Key': key } }).then((res) => res.data),
+    mutationFn: ({ key }) => api.post('/mail/test', null, keyed(key)).then((res) => res.data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mail-status'] }),
   });
 }

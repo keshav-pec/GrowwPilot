@@ -15,7 +15,7 @@ const occasionCampaignVersionSchema = new mongoose.Schema(
     branchId: ref('Branch', { default: null }),
     name: { type: String, required: true },
     rules: { type: campaignRulesSchema, required: true },
-    messages: { type: mongoose.Schema.Types.Mixed, default: null }, // WhatsApp / SMS / email wording (Phase 4)
+    messages: { type: mongoose.Schema.Types.Mixed, default: null }, // WhatsApp / SMS / email wording
     publishedBy: ref('User', { required: true }),
     publishedByName: { type: String, required: true },
     publishedAt: { type: Date, required: true },

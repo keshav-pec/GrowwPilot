@@ -3,7 +3,7 @@ import { ref } from './fields.js';
 
 export const EMAIL_KINDS = ['TEST', 'OCCASION_OFFER', 'PASSWORD', 'BILL'];
 export const EMAIL_STATUSES = ['PENDING', 'SENDING', 'SENT', 'FAILED', 'SKIPPED'];
-export const EMAIL_ROUTES = ['APPS_SCRIPT', 'SMTP', 'LOG']; // LOG = email not set up (development): printed, not sent
+const EMAIL_ROUTES = ['APPS_SCRIPT', 'SMTP', 'LOG']; // LOG = email is off (development): printed, not sent
 
 // One email the app sends. Written in the same transaction as whatever caused it, sent in the background
 // (modules/mail/outbox.js) with retries. Attachments are not stored: a bill PDF is rebuilt when it is sent.

@@ -20,7 +20,7 @@ const paymentSchema = new mongoose.Schema(
     // REFUND = money given back, MIGRATED = from a bill made before payments had their own records
     source: { type: String, enum: ['CHECKOUT', 'LATER', 'ADVANCE', 'REFUND', 'MIGRATED'], required: true },
     refundId: ref('Refund', { default: null }),
-    verificationStatus: { type: String, enum: ['RECORDED'], default: 'RECORDED' }, // no payment gateway: the desk records what it received
+    verificationStatus: { type: String, enum: ['RECORDED'], default: 'RECORDED' }, // the desk records what it received
     status: { type: String, enum: ['VALID', 'REVERSED'], default: 'VALID' },
     reversal: { at: Date, by: ref('User'), byName: String, reason: String }, // an owner undid a wrongly recorded payment
   },

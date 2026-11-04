@@ -394,12 +394,11 @@ describe('Bills list', () => {
     expect((await listInvoices(desk, { from: '2020-01-01', to: '2099-12-31', page: 1 })).total).toBe(3);
   });
 
-  it('the dashboard lists unbilled visits and bills with dues', async () => {
+  it('the dashboard lists unbilled visits', async () => {
     await completed();
     await checkout(desk, await completed(), { payments: cash(50000) });
     const { attention } = await getDashboard({ ...owner, activeBranchId: String(f.andheri._id) });
     expect(attention.filter((i) => i.kind === 'UNPAID')).toHaveLength(1);
-    expect(attention.find((i) => i.kind === 'DUE')).toMatchObject({ title: 'Priya owes ₹1,030.00', action: { label: 'Record payment' } });
   });
 });
 

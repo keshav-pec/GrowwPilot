@@ -83,11 +83,11 @@ const invoiceSchema = new mongoose.Schema(
   {
     orgId: ref('Organization', { required: true }),
     branchId: ref('Branch', { required: true }),
-    // Set while the bill counts for this appointment. A voided bill (Phase 2) moves it to voidedAppointmentId,
+    // Set while the bill counts for this appointment. A voided bill moves it to voidedAppointmentId,
     // so the appointment can be billed again; the partial unique index below needs this.
     appointmentId: ref('Appointment', { default: undefined }),
     voidedAppointmentId: ref('Appointment', { default: undefined }),
-    customerId: ref('Customer', { default: null }), // empty only for guest product sales (Phase 2)
+    customerId: ref('Customer', { default: null }), // empty only for guest product sales
 
     status: { type: String, enum: INVOICE_STATUSES, default: 'DRAFT' },
     settlementStatus: { type: String, enum: SETTLEMENT_STATUSES, default: 'UNPAID' },

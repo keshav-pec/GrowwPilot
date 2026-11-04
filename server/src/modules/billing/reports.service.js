@@ -1,15 +1,14 @@
-import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
 import { Branch, CommissionEntry, Customer, CustomerAdvance, Invoice, Payment, PaymentAllocation, Refund } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
-import { scoped } from '../../utils/scoped.js';
+import { oid, scoped } from '../../utils/scoped.js';
 import { dayRangeUTC, todayInZone } from '../../utils/time.js';
 import { billingPermissions, getBillingSettings } from './settings.service.js';
 import { advancesOf } from '../payments/allocations.js';
 import { cashDaysBetween } from '../cash/cash.service.js';
 
 // ---------------------------------------------------------------------------
-// Billing reports (BILLING_PLAN.md, Phase 3). Each one is a plain table { title, note, columns, rows },
+// Billing reports. Each one is a plain table { title, note, columns, rows },
 // shown on screen and downloadable as CSV. Dates are read in each branch's own timezone.
 //   Owners: every report, for the selected branch or all their branches.
 //   Front desk: only today's collections at their branch.
@@ -19,7 +18,6 @@ import { cashDaysBetween } from '../cash/cash.service.js';
 //   collected  = money received (payments and advances) less money handed back
 // ---------------------------------------------------------------------------
 
-const oid = (id) => new mongoose.Types.ObjectId(String(id));
 const localDay = (date, zone) => DateTime.fromJSDate(date, { zone }).toISODate();
 const METHOD_WORDS = { CASH: 'Cash', UPI: 'UPI', CARD: 'Card', OTHER: 'Other' };
 const BUCKETS = [

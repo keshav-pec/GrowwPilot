@@ -7,18 +7,16 @@ import {
   InventorySku,
   InventorySkuBranch,
   InventoryTransaction,
-  User,
 } from '../../../models/index.js';
 import { REASON_BUCKET } from '../../../config/inventory.js';
 import { AppError } from '../../../utils/AppError.js';
 import { scoped } from '../../../utils/scoped.js';
 import { formatAmount } from '../../../utils/money.js';
 import { runOnce } from '../../../middleware/idempotency.js';
-import { actorRole } from '../../activity/activity.service.js';
-import { notify } from '../../notifications/notifications.service.js';
+import { logActivity, personOf } from '../../activity/activity.service.js';
+import { approverIdsWhere, notify } from '../../notifications/notifications.service.js';
 import { assertCan, can } from '../permissions.js';
 import { getBranchSettings } from '../settings/settings.service.js';
-import { recordInventoryAction } from '../activity.js';
 import { postMovement } from '../stock/stock.engine.js';
 import { branchStock } from '../stock/stock.queries.js';
 import { ensureBranchLocations } from '../locations/locations.service.js';
@@ -35,8 +33,6 @@ export const REASON_WORDS = {
   OTHER: 'other',
 };
 
-export const personOf = (ctx) => ({ id: ctx.userId, name: ctx.userName, role: actorRole(ctx) });
-
 // "Wrote off 2 bottles of Shampoo (damaged)" / "Used 1 kit of Facial kit" / "Corrected the count of Wax: 2 jars more"
 function describeWriteOff({ sku, qty, reason, direction }) {
   if (reason === 'STOCK_COUNT_CORRECTION') return `Corrected the count of ${sku.name}: ${describeQty(qty, sku)} ${direction === 'ADD' ? 'more' : 'less'}`;
@@ -46,7 +42,7 @@ function describeWriteOff({ sku, qty, reason, direction }) {
 
 // Posts a use / write-off / count correction. Shared by a direct write-off and an approved one.
 // From a store (locationId) or from a hand-out in use (allocation).
-export async function postWriteOff(ctx, { branchId, sku, locationId, allocation, qty, reason, direction, note, actor, approvedBy, requestKey }, session) {
+async function postWriteOff(ctx, { branchId, sku, locationId, allocation, qty, reason, direction, note, actor, approvedBy, requestKey }, session) {
   let from = locationId;
   let heldBy;
   if (allocation) {
@@ -77,9 +73,9 @@ export async function postWriteOff(ctx, { branchId, sku, locationId, allocation,
     );
   }
   const summary = describeWriteOff({ sku, qty, reason, direction }) + (approvedBy ? `, approved by ${approvedBy.name}` : '');
-  await recordInventoryAction(
+  await logActivity(
     ctx,
-    { action: 'inventory.write_off', branchId, summary, after: { qty, reason, direction, note }, link: `/app/inventory?tab=products&product=${sku._id}` },
+    { action: 'inventory.write_off', branchId, summary, after: { qty, reason, direction, note } },
     session
   );
   return transaction;
@@ -87,14 +83,11 @@ export async function postWriteOff(ctx, { branchId, sku, locationId, allocation,
 
 // Owners who may approve a write-off of this value at this branch (the business owner always;
 // a branch owner only within their limit)
-async function writeOffApproverIds(ctx, branchId, value, settings) {
-  const owners = await User.find(scoped(ctx, { role: 'OWNER', status: 'active', $or: [{ allBranches: true }, { branchIds: branchId }] })).lean();
-  return owners
-    .filter((o) => {
-      const decision = can({ role: 'OWNER', isPrimaryOwner: o.allBranches }, 'inventory.writeOff', { settings, value: value ?? undefined });
-      return decision.allowed && !decision.needsApproval;
-    })
-    .map((o) => o._id);
+function writeOffApproverIds(ctx, branchId, value, settings) {
+  return approverIdsWhere(ctx, branchId, (owner) => {
+    const decision = can(owner, 'inventory.writeOff', { settings, value: value ?? undefined });
+    return decision.allowed && !decision.needsApproval;
+  });
 }
 
 // A pending problem report from the front desk, closed by the write-off made for it
@@ -109,7 +102,7 @@ async function closeReport(ctx, reportId, { decisionNote, transactionId }, sessi
 }
 
 // ---------------------------------------------------------------------------
-// Use, write-off or count correction by hand (INV-08).
+// Use, write-off or count correction by hand.
 // input: { skuId, locationId | allocationId, qty, reason, direction ('REMOVE' | 'ADD'), note?, reportId? }
 // Within the person's limit it is posted at once. Above it, a note is needed and it waits for an owner.
 // The front desk can never do this; they report a problem instead.
@@ -118,7 +111,7 @@ export async function writeOff(ctx, input, key) {
   const branchId = ctx.activeBranchId;
   const { qty, reason, direction, note, reportId } = input;
   const settings = await getBranchSettings(ctx, branchId);
-  assertCan(ctx, 'inventory.writeOff', { settings, value: 0 }); // the front desk stops here (AC18)
+  assertCan(ctx, 'inventory.writeOff', { settings, value: 0 }); // the front desk stops here
 
   const [sku, here] = await Promise.all([
     InventorySku.findOne(scoped(ctx, { _id: input.skuId })).lean(),
@@ -153,7 +146,7 @@ export async function writeOff(ctx, input, key) {
       );
       await closeReport(ctx, reportId, { decisionNote: 'Sent for an owner’s approval' }, session);
       const summary = `${describeWriteOff({ sku, qty, reason, direction })}: waiting for approval${value != null ? ` (${formatAmount(value)})` : ''}`;
-      await recordInventoryAction(ctx, { action: 'inventory.write_off_requested', branchId, summary, after: { qty, reason, note }, link: '/app/inventory?tab=overview' }, session);
+      await logActivity(ctx, { action: 'inventory.write_off_requested', branchId, summary, after: { qty, reason, note } }, session);
       await notify(ctx, await writeOffApproverIds(ctx, branchId, value, settings), { message: `${ctx.userName} asks to approve: ${summary}`, link: '/app/inventory?tab=overview' }, session);
       return { status: 'PENDING_APPROVAL', approval: approval.toObject() };
     });
@@ -211,7 +204,7 @@ export async function decideWriteOff(ctx, id, { approve, note }, key) {
       );
       await InventoryApproval.updateOne(scoped(ctx, { _id: approval._id }), { $set: { transactionId: transaction._id } }, { session });
     } else {
-      await recordInventoryAction(
+      await logActivity(
         ctx,
         { action: 'inventory.write_off_rejected', branchId: approval.branchId, summary: `Turned down: ${describeWriteOff({ sku, ...approval })}${note ? `. ${note}` : ''}` },
         session
@@ -262,9 +255,9 @@ export async function correctFinish(ctx, transactionId, { note }, key) {
       [{ orgId: ctx.orgId, branchId, allocationId: allocation._id, type: 'CORRECTED', qty: -line.qty, to: allocation.recipient, transactionId: transaction._id, actorId: ctx.userId, actorName: ctx.userName, note }],
       { session }
     );
-    await recordInventoryAction(
+    await logActivity(
       ctx,
-      { action: 'inventory.finish_corrected', branchId, summary: `Undid a finish of ${describeQty(-line.qty, sku)} of ${sku.name} (${allocation.recipient.name}): ${note}`, link: `/app/inventory?tab=products&product=${sku._id}` },
+      { action: 'inventory.finish_corrected', branchId, summary: `Undid a finish of ${describeQty(-line.qty, sku)} of ${sku.name} (${allocation.recipient.name}): ${note}` },
       session
     );
     return { transactionId: transaction._id, allocation };

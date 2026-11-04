@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { validate } from '../../../middleware/validate.js';
-import { runReport, toCsv } from './reports.service.js';
+import { runReport } from './reports.service.js';
+import { sendCsv } from '../../../utils/csv.js';
 
 // /api/inventory/reports/:name?from=2026-10-01&to=2026-10-31&branches=current|all&format=csv
 const router = Router();
@@ -17,10 +18,8 @@ const querySchema = z.object({
 router.get('/:name', validate({ query: querySchema }), async (req, res) => {
   const report = await runReport(req.ctx, req.params.name, req.valid.query);
   if (req.valid.query.format === 'csv') {
-    // Built on the server, so cost columns are already gone for people who may not see costs (AC27)
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${report.name}-${report.from}-to-${report.to}.csv"`);
-    return res.send(`﻿${toCsv(report)}`);
+    // Built on the server, so cost columns are already gone for people who may not see costs
+    return sendCsv(res, `${report.name}-${report.from}-to-${report.to}.csv`, report);
   }
   res.json(report);
 });

@@ -15,7 +15,7 @@ import { runOnce } from '../../../middleware/idempotency.js';
 import { assertCan, can } from '../permissions.js';
 import { withoutCosts } from '../serializers.js';
 import { getBranchSettings } from '../settings/settings.service.js';
-import { recordInventoryAction } from '../activity.js';
+import { logActivity } from '../../activity/activity.service.js';
 import { describeQty } from '../units.js';
 import { postMovement } from '../stock/stock.engine.js';
 import { availableToIssue, branchStock } from '../stock/stock.queries.js';
@@ -25,7 +25,6 @@ import { findSupplier } from '../suppliers/suppliers.service.js';
 
 const PAGE_SIZE = 50;
 const HISTORY_PAGE_SIZE = 25;
-const productLink = (id) => `/app/inventory?tab=products&product=${id}`;
 
 // The fields that describe the product itself (the same at every branch)
 const PRODUCT_FIELDS = ['name', 'category', 'brand', 'barcodes', 'type', 'stockUnit', 'wayOfUse', 'baseUnit', 'unitsPerStockUnit', 'sellPrice', 'taxRateBps', 'hsnCode'];
@@ -116,7 +115,7 @@ export async function createSku(ctx, input, key) {
       );
       summary += ` with ${describeQty(openingQty, sku)} opening stock`;
     }
-    await recordInventoryAction(ctx, { action: 'inventory.product_added', branchId, summary, after: { code: sku.code, name: sku.name }, link: productLink(sku._id) }, session);
+    await logActivity(ctx, { action: 'inventory.product_added', branchId, summary, after: { code: sku.code, name: sku.name } }, session);
     return { sku };
   });
 }
@@ -177,9 +176,9 @@ export async function updateSku(ctx, id, input, key) {
     const changed = [...Object.keys(productChanges), ...Object.keys(branchChanges)];
     if (changed.length > 0) {
       const before = Object.fromEntries(Object.keys(productChanges).map((f) => [f, sku[f]]));
-      await recordInventoryAction(
+      await logActivity(
         ctx,
-        { action: 'inventory.product_changed', branchId, summary: `Changed ${updated.name} (${updated.code})`, before, after: { ...productChanges, ...branchChanges }, link: productLink(sku._id) },
+        { action: 'inventory.product_changed', branchId, summary: `Changed ${updated.name} (${updated.code})`, before, after: { ...productChanges, ...branchChanges } },
         session
       );
     }
@@ -201,7 +200,7 @@ export async function setSkuStatus(ctx, id, { status, version }, key) {
     if (!updated) throw new AppError(409, 'STALE_VERSION', 'Someone else changed this product. Close it and open it again to see the latest.');
     if (status !== sku.status) {
       const verb = status === 'inactive' ? 'Deactivated' : 'Reactivated';
-      await recordInventoryAction(ctx, { action: 'inventory.product_status', branchId: ctx.activeBranchId, summary: `${verb} ${sku.name} (${sku.code})`, before: { status: sku.status }, after: { status }, link: productLink(sku._id) }, session);
+      await logActivity(ctx, { action: 'inventory.product_status', branchId: ctx.activeBranchId, summary: `${verb} ${sku.name} (${sku.code})`, before: { status: sku.status }, after: { status } }, session);
     }
     return { sku: updated };
   });
@@ -224,7 +223,7 @@ export async function useSkuHere(ctx, id, key) {
     } else {
       await InventorySkuBranch.create([{ orgId: ctx.orgId, branchId, skuId: sku._id }], { session });
     }
-    await recordInventoryAction(ctx, { action: 'inventory.product_added', branchId, summary: `Started using ${sku.name} (${sku.code}) at this branch`, link: productLink(sku._id) }, session);
+    await logActivity(ctx, { action: 'inventory.product_added', branchId, summary: `Started using ${sku.name} (${sku.code}) at this branch` }, session);
     return { sku };
   });
 }
@@ -341,7 +340,7 @@ async function balanceRows(ctx, branchId, skuId, locations) {
 }
 
 // ---------------------------------------------------------------------------
-// Movement history (INV-13): every change to this product's stock at the selected branch, newest first
+// Movement history: every change to this product's stock at the selected branch, newest first
 // ---------------------------------------------------------------------------
 export async function listSkuMovements(ctx, id, { page }) {
   const branchId = ctx.activeBranchId;

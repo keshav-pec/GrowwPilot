@@ -1,4 +1,4 @@
-// Fixed lists for the Inventory add-on (INVENTORY_PLAN.md).
+// Fixed lists for the Inventory add-on.
 
 // What kind of product it is
 export const SKU_TYPES = ['PROFESSIONAL', 'RETAIL', 'DISPOSABLE', 'GENERAL_SUPPLY', 'REUSABLE_ASSET'];
@@ -16,7 +16,6 @@ export const BASE_UNITS = ['ml', 'g', 'piece'];
 // STORE: shelves (Main store, more can be added). IN_USE: opened / handed out (one per branch).
 // STATION: a named chair or area that receives stock. Its stock sits in IN_USE, it has no balance of its own.
 export const LOCATION_KINDS = ['STORE', 'IN_USE', 'STATION'];
-export const BALANCE_KINDS = ['STORE', 'IN_USE'];
 
 // One row per action in the movement history
 export const MOVEMENT_TYPES = [

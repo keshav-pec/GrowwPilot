@@ -1,17 +1,13 @@
 // The payslip PDF (pdfkit, same look as the sales PDF). Earnings, deductions, pay, and payments made.
 import PDFDocument from 'pdfkit';
 import { DateTime } from 'luxon';
-import { formatMoney } from '../../utils/money.js';
+import { BROWN, MUTED, pdfMoney as money, pdfRow, pdfText as text } from '../../utils/pdf.js';
 import { monthName as nameOfMonth } from './monthlyPay.rules.js';
 
-const BROWN = '#6B4226';
-const MUTED = '#6B6B6B';
-const LINE = '#E5E5E0';
 const WIDTH = 515; // A4 width minus margins
-
-// The built-in PDF fonts have no ₹ sign, so the PDF writes "Rs." instead (in amounts and in text like "₹18,000/month")
-const text = (value) => String(value ?? '').replaceAll('₹', 'Rs. ');
-const money = (paise) => text(formatMoney(paise));
+const LINE_COLUMNS = [{ width: 150 }, { width: 265 }, { width: 100, align: 'right' }];
+const TOTAL_COLUMNS = [{ width: 415 }, { width: 100, align: 'right' }];
+const PAYMENT_COLUMNS = [{ width: 100 }, { width: 110 }, { width: 205 }, { width: 100, align: 'right' }];
 const METHOD = { CASH: 'Cash', UPI: 'UPI', BANK: 'Bank transfer' };
 
 // "GrowwPilot_Payslip_Rahul_2026-10.pdf"
@@ -19,27 +15,15 @@ export function payslipFileName(staffName, month) {
   return `GrowwPilot_Payslip_${staffName.replace(/[^a-z0-9]+/gi, '-')}_${month}.pdf`;
 }
 
-function row(doc, cells, widths, { bold = false, color = 'black', aligns = [] } = {}) {
-  const left = doc.page.margins.left;
-  const y = doc.y;
-  let x = left;
-  doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(9).fillColor(color);
-  cells.forEach((cell, i) => {
-    doc.text(text(cell), x + 4, y + 5, { width: widths[i] - 8, align: aligns[i] ?? 'left', lineBreak: false, ellipsis: true });
-    x += widths[i];
-  });
-  doc.moveTo(left, y + 20).lineTo(left + WIDTH, y + 20).strokeColor(LINE).lineWidth(0.5).stroke();
-  doc.y = y + 20;
-}
+const row = (doc, columns, cells, options = {}) => pdfRow(doc, columns, cells, { ...options, height: 20, pad: 5 });
 
 function section(doc, title, lines) {
   doc.x = doc.page.margins.left;
   doc.moveDown(0.8);
   doc.font('Helvetica-Bold').fontSize(11).fillColor(BROWN).text(title);
   doc.moveDown(0.2);
-  const widths = [150, 265, 100];
-  row(doc, ['Item', 'Details', 'Amount'], widths, { bold: true, color: MUTED, aligns: [, , 'right'] });
-  for (const line of lines) row(doc, [line.label, line.detail, money(line.amount)], widths, { aligns: [, , 'right'] });
+  row(doc, LINE_COLUMNS, ['Item', 'Details', 'Amount'], { bold: true, color: MUTED });
+  for (const line of lines) row(doc, LINE_COLUMNS, [line.label, line.detail, money(line.amount)]);
 }
 
 export function writePayslipPdf(stream, { item, run, branch, salonName, payments }) {
@@ -72,8 +56,8 @@ export function writePayslipPdf(stream, { item, run, branch, salonName, payments
     ['Total earnings', money(item.gross)],
     ['Total deductions', money(item.deductions)],
   ];
-  for (const [label, value] of totals) row(doc, [label, value], [415, 100], { aligns: [, 'right'] });
-  row(doc, ['Net pay', money(item.net)], [415, 100], { bold: true, aligns: [, 'right'] });
+  for (const [label, value] of totals) row(doc, TOTAL_COLUMNS, [label, value]);
+  row(doc, TOTAL_COLUMNS, ['Net pay', money(item.net)], { bold: true });
 
   // ----- Payments -----
   if (locked) {
@@ -81,13 +65,12 @@ export function writePayslipPdf(stream, { item, run, branch, salonName, payments
     doc.moveDown(0.8);
     doc.font('Helvetica-Bold').fontSize(11).fillColor(BROWN).text('Payments made');
     doc.moveDown(0.2);
-    const widths = [100, 110, 205, 100];
-    row(doc, ['Date', 'Method', 'Reference', 'Amount'], widths, { bold: true, color: MUTED, aligns: [, , , 'right'] });
-    if (payments.length === 0) row(doc, ['No payments recorded yet'], [WIDTH], { color: MUTED });
-    for (const p of payments) row(doc, [DateTime.fromISO(p.paidOn).toFormat('d LLL yyyy'), METHOD[p.method], p.reference || '-', money(p.amount)], widths, { aligns: [, , , 'right'] });
+    row(doc, PAYMENT_COLUMNS, ['Date', 'Method', 'Reference', 'Amount'], { bold: true, color: MUTED });
+    if (payments.length === 0) row(doc, [{ width: WIDTH }], ['No payments recorded yet'], { color: MUTED });
+    for (const p of payments) row(doc, PAYMENT_COLUMNS, [DateTime.fromISO(p.paidOn).toFormat('d LLL yyyy'), METHOD[p.method], p.reference || '-', money(p.amount)]);
     const paid = payments.reduce((sum, p) => sum + p.amount, 0);
-    row(doc, ['Paid', money(paid)], [415, 100], { aligns: [, 'right'] });
-    row(doc, ['Still owed', money(Math.max(item.net - paid, 0))], [415, 100], { bold: true, aligns: [, 'right'] });
+    row(doc, TOTAL_COLUMNS, ['Paid', money(paid)]);
+    row(doc, TOTAL_COLUMNS, ['Still owed', money(Math.max(item.net - paid, 0))], { bold: true });
   }
 
   doc.moveDown(2);

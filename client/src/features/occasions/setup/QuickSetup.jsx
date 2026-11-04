@@ -4,9 +4,9 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Check } from 'lucide-react';
 import { useServices } from '../../../api/catalog';
 import { useCampaignAction, useCampaignPreview, useCampaigns, useOccasionSettings, useSaveOccasionSettings, useStarterCampaigns, useUpdateCampaign } from '../../../api/occasions';
-import { newRequestKey } from '../../../lib/billing';
+import { newRequestKey } from '../../../lib/requestKey';
 import { DELIVERY_LABEL, OCCASION_LABEL, fromRulesForm, rulesFormErrors, toRulesForm } from '../../../lib/occasions';
-import { Badge, Button, EmptyState, PageHeader, Spinner, Tabs } from '../../../components/ui';
+import { Badge, Button, EmptyState, PageHeader, PageSpinner, Spinner, Tabs } from '../../../components/ui';
 import CampaignForm from '../campaigns/CampaignForm';
 import DeliveryModeChoice from '../campaigns/DeliveryModeChoice';
 
@@ -35,11 +35,7 @@ export default function QuickSetup() {
   const [step, setStep] = useState(null);
 
   if (settingsQuery.isPending) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner size={28} />
-      </div>
-    );
+    return <PageSpinner />;
   }
   if (settingsQuery.isError) return <EmptyState title="Couldn’t load the setup" message={settingsQuery.error.message} />;
   const settings = settingsQuery.data;

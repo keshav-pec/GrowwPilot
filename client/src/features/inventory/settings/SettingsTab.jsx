@@ -2,12 +2,12 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { ShieldCheck } from 'lucide-react';
 import { fetchStockCheck, useInventorySettings, useSaveInventorySettings } from '../../../api/inventory/settings';
-import { newRequestKey } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { formatAmount, isValidRupees, toPaise } from '../../../lib/money';
 import { Button, Card, Input, Spinner } from '../../../components/ui';
 import LocationsCard from './LocationsCard';
 
-// What the front desk may do (PRD launch defaults: only mark finished)
+// What the front desk may do (by default: only mark finished)
 const FRONT_DESK = [
   ['finish', 'Mark bottles finished', 'Report empty bottles (and replace them, if they may also issue)'],
   ['issue', 'Issue and return stock', 'Hand products from the store to stylists and stations, and put unused ones back'],
@@ -21,7 +21,7 @@ const LIMITS = [
   ['branchOwnerPoApproval', 'Branch owner: approve orders up to', 'Bigger orders go to the business owner.', true],
 ];
 
-// Inventory settings (INV-15) for the selected branch. Owners only; the business owner alone decides
+// Inventory settings for the selected branch. Owners only; the business owner alone decides
 // branch owners' limits and whether they see costs.
 export default function SettingsTab() {
   const settingsQuery = useInventorySettings();

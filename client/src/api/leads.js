@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { api } from './client';
+import { useChange } from './request';
 
 export function useLeads(filters) {
   const { activeBranchId } = useAuth();
@@ -28,38 +29,14 @@ export function useAssignees() {
   });
 }
 
-function useRefreshLeads() {
-  const queryClient = useQueryClient();
-  return () => {
-    queryClient.invalidateQueries({ queryKey: ['leads'] });
-    queryClient.invalidateQueries({ queryKey: ['lead'] });
-  };
-}
+const useLeadChange = (mutationFn) => useChange(mutationFn, ['leads', 'lead']);
 
 // Create (no _id) or edit (with _id)
-export function useSaveLead() {
-  const refresh = useRefreshLeads();
-  return useMutation({
-    mutationFn: ({ _id, ...values }) => (_id ? api.patch(`/leads/${_id}`, values) : api.post('/leads', values)).then((res) => res.data.lead),
-    onSuccess: refresh,
-  });
-}
+export const useSaveLead = () => useLeadChange(({ _id, ...values }) => (_id ? api.patch(`/leads/${_id}`, values) : api.post('/leads', values)).then((res) => res.data.lead));
 
-export function useSetLeadStatus() {
-  const refresh = useRefreshLeads();
-  return useMutation({
-    mutationFn: ({ _id, status }) => api.patch(`/leads/${_id}/status`, { status }).then((res) => res.data.lead),
-    onSuccess: refresh,
-  });
-}
+export const useSetLeadStatus = () => useLeadChange(({ _id, status }) => api.patch(`/leads/${_id}/status`, { status }).then((res) => res.data.lead));
 
-export function useAddLeadNote() {
-  const refresh = useRefreshLeads();
-  return useMutation({
-    mutationFn: ({ _id, text }) => api.post(`/leads/${_id}/notes`, { text }).then((res) => res.data.lead),
-    onSuccess: refresh,
-  });
-}
+export const useAddLeadNote = () => useLeadChange(({ _id, text }) => api.post(`/leads/${_id}/notes`, { text }).then((res) => res.data.lead));
 
 // Convert: books the appointment and closes the lead in one go
 export function useConvertLead() {

@@ -2,11 +2,13 @@ import { Customer } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { runOnce } from '../../middleware/idempotency.js';
 import { logActivity } from '../activity/activity.service.js';
-import { MONTH_NAMES, dayFitsMonth, maskPhone } from '../../config/occasions.js';
+import { MONTH_NAMES, dayFitsMonth } from '../../config/occasions.js';
 import { assertCan } from './permissions.js';
 import { customerScope } from './settings.service.js';
 import { occasionDateChanges } from './customers.service.js';
 import { reevaluateSoon } from './engine/reevaluate.js';
+import { maskPhone } from '../../utils/mask.js';
+import { plural } from '../../utils/text.js';
 
 // Spreadsheet import of birthdays and anniversaries (owners):
 //   1. download the template: one row per customer (ID, name, masked phone, the months saved now)
@@ -25,7 +27,7 @@ const MONTH_WORDS = {
 };
 
 // "11", "Nov", "November" -> 11; "" -> null; anything else -> NaN
-export function parseMonth(text) {
+function parseMonth(text) {
   const value = String(text ?? '').trim().toLowerCase();
   if (value === '') return null;
   if (/^\d{1,2}$/.test(value)) {
@@ -132,7 +134,7 @@ export async function importDates(ctx, { rows, checkOnly }, key) {
     const saved = result.modifiedCount;
     await logActivity(
       ctx,
-      { action: 'occasions.dates_imported', summary: `Imported birthdays and anniversaries from a spreadsheet: ${saved} customer${saved === 1 ? '' : 's'} updated, ${rejected.length} row${rejected.length === 1 ? '' : 's'} rejected` },
+      { action: 'occasions.dates_imported', summary: `Imported birthdays and anniversaries from a spreadsheet: ${plural(saved, 'customer')} updated, ${plural(rejected.length, 'row')} rejected` },
       session
     );
     return { ...summary, saved, skippedChanged: checked.length - saved, checkOnly: false };

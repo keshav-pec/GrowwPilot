@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { useAddAdjustment } from '../../api/payroll';
 import { isValidRupees, toPaise } from '../../lib/money';
 import { formatMonth } from '../../lib/payroll';
-import { Button, Input, Modal, Select, Textarea } from '../../components/ui';
+import { Input, Modal, ModalFooter, Select, Textarea } from '../../components/ui';
 
 // Add a bonus or a deduction to one person's pay for a month, always with a reason.
 // correctsMonth: set when this fixes a month that is already locked.
@@ -35,14 +35,9 @@ export default function AdjustmentModal({ staff, month, correctsMonth, onClose }
       onClose={onClose}
       title={correctsMonth ? `Correction for ${staff.name}` : `Bonus or deduction for ${staff.name}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={save} loading={add.isPending}>
+        <ModalFooter onClose={onClose} onClick={save} loading={add.isPending}>
             Add
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">

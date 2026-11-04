@@ -7,7 +7,7 @@ import WriteOffModal from '../actions/WriteOffModal';
 import ReportProblemModal from '../actions/ReportProblemModal';
 import { MoveModal, ReturnModal } from '../actions/HandoutModals';
 
-// Open hand-outs (In use, INV-06), with what each person may do with them:
+// Open hand-outs (In use), with what each person may do with them:
 // Finished, Return unused, Move to someone else, and Write off (or Report a problem for the front desk)
 export default function HandoutsList({ handouts, can, showProduct = true }) {
   const [open, setOpen] = useState(null); // { action, handout }

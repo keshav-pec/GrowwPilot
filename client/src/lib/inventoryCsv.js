@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import { readCsvFile } from './csv';
 
 // The spreadsheet (CSV) import: the columns, a template, a filled-in example, and reading a file.
 // The server checks every row again; this only reads the file and catches the obvious problems early.
@@ -50,26 +51,14 @@ function download(fileName, rows) {
 export const downloadTemplate = () => download('inventory-template.csv', []);
 export const downloadExample = () => download('inventory-example.csv', EXAMPLE_ROWS);
 
-// Reads a CSV file in the browser. Column names are matched loosely ("Stock unit" = stock_unit).
-// Resolves to { rows } or { problem: 'what is wrong with the file' }.
+// Resolves to { rows } or { problem: 'what is wrong with the file' }
 export function readImportFile(file) {
-  return new Promise((resolve) => {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: 'greedy',
-      transformHeader: (h) => h.replace(/^﻿/, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_'),
-      complete: ({ data, meta }) => {
-        const missing = REQUIRED_COLUMNS.filter((c) => !meta.fields?.includes(c));
-        if (missing.length > 0) return resolve({ problem: `The file is missing these columns: ${missing.join(', ')}. Start from the template.` });
-        if (data.length === 0) return resolve({ problem: 'The file has no rows.' });
-        if (data.length > MAX_IMPORT_ROWS) {
-          return resolve({ problem: `The file has ${data.length} rows. Import at most ${MAX_IMPORT_ROWS} at a time by splitting it into parts.` });
-        }
-        // Keep only the columns we know, as text
-        const rows = data.map((r) => Object.fromEntries(IMPORT_COLUMNS.map((c) => [c, String(r[c] ?? '').trim()])));
-        resolve({ rows });
-      },
-      error: () => resolve({ problem: 'This file could not be read. Save it as CSV and try again.' }),
-    });
+  return readCsvFile(file, {
+    columns: IMPORT_COLUMNS,
+    maxRows: MAX_IMPORT_ROWS,
+    checkColumns(fields) {
+      const missing = REQUIRED_COLUMNS.filter((c) => !fields.includes(c));
+      return missing.length > 0 ? `The file is missing these columns: ${missing.join(', ')}. Start from the template.` : null;
+    },
   });
 }

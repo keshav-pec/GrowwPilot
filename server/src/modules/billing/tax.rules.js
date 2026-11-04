@@ -11,7 +11,7 @@ export function roundHalfUp(num, den) {
 }
 
 // A percentage typed by a person (up to 2 decimals) -> basis points: 12.5 -> 1250
-export function percentToBps(percent) {
+function percentToBps(percent) {
   return Math.round(percent * 100);
 }
 
@@ -44,7 +44,7 @@ export function lineTax(amount, rateBps, { gstRegistered, pricesIncludeTax }) {
 }
 
 // ---------------------------------------------------------------------------
-// A birthday / anniversary offer on a bill (OCCASION_OFFERS_PLAN.md, Phase 5). rules are the offer's frozen terms:
+// A birthday / anniversary offer on a bill. rules are the offer's frozen terms:
 // { discountType: PERCENT (value in basis points) | FLAT (value in paise), maxDiscount, minSubtotal }.
 // eligibleSubtotal: what the eligible services cost on this bill before GST is worked out.
 // Returns { eligible, discount, code?, shortBy? }:
@@ -69,7 +69,7 @@ export function occasionDiscount(rules, eligibleSubtotal) {
 //   4. GST is worked out on each line's final amount, rounded per line (half up)
 //
 // lines: [{ unitPrice, qty, comboDiscount, discount: { type, value } | null, taxRateBps, name, discountable (default true), occasionEligible }]
-// A line that is not discountable (e.g. a future gift card) takes no line discount and no share of the bill discount.
+// A line that is not discountable takes no line discount and no share of the bill discount.
 // billDiscount: { type, value } | null
 // mode: { gstRegistered, pricesIncludeTax }
 // occasion: an offer's rules (see occasionDiscount), or null. Old bills have none and price exactly as before.

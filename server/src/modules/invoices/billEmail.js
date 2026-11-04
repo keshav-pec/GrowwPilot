@@ -7,12 +7,12 @@ import { runOnce } from '../../middleware/idempotency.js';
 import { logActivity } from '../activity/activity.service.js';
 import { mailMode } from '../mail/config.js';
 import { escapeHtml, layout, textToHtml } from '../mail/html.js';
-import { maskEmail } from '../mail/mask.js';
+import { maskEmail } from '../../utils/mask.js';
 import { kickMailer, onAttachment, queueEmail } from '../mail/outbox.js';
 import { loadInvoice, present } from './invoices.service.js';
 import { invoicePdfName, writeInvoicePdf } from './invoice.pdf.js';
 
-// "Email bill" (EMAIL_PLAN.md Part 5): the issued bill as a PDF, to the customer's email (or one typed in).
+// "Email bill": the issued bill as a PDF, to the customer's email (or one typed in).
 // The PDF isn't stored: it is made again from the bill when the email goes out (phone partly hidden, as on a
 // shared link). Emails with a PDF go by SMTP first, then the Apps Script.
 
@@ -21,7 +21,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // POST /api/invoices/:id/email — { to? }. Front desk for their branch, owners for theirs (loadInvoice checks).
 export async function emailBill(ctx, id, { to }, key) {
   const invoice = await loadInvoice(ctx, id); // another salon's or branch's bill: not found
-  if (mailMode() === 'off') throw new AppError(409, 'MAIL_NOT_SET_UP', 'Email isn’t set up yet. Use Send to customer to share a link instead.');
+  if (mailMode() === 'off') throw new AppError(409, 'MAIL_OFF', 'Email is off. Use Send to customer to share a link instead.');
   if (invoice.status !== 'ISSUED') throw new AppError(409, 'NOT_ISSUED', 'Only issued bills can be emailed');
   const customer = invoice.customerId ? await Customer.findOne(scoped(ctx, { _id: invoice.customerId })).select('name email').lean() : null;
   const address = String(to ?? customer?.email ?? '').trim().toLowerCase();
@@ -69,7 +69,7 @@ export async function billEmails(ctx, id) {
 }
 
 // The PDF, made when the email goes out
-export async function invoicePdfBuffer(row) {
+async function invoicePdfBuffer(row) {
   const invoice = await Invoice.findOne({ _id: row.attachment.id, orgId: row.orgId }).lean();
   if (!invoice) throw new Error('The bill no longer exists');
   const shown = await present({ orgId: String(row.orgId), role: 'PUBLIC', allowedBranchIds: [String(invoice.branchId)] }, invoice);

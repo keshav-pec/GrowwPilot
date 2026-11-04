@@ -3,15 +3,17 @@ import toast from 'react-hot-toast';
 import { DateTime } from 'luxon';
 import { useAuth } from '../../../auth/AuthContext';
 import { useOrder, useOrderStep } from '../../../api/inventory/purchasing';
-import { PO_STATUS, formatQty, newRequestKey } from '../../../lib/inventory';
+import { PO_STATUS, formatQty } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { formatAmount, isValidRupees, toPaise } from '../../../lib/money';
-import { Badge, Button, Drawer, Input, Modal, Spinner } from '../../../components/ui';
+import { Badge, Button, Drawer, Input, Modal, ModalFooter, Spinner } from '../../../components/ui';
+import ReasonModal from '../../../components/ReasonModal';
 import { QtyField, StoreSelect } from '../actions/fields';
 import OrderFormModal from './OrderFormModal';
 
 const STEP_DONE = { submit: 'Sent', order: 'Marked as ordered', cancel: 'Cancelled', close: 'Closed' };
 
-// One purchase order (INV-11): its lines, what has arrived, and the next step
+// One purchase order: its lines, what has arrived, and the next step
 export default function OrderDrawer({ orderId, canSeeCosts, onClose }) {
   const { activeBranch } = useAuth();
   const orderQuery = useOrder(orderId);
@@ -121,8 +123,14 @@ export default function OrderDrawer({ orderId, canSeeCosts, onClose }) {
       {open === 'edit' && <OrderFormModal order={order} canSeeCosts={canSeeCosts} onClose={() => setOpen(null)} />}
       {open === 'receive' && <ReceiveModal order={order} canSeeCosts={canSeeCosts} acceptMore={can.acceptMore} onClose={() => setOpen(null)} />}
       {open === 'sendBack' && (
-        <SendBackModal
-          onSend={(note) => {
+        <ReasonModal
+          singleLine
+          danger={false}
+          title="Send the order back"
+          label="What should change?"
+          placeholder="e.g. Order 10, not 20"
+          confirmLabel="Send back"
+          onConfirm={(note) => {
             run('decide', { approve: false, note });
             setOpen(null);
           }}
@@ -133,7 +141,7 @@ export default function OrderDrawer({ orderId, canSeeCosts, onClose }) {
   );
 }
 
-// Receive a delivery (INV-12): only what arrived. More than was ordered needs the business owner and a reason.
+// Receive a delivery: only what arrived. More than was ordered needs the business owner and a reason.
 function ReceiveModal({ order, canSeeCosts, acceptMore, onClose }) {
   const step = useOrderStep();
   const [key] = useState(newRequestKey);
@@ -181,14 +189,9 @@ function ReceiveModal({ order, canSeeCosts, acceptMore, onClose }) {
       size="wide"
       title={`Receive ${order.number}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={save} loading={step.isPending} disabled={!anything || !pricesOk || (over && (!acceptMore || overReason.trim().length < 3))}>
+        <ModalFooter onClose={onClose} onClick={save} loading={step.isPending} disabled={!anything || !pricesOk || (over && (!acceptMore || overReason.trim().length < 3))}>
             Receive
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="flex flex-col gap-4">
@@ -231,25 +234,3 @@ function ReceiveModal({ order, canSeeCosts, acceptMore, onClose }) {
   );
 }
 
-function SendBackModal({ onSend, onClose }) {
-  const [note, setNote] = useState('');
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title="Send the order back"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button disabled={note.trim().length < 3} onClick={() => onSend(note)}>
-            Send back
-          </Button>
-        </>
-      }
-    >
-      <Input id="sendback-note" label="What should change?" autoFocus placeholder="e.g. Order 10, not 20" value={note} onChange={(e) => setNote(e.target.value)} />
-    </Modal>
-  );
-}

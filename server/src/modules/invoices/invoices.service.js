@@ -27,7 +27,7 @@ import { redeemOffer, restoreOffer } from '../occasions/checkout/redeem.js';
 export { branchCode } from '../billing/settings.service.js';
 
 // ---------------------------------------------------------------------------
-// Bills (BILLING_PLAN.md). One checkout for everything:
+// Bills. One checkout for everything:
 //   1. Opening checkout for a finished appointment makes a DRAFT bill (no number yet, can be changed).
 //      "New sale" makes an empty draft for selling products only (to a customer, or a guest if allowed).
 //   2. While it's a draft: products can be added (Inventory add-on), discounts given per line or on the whole bill,

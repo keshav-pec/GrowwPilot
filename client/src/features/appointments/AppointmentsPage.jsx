@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CalendarPlus, CalendarX, Search } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useAppointments } from '../../api/appointments';
 import { useServiceStaff } from '../../api/staff';
 import { STATUS_LABEL, staffNames } from '../../lib/appointments';
-import { useDebounce } from '../../lib/useDebounce';
 import { formatMoney } from '../../lib/money';
 import { formatDate, formatTime, todayIn } from '../../lib/time';
 import { Button, EmptyState, Input, PageHeader, Select, Table } from '../../components/ui';
-import AppointmentStatusBadge from '../../components/AppointmentStatusBadge';
+import { AppointmentStatusBadge } from '../../components/StatusBadge';
 import AppointmentDrawer from './AppointmentDrawer';
+import { useUrlFilters } from '../../lib/useUrlFilters';
 
 const STATUS_OPTIONS = Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }));
 
@@ -19,30 +19,12 @@ export default function AppointmentsPage() {
   const navigate = useNavigate();
   const { activeBranch } = useAuth();
   const zone = activeBranch.timezone;
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { searchParams, setFilter, search, setSearch, debouncedSearch } = useUrlFilters();
 
   // date: missing = today, "all" = every date
   const dateParam = searchParams.get('date') || todayIn(zone);
   const status = searchParams.get('status') || '';
   const staffId = searchParams.get('staffId') || '';
-
-  // The search box updates the URL 300 ms after typing stops
-  const [search, setSearch] = useState(searchParams.get('search') || '');
-  const debouncedSearch = useDebounce(search);
-  useEffect(() => {
-    setFilter('search', debouncedSearch);
-  }, [debouncedSearch]);
-
-  function setFilter(key, value) {
-    setSearchParams(
-      (params) => {
-        if (value) params.set(key, value);
-        else params.delete(key);
-        return params;
-      },
-      { replace: true }
-    );
-  }
 
   const appointmentsQuery = useAppointments({
     date: dateParam === 'all' ? undefined : dateParam,

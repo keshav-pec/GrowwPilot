@@ -1,25 +1,8 @@
-# Payroll module plan (salary, commission, payroll)
+# Payroll
 
-Based on *GrowwPilot Salon CRM Salary, Commission & Payroll PRD v1.0* (10 Oct 2026), adapted to this app.
-Built in parts; each part ends with a check-and-commit stop.
+Salary, commission and monthly payroll. Who can do what is in the [README](README.md#1-what-it-does); there is no separate "payroll admin" role, and the server enforces every rule.
 
-## Who can do what (no separate "payroll admin" role)
-
-| | Business owner (all branches) | Branch owner | Front desk | Super Admin |
-|---|---|---|---|---|
-| See staff pay setup | Every branch | Their branches | Their branch (pay setup only) | No |
-| Change pay setup | Yes | Their branches | **Request only**, an owner approves | No |
-| Approve front desk requests | Yes | Their branches | No | No |
-| Monthly payroll: review, lock the month | Every branch | Their branches | No | No |
-| Record salary payments, payslips | Every branch | Their branches | No | No |
-| Activity log | Every branch | Their branches | No | No |
-| Notifications (bell) | Every change made by someone else | Requests to approve at their branches | Answers to their requests | No |
-
-- Every change is written to the **activity log** (who, what, when, before and after). Nothing in the log can be edited or deleted.
-- The **business owner is notified** of every pay change made by a branch owner or approved from a front desk request.
-- The server enforces these rules. Hiding buttons on screen is only a convenience.
-
-## Ways to pay someone (all supported)
+## Ways to pay someone
 
 | Option on screen | Code | Needs |
 |---|---|---|
@@ -31,91 +14,43 @@ Built in parts; each part ends with a check-and-commit stop.
 | Per service done | `ASSIGNMENT` | amount per service |
 | A mix | `HYBRID` | any two or more of the above |
 
-A pay setup has a **start date**. A change creates a new setup from a new date; the old one stays in history and is never rewritten.
-Money is stored in whole paise, commission in basis points (10% = 1000).
+A pay setup has a start date. A change creates a new setup from a new date; the old one stays in history. Money is in whole paise, commission in basis points (10% = 1000). Front desk members are paid a monthly salary, per day or per hour only.
 
----
+## Commission
 
-## Parts
-
-### Part 1: Roles, pay setup, approvals, activity log, notifications ✅ done
-- Sidebar **Payroll** (owners) / **Staff pay** (front desk), replacing the "Salary: coming soon" placeholder.
-- **Pay setup** tab: every stylist at the branch with how they are paid; open one to see current, upcoming and past setups.
-- Owners change pay directly; front desk sends a request with a reason. One open request per stylist at a time.
-- **Requests** tab: owners approve or reject; the front desk sees the answer.
-- **Activity log** tab (owners) and a **bell** in the top bar for everyone in the salon.
-- Upcoming setups (not started yet) can be edited or cancelled; a current one can be ended (e.g. someone leaves).
-
----
-
-### Part 2: Commission ✅ done
-- Commission is earned when a service is **completed and paid** (at checkout), on the amount actually charged, with any bill discount shared across the services. The app has no GST, so nothing is taken out.
-- Only people whose pay setup includes commission earn it. Rate order: **special rate for that service** (e.g. 15% on Hair Colour; 0% = none) → the person's **normal %** from their pay setup.
-  - *Decision:* the PRD's third level, a salon-wide default %, is left out because everyone who earns commission already has their own % in their pay setup, so it would never be used.
-- Each commission line keeps the rate and where it came from, so later rate changes don't change past earnings. Lines can't be edited, and the same service on the same bill can't earn twice.
-- Combos: the combo price is shared across its services by their normal prices. Two stylists on one bill each earn on their own service.
+- Earned when a service is completed and its bill is fully paid, on what the customer actually paid, without GST. Bill discounts are shared across the services.
+- Rate order: a special rate for that service (0% = none), then the person's normal %.
+- Each line keeps its rate, so later changes never touch past earnings. Lines can't be edited, and the same service on the same bill can't earn twice.
+- A combo's price is shared across its services by their normal prices. Two stylists on one bill each earn on their own service.
 - Pay set up with a past start date catches up on bills already paid since that date.
-- Owners see **Commission this month** in the list and **Commission earned** per month (each line linked to its bill) when they open a person. Special rates are set there too (owners), and shown read-only to the front desk.
-- Not possible yet: splitting one service between two stylists (a booking has one stylist per service), refunds (the app has none).
 
-### Part 3: Monthly payroll ✅ done
-- **Payroll → Monthly payroll** (owners; branch owners for their branches): one payroll per branch per month, worked out from pay setups, attendance, commission and per-service pay, plus bonuses and deductions.
-- Opening a month works it out; a draft is worked out again when it's a few minutes old, or on **Recalculate**. The same data always gives the same amounts.
-- **Things to check.** Must fix (stops the lock): no pay setup for someone still working, attendance not marked for per-day / per-hour staff, a present day without times for per-hour staff, pay below zero. Reminders only: attendance not marked for others, finished services not paid yet.
-- Click a person: every line of their pay, notes (absences), and **Add bonus or deduction** (with a reason, logged, business owner notified).
-- **Lock month** from the month's last day, with a confirmation. A locked month never changes (its amounts are fingerprinted). Corrections are added to a later month, marked "correction for <month>".
-- **Export** downloads the month as a spreadsheet (CSV).
-- Defaults to confirm with the owner (easy to change later):
-  - Monthly salary is **not** cut automatically for absences; absences are shown, and an owner adds a deduction if needed.
-  - When a pay setup covers only part of a month (joined, left, pay changed mid-month), monthly salary is split by calendar days.
-  - Per-day pay counts days marked present (leave is unpaid for per-day staff). Per-hour pay counts check-in to check-out.
-  - Per-service pay counts completed and paid services, like commission.
-  - A month can be locked from its last day.
-  - Early in a month (1st–7th), the screen opens on last month, since that's usually the one being paid.
+## Monthly payroll
 
-### Part 4: Payments, payslips, advances ✅ done
-- **Payments** only against a **locked** month: full or part, cash / UPI / bank transfer, with reference, date and note. The list shows Paid / Part paid / Not paid; the totals show paid so far and still owed.
-- **Can't pay more than is owed**, unless the business owner ticks an override and gives a reason. Branch owners can't override.
-- A double click or retry records a payment once (each form sends a unique key). Two payments at the same moment can't both slip under the amount owed.
-- A payment entered by mistake is **cancelled with a reason**; it stays in the history, marked cancelled.
-- **Salary still owed from earlier locked months** shows as a reminder on later months.
-- **Payslip PDF** per person: earnings, deductions, net pay, payments made and still owed. Before locking it's a preview marked DRAFT.
-- **Advances** (open a person in Pay setup): amount, how it was given, reason, how much to take back each month and from which month. Repayments show up as deductions in each month's payroll automatically (e.g. ₹10,000 at ₹3,000/month = 3,000 + 3,000 + 3,000 + 1,000). Repayments can be stopped from a month on (e.g. paid back in cash). They can't start or stop in a month that's already locked.
-- **Staff who have left** stay in the payroll for any month they're owed pay, and can be paid.
-- Draft months work themselves out again as soon as something that changes pay happens (pay setup, special rate, attendance, a paid bill, an advance, a bonus).
-- Every payment, cancellation and advance is in the activity log; the business owner is notified of those made by a branch owner.
+- One payroll per branch per month, worked out from pay setups, attendance, commission and per-service pay, plus bonuses and deductions. Drafts are worked out again whenever something that changes pay happens.
+- **Must fix before locking:** no pay setup for someone still working, attendance not marked for per-day or per-hour staff, a present day without times for per-hour staff, pay below zero.
+- **Reminders only:** attendance not marked for others, finished services not paid.
+- **Lock month** from the month's last day. A locked month never changes (its amounts are fingerprinted); corrections go into a later month.
 
-### Part 5: Front desk members in the team list ✅ done
-- Each team member is either **Service staff** (stylists, beauticians: can be booked) or **Front desk** (paid, never booked). Everyone saved before this is service staff.
-- A front desk member can be linked to their front desk login (same branch, one login per person).
-- Front desk members never show in booking, the day board, stylist filters, preferred stylist or "chairs filled". The server refuses to book them.
-- A stylist with upcoming bookings can't be moved to the front desk until those bookings are reassigned.
-- Attendance lists front desk members too (marked by the front desk, a branch owner or the business owner).
-- Payroll leaves front desk members out until Part 6.
+Rules in use:
 
-### Part 6: Simple pay setup for front desk ✅ done
-- Front desk members are paid a **monthly salary**, **per day** or **per hour**. The server refuses commission, per-service pay, a mix, and special service rates for them.
-- Owners see front desk members in Pay setup (marked "Front desk"); their pay drawer has no commission or special-rate sections.
-- **Owners only**: front desk logins don't see front desk members in Pay setup, can't open their pay and can't request changes for them (not even their own).
-- A stylist can only be moved to the front desk once their pay has no commission or per-service pay and no special service rates. Pay that already ended stays as it was.
-- Monthly payroll, payments and advances still leave front desk members out until Parts 7 and 8.
+- Monthly salary isn't cut for absences; an owner adds a deduction if needed.
+- When a pay setup covers part of a month, monthly salary is split by calendar days.
+- Per-day pay counts days marked present (leave is unpaid). Per-hour pay counts check-in to check-out.
+- Early in a month (1st–7th) the screen opens on last month.
 
-### Part 7: Separate Staff and Front desk sections ✅ done
-- Owners switch between **Staff** and **Front desk** in Pay setup and Monthly payroll (front desk logins only see Staff, as before).
-- Monthly payroll now includes front desk members: salary, per day or per hour, bonuses and deductions, things to check. Each section shows its own to-pay, deductions and things to check; the branch total shows both.
-- The month is still worked out and **locked for the whole branch at once**. If the other section has something that must be fixed, a note says so.
-- Export has a "Section" column. Locked months can be paid and payslips downloaded for front desk members the same way as for staff.
-- Old payroll lines (before front desk existed) count as Staff.
+## Payments and advances
 
-### Part 8: Front desk payments, payslips, advances; README, help and access tests ✅ done
-- Front desk members get **advances** like staff. Payments and payslips work from Part 7 (a front desk payslip only lists salary, bonus and deduction lines, so there's no commission on it).
-- **Owners only.** Front desk logins can't see any front desk pay, not even their own payslip (for now). A branch owner can't reach another branch's front desk pay.
-- An API test logs in as the business owner, a branch owner of another branch and a front desk login, and tries every front desk pay action (open, change, request, monthly payroll, payslip, payment, advance, bonus).
-- README and the help assistant ("how do I pay the front desk salary?") explain it.
+- Payments only against a locked month: full or part, cash, UPI or bank transfer. A double click records once.
+- Can't pay more than is owed, unless the business owner ticks an override and gives a reason.
+- A mistaken payment is cancelled with a reason and stays in the history.
+- Payslip PDF per person; before locking it's marked DRAFT.
+- Advances are taken back monthly as deductions (₹10,000 at ₹3,000/month = 3,000 + 3,000 + 3,000 + 1,000), and can be stopped from a month on.
+- Staff who have left stay in the payroll for any month they're owed pay.
 
-### Not in this module for now (and why)
-- **Staff "My earnings" screen**: stylists don't log in to GrowwPilot today. Owners can download and share payslips instead.
-- **Product commission, refunds, gift cards, memberships, packages, deposits**: the app doesn't sell products or have these yet.
-- **Commission slabs and target bonuses**: after Parts 1–4.
-- **PF, ESI, TDS, professional tax**: need a payroll/legal expert's review first. Owners can add these as manual deductions meanwhile.
-- **Email notifications**: in-app only for now.
+## Front desk members
+
+A team member is either **Service staff** (can be booked) or **Front desk** (paid, never booked, linked to their login). Their pay is for owners only: front desk logins can't see it, not even their own. A stylist can move to the front desk only once their upcoming bookings are reassigned and their pay has no commission or per-service parts. Owners switch between Staff and Front desk in Pay setup and Monthly payroll; the month is still locked for the whole branch at once.
+
+## Activity log
+
+Every change goes in an activity log that can't be edited: who, what, when, before and after.

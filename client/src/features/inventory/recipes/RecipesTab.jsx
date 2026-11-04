@@ -7,7 +7,7 @@ import { describeRecipe } from '../../../lib/inventory';
 import { Badge, EmptyState, Spinner } from '../../../components/ui';
 import RecipeModal from './RecipeModal';
 
-// Service recipes (INV-09): what each service uses. Owners edit; inventory logins can look.
+// Service recipes: what each service uses. Owners edit; inventory logins can look.
 export default function RecipesTab({ can }) {
   const { activeBranch } = useAuth();
   const recipesQuery = useRecipes();

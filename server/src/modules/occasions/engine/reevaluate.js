@@ -5,7 +5,7 @@ import { addOfferEvents } from './events.js';
 import { campaignsForBranch, customerCopy, issueForCustomer } from './issue.js';
 
 // This year's offer (not a replaced one) for one customer and occasion, at their home branch's year
-export function currentOffer(orgId, customerId, type, year, session = null) {
+function currentOffer(orgId, customerId, type, year, session = null) {
   return OfferIssue.findOne({ orgId, customerId, type, year, superseded: false }).session(session).lean();
 }
 

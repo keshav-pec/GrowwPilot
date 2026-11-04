@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useAdvances, useCloseAdvance, useGiveAdvance } from '../../api/payroll';
 import { formatAmount, isValidRupees, toPaise } from '../../lib/money';
 import { SALARY_METHODS, formatMonth, formatPayDay, nextMonth } from '../../lib/payroll';
-import { Badge, Button, Input, Modal, Select, Textarea } from '../../components/ui';
+import { Badge, Button, Input, Modal, ModalFooter, Select, Textarea } from '../../components/ui';
 
 // Give money now, take it back from pay each month
 function GiveAdvanceModal({ staff, today, onClose }) {
@@ -50,14 +50,9 @@ function GiveAdvanceModal({ staff, today, onClose }) {
       onClose={onClose}
       title={`Give ${staff.name} an advance`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={save} loading={give.isPending}>
+        <ModalFooter onClose={onClose} onClick={save} loading={give.isPending}>
             Save
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
@@ -109,14 +104,9 @@ function CloseAdvanceModal({ advance, today, onClose }) {
       onClose={onClose}
       title="Stop repayments?"
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={save} loading={close.isPending}>
+        <ModalFooter onClose={onClose} variant="danger" onClick={save} loading={close.isPending}>
             Stop repayments
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="space-y-4">

@@ -25,7 +25,7 @@ function visibleFilter(ctx, extra = {}) {
   return scoped(ctx, { $or: [{ scope: 'BUSINESS_DEFAULT' }, { scope: 'BRANCH_ONLY', branchId: { $in: ctx.allowedBranchIds } }], ...extra });
 }
 
-export function canManageCampaign(ctx, campaign) {
+function canManageCampaign(ctx, campaign) {
   if (!can(ctx, 'occasions.manageCampaigns')) return false;
   if (campaign.scope === 'BUSINESS_DEFAULT') return can(ctx, 'occasions.manageSalonCampaigns');
   return ctx.isPrimaryOwner || ctx.allowedBranchIds.includes(String(campaign.branchId));
@@ -93,7 +93,7 @@ function toView(ctx, campaign, { published, branchName }) {
     status: campaign.status,
     deliveryMode: campaign.deliveryMode,
     // Set to send automatically, but the server can't send email: nothing goes out, offers stay on the staff list
-    deliveryWarning: campaign.deliveryMode === 'AUTO_EMAIL' && mailMode() === 'off' ? 'Email isn’t set up on the server, so nothing is sent automatically. These offers stay on the staff list.' : null,
+    deliveryWarning: campaign.deliveryMode === 'AUTO_EMAIL' && mailMode() === 'off' ? 'Email is off on the server, so nothing is sent automatically. These offers stay on the staff list.' : null,
     emailReady: mailMode() !== 'off', // the server can send email (or log it, in development)
     currentVersion: campaign.currentVersion,
     version: campaign.version,
@@ -137,7 +137,7 @@ export async function listCampaigns(ctx, { includeArchived = false } = {}) {
 
   return {
     campaigns: await viewsOf(ctx, campaigns),
-    audience: { ...audience, toDo: null }, // "still to do" comes with the front desk list (Phase 3)
+    audience,
     delivery: { modes: ['STAFF_ASSISTED', 'AUTO_EMAIL'], emailReady: mailMode() !== 'off' },
     can: {
       createSalonCampaign: can(ctx, 'occasions.manageSalonCampaigns'),
@@ -274,7 +274,7 @@ export async function publishCampaign(ctx, id, key) {
       { action: 'occasions.campaign_published', branchId: campaign.branchId ?? null, summary: `Published ${campaign.name} version ${number}: ${describeOffer(campaign.draftRules)}` },
       session
     );
-    // Phase 3: publishing gives this month's offers straight away (the offer engine)
+    // Publishing gives this month's offers straight away (the offer engine)
     return { version: number };
   });
 }

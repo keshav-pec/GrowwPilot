@@ -2,11 +2,9 @@ import {
   InventoryAllocation,
   InventoryApproval,
   InventoryException,
-  InventoryLedgerEntry,
   InventoryOutbox,
   InventorySku,
   InventorySkuBranch,
-  InventoryTransaction,
 } from '../../../models/index.js';
 import { scoped } from '../../../utils/scoped.js';
 import { can } from '../permissions.js';
@@ -15,9 +13,8 @@ import { availableToIssue, branchStock } from '../stock/stock.queries.js';
 
 const UNIT_FIELDS = 'name code stockUnit wayOfUse baseUnit unitsPerStockUnit';
 
-// Overview (INV-01) for the selected branch: stock health, what needs ordering, hand-outs that need a
-// handover, requests waiting, and recent activity. Stock value only for people who may see costs.
-// The front desk's recent activity is limited to their own actions.
+// Overview for the selected branch: stock health, what needs ordering, hand-outs that need a handover and
+// requests waiting. Stock value only for people who may see costs.
 export async function getOverview(ctx) {
   const branchId = ctx.activeBranchId;
   const settings = await getBranchSettings(ctx, branchId);
@@ -45,13 +42,12 @@ export async function getOverview(ctx) {
   }
   needToOrder.sort((a, b) => a.available - b.available);
 
-  const [openHandouts, handover, waiting, exceptions, failedEvents, recent] = await Promise.all([
+  const [openHandouts, handover, waiting, exceptions, failedEvents] = await Promise.all([
     InventoryAllocation.countDocuments(scoped(ctx, { branchId, status: 'OPEN' })),
     InventoryAllocation.find(scoped(ctx, { branchId, status: 'OPEN', needsHandover: true })).sort({ createdAt: 1 }).lean(),
     handlesRequests ? InventoryApproval.countDocuments(scoped(ctx, { branchId, status: 'PENDING' })) : 0,
     handlesExceptions ? InventoryException.countDocuments(scoped(ctx, { branchId, status: 'OPEN' })) : 0,
     handlesExceptions ? InventoryOutbox.countDocuments(scoped(ctx, { branchId, status: 'FAILED' })) : 0,
-    recentActivity(ctx, branchId, { mineOnly: ctx.role === 'FRONT_DESK' }),
   ]);
   const skuOf = Object.fromEntries(skus.map((s) => [String(s._id), s]));
 
@@ -67,31 +63,5 @@ export async function getOverview(ctx) {
     handover: handover.map((h) => ({ ...h, sku: skuOf[String(h.skuId)] })),
     waitingRequests: waiting,
     automationIssues: exceptions + failedEvents, // services that couldn't take their stock
-    recent,
   };
-}
-
-// The latest stock movements at a branch, each with its lines in words-ready form
-async function recentActivity(ctx, branchId, { mineOnly }) {
-  const filter = scoped(ctx, { branchId });
-  if (mineOnly) filter.actorId = ctx.userId;
-  const transactions = await InventoryTransaction.find(filter).sort({ postedAt: -1 }).limit(12).lean();
-  const entries = await InventoryLedgerEntry.find(scoped(ctx, { transactionId: { $in: transactions.map((t) => t._id) } }))
-    .populate('locationId', 'name kind')
-    .lean();
-  const skus = await InventorySku.find(scoped(ctx, { _id: { $in: entries.map((e) => e.skuId) } })).select(UNIT_FIELDS).lean();
-  const skuOf = Object.fromEntries(skus.map((s) => [String(s._id), s]));
-
-  return transactions.map((t) => ({
-    _id: t._id,
-    type: t.type,
-    reason: t.reason,
-    note: t.note,
-    actorName: t.actorName,
-    heldBy: t.heldBy?.kind ? t.heldBy : null,
-    occurredAt: t.occurredAt,
-    lines: entries
-      .filter((e) => String(e.transactionId) === String(t._id))
-      .map((e) => ({ qty: e.qty, location: e.locationId, sku: skuOf[String(e.skuId)] })),
-  }));
 }

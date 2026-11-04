@@ -5,7 +5,7 @@
 GrowwPilot runs many salons on one platform. Each salon (an *organization*) has one or more branches, its own staff, services, customers, leads, bookings and payments, and it can never see another salon's data.
 
 - **Live demo:** growwpilot.vercel.app
-- **Demo accounts:** login page has a clickable "Demo accounts" list
+- **Demo accounts:** the login page has a clickable "Demo accounts" list. Every account uses the password `Password@123`.
 
 | Role | Email | What to try |
 |---|---|---|
@@ -18,8 +18,6 @@ GrowwPilot runs many salons on one platform. Each salon (an *organization*) has 
 | Owner, another salon | `owner@desertrose.com` | A second salon in Dubai (different timezone) |
 | Front desk, another salon | `desk@desertrose.com` | |
 
----
-
 ## Contents
 
 1. [What it does](#1-what-it-does)
@@ -28,14 +26,9 @@ GrowwPilot runs many salons on one platform. Each salon (an *organization*) has 
 4. [Run it locally](#4-run-it-locally)
 5. [Tests](#5-tests)
 6. [Deployment](#6-deployment)
-7. [Assumptions](#7-assumptions)
-8. [Product and UX decisions](#8-product-and-ux-decisions)
-9. [Technical decisions](#9-technical-decisions)
-10. [Trade-offs](#10-trade-offs)
-11. [Known limitations](#11-known-limitations)
-12. [Tenant isolation smoke test](#12-tenant-isolation-smoke-test)
-13. [AI usage](#13-ai-usage)
-14. [Future scope](#14-future-scope)
+7. [Tenant isolation smoke test](#7-tenant-isolation-smoke-test)
+
+More detail on each area: [core design](IMPLEMENTATION_PLAN.md), [billing](BILLING_PLAN.md), [payroll](PAYROLL_PLAN.md), [inventory](INVENTORY_PLAN.md), [offers](OCCASION_OFFERS_PLAN.md), [email](EMAIL_PLAN.md).
 
 ---
 
@@ -43,47 +36,50 @@ GrowwPilot runs many salons on one platform. Each salon (an *organization*) has 
 
 | Who | Logs in? | Main screens |
 |---|---|---|
-| **Super Admin** (GrowwPilot team) | Yes | Salon list with search and status filter; onboarding (salon + first branch + owner login in one step); activate or deactivate a salon; switch paid add-ons (Inventory) on or off |
-| **Owner** | Yes | **Dashboard** (Salon Pulse, KPIs, Requires attention), **Analytics** (demand charts + sales PDF), **Billing** (approve discounts and refunds, void bills, reverse wrong payments, billing settings and reports), **Payroll** (pay setup, commission, monthly payroll, salary payments, payslips, advances, activity log), branches, team (staff, front desk logins, branch owners), services and combos, plus everything the front desk sees |
-| **Front desk** | Yes | **Day board**, booking (multi-service or combo), appointment list, customers, leads (and convert to appointment), **checkout and bills** (GST bills, discounts, split and part payments, product sales, advances, refund requests), **cash drawer**, dues, staff attendance, **Staff pay** (see how each person is paid, request a change). Works in **one branch only**. |
-| **Inventory login** (add-on) | Yes | **Inventory only**, for one branch: products, issuing and finishing stock, write-offs (up to a limit), purchase orders (sent for approval), deliveries, stock counts, reports without costs |
+| **Super Admin** (GrowwPilot team) | Yes | Salon list; onboarding (salon + first branch + owner login in one step); activate or deactivate a salon; switch paid add-ons on or off |
+| **Owner** | Yes | **Dashboard**, **Analytics** (demand charts + sales PDF), **Billing** (approvals, voids, settings and reports), **Payroll**, branches, team, services and combos, plus everything the front desk sees |
+| **Front desk** | Yes | **Day board**, booking, appointment list, customers, leads, **checkout and bills**, **cash drawer**, dues, attendance, **Staff pay**. Works in **one branch only**. |
+| **Inventory login** (add-on) | Yes | **Inventory only**, for one branch |
 | **Staff** (stylists) | No | A record: booked on appointments, attendance marked by the front desk, paid through payroll |
-| **Front desk member** | Their front desk login, if linked | A team member of type *Front desk*: never booked, attendance marked like stylists, paid a salary, per day or per hour (no commission). Their pay is for owners only. |
+| **Front desk member** | Their front desk login, if linked | A team member of type *Front desk*: never booked, paid a salary, per day or per hour |
 | **Customer** | No | A record: created by the front desk or by converting a lead |
 
-There are **two kinds of owner**: the **primary owner** (shown as **Business owner** in the app) sees and manages every branch, and a **branch owner** only sees the branches the primary owner gives them.
+There are **two kinds of owner**: the **primary owner** (shown as **Business owner**) sees and manages every branch, and a **branch owner** only sees the branches the primary owner gives them.
 
-**Payroll** (salary, commission and payroll, built from the *Payroll PRD v1*; full plan and decisions in [`PAYROLL_PLAN.md`](PAYROLL_PLAN.md)). There is no separate "payroll admin" role; payroll uses the existing roles and branch access:
+**Dashboard.** For the selected branch: **Salon Pulse** (net sales vs a usual same weekday, chairs filled), today's net sales, appointments and open leads, and a **Requires attention** list with a one-click action per row (customers waiting or not showing up, visits not billed, bookings whose stylist is away, overdue lead follow-ups).
+
+**Analytics.** Branch demand, the busiest times (weekday × hour), stylist demand and top services for a date range, with a timestamped **sales PDF**.
+
+**Bell.** It only shows things that need you: a request to approve (discount, refund, write-off, order, stock count, pay change, problem report), the answer to your own request, or something that failed and needs a person (a service that couldn't take its stock, a stylist who left with stock, an offer email not sent). Everything else is in the activity log.
+
+**Payroll.** Uses the existing roles and branch access.
 
 | | Business owner | Branch owner | Front desk |
 |---|---|---|---|
 | Pay setup (how each person is paid) | Every branch | Their branches | See only, at their branch; **request** a change for an owner to approve |
 | Commission, monthly payroll, lock the month | Every branch | Their branches | No |
 | Salary payments, payslips, advances | Every branch | Their branches | No |
-| Front desk members' pay (setup, payroll, payments, payslips, advances) | Every branch | Their branches | No, not even their own |
+| Front desk members' pay | Every branch | Their branches | No, not even their own |
 | Activity log | Every branch | Their branches | No |
 
 - **7 ways to pay:** fixed monthly, monthly + commission, commission only, per day, per hour, per service, or a mix. A change starts on a date and never rewrites past pay.
-- **Two sections, Staff and Front desk.** Owners switch between them in Pay setup and Monthly payroll; the month is still worked out and locked for the whole branch at once, and the branch total shows both. Front desk members are paid a monthly salary, per day or per hour only.
 - **Commission** is earned when a service is completed **and paid**, on what the customer actually paid; a special rate per service beats the person's normal %.
-- **Monthly payroll** per branch: worked out from pay setups, attendance and commission, with a "things to check" list, bonuses and deductions with a reason, and **Lock month**. A locked month never changes; corrections go into a later month.
-- **Payments** (full or part; cash, UPI, bank) only against locked months, **payslip PDFs**, and **advances** taken back monthly.
-- **Every change is logged** in an activity log that can't be edited, and a **bell** notifies the business owner of changes made by others, branch owners of requests to approve, and the front desk of the answers.
+- **Monthly payroll** per branch: worked out from pay setups, attendance and commission, with a "things to check" list, bonuses and deductions, and **Lock month**. A locked month never changes.
+- **Payments** (full or part) only against locked months, **payslip PDFs**, and **advances** taken back monthly.
 
-**Billing, POS & Payments** (built from the *Billing, POS & Payments Enhancement PRD v1.0*; full plan and decisions in [`BILLING_PLAN.md`](BILLING_PLAN.md)). The existing checkout grew into a proper till; there is still only one checkout and one set of money records:
+**Billing, POS & Payments.**
 
-- **Bills:** checkout opens a **draft** (can be changed); **Issue & Pay** gives it its number (`AND/26-27/00001`, per branch and financial year) and locks it. Older bills keep their old numbers (`GP-AND-000123`).
-- **GST** (optional per salon): GSTIN per branch, prices with or without GST, a rate per service and product, CGST + SGST worked out per line by the server, a saved copy of every price and tax on the bill. **Not GST registered** salons get plain bills.
-- **Discounts** per line or on the whole bill (₹ or %). The front desk has a limit (10%); above it an owner approves. Only owners change a price, with a reason.
-- **Payments:** split (Cash, UPI, Card, Other), part payments and pay later, **Record payment** for the rest. Never recorded twice, never more than the bill. Owners can reverse a wrong payment.
-- **Products** (with the Inventory add-on): add retail products at checkout or make a **New sale**; stock goes down once, in the same step as the bill.
-- **Refunds and returns:** the front desk asks, an owner approves. Money back, a **credit note** on GST bills, sellable products back on the shelf (damaged ones written off), the stylist's commission taken back. Owners can **void** a bill with no money on it.
-- **Customer advances:** taken on the profile, used at checkout at any branch, and extra money at checkout can be kept as an advance.
-- **Cash drawer:** open with a float, cash in and out filled in by itself, petty cash, count and close; a closed day only takes adjustments.
-- **Dues** by age, a customer's **Bills & payments**, **billing reports** with CSV (sales, GST, discounts, collections, dues, advances, retail, cash, staff), bill **PDFs**, a **share link** for the customer (WhatsApp), and each bill's **history**.
-- Commission is earned when a bill is fully paid, on the amount without GST. The dashboard and analytics show **net sales** (after discounts and refunds, without GST) and money collected.
+- **Bills:** checkout opens a **draft**; **Issue & Pay** gives it its number (`AND/26-27/00001`, per branch and financial year) and locks it.
+- **GST** (optional per salon): GSTIN per branch, prices with or without GST, a rate per service and product, CGST + SGST per line. **Not GST registered** salons get plain bills.
+- **Discounts** per line or on the whole bill. The front desk has a limit (10%); above it an owner approves. Only owners change a price.
+- **Payments:** split (Cash, UPI, Card, Other), part payments and pay later. Never recorded twice, never more than the bill. Owners can reverse a wrong payment.
+- **Products** (with the Inventory add-on): add retail products at checkout or make a **New sale**.
+- **Refunds and returns:** the front desk asks, an owner approves. Money back, a **credit note** on GST bills, sellable products back on the shelf, commission taken back. Owners can **void** a bill with no money on it.
+- **Customer advances:** taken on the profile, used at checkout at any branch.
+- **Cash drawer:** open with a float, cash in and out filled in by itself, petty cash, count and close.
+- **Dues** by age, a customer's **Bills & payments**, **billing reports** with CSV, bill **PDFs**, a **share link** for the customer, and each bill's **history**.
 
-**Inventory & Procurement** (a paid add-on, built from the *Inventory & Procurement PRD v1*; full plan and decisions in [`INVENTORY_PLAN.md`](INVENTORY_PLAN.md)). The Super Admin switches it on per salon; when it's off, every inventory screen and API is closed and nothing else changes.
+**Inventory & Procurement** (a paid add-on the Super Admin switches on per salon).
 
 | | Business owner | Branch owner | Inventory login | Front desk |
 |---|---|---|---|---|
@@ -95,49 +91,47 @@ There are **two kinds of owner**: the **primary owner** (shown as **Business own
 | Recipes, stock count approval, settings | Yes | Their branches | Recipes view only; count | No |
 | Costs and stock value | Yes | Their branches (unless turned off) | No | No |
 
-- **Every stock change is a movement** in a history that can't be edited. Balances are never typed in; opening stock, counts and corrections are movements too, and stock can never go below zero, even when two people act at once.
-- **Four ways stock is used:** whole bottles handed out and used up when someone marks them **finished** (with *Finish & replace* in one step); a set number of units **per service**; a set amount of ml or g **per service**; or recorded **by hand**. Measured products are counted in whole ml or g and shown as *"3 bottles + 400 ml"*.
-- **Service recipes:** completing an appointment takes its stock automatically in the background (once per service, never twice), from the branch where it happened. If stock is short nothing goes negative; it waits in an exceptions list to post later.
-- **Purchasing:** suppliers, reorder suggestions (counting stock already on approved orders), purchase orders with approval limits, part deliveries, over-receipt only with the business owner's OK, returns to suppliers, and **stock counts** an owner approves.
-- **First-time setup guide** with a **CSV import** that shows every row (✅ / ⚠️ / ❌, duplicates flagged) before anything is saved.
-- **Reports** (stock summary, low stock, use, waste, purchasing, stock value, bottle efficiency…) with **CSV export**; cost columns are removed on the server for anyone who can't see costs.
-- **Product photos and catalogue:** up to 4 photos per product (one main), a **Catalogue** view of photo cards next to the product list, **bulk photo upload** matched by product code (`SKU-000012.jpg`, `SKU-000012-2.jpg`), and a **printable catalogue** (print or save as PDF; costs only for owners).
-- **Inventory logins** are created by owners in **Team → Inventory logins**, one branch each.
+- **Every stock change is a movement** in a history that can't be edited. Stock can never go below zero, even when two people act at once.
+- **Four ways stock is used:** whole bottles used up when marked **finished**, a set number of units **per service**, a set amount of ml or g **per service**, or recorded **by hand**.
+- **Service recipes:** completing an appointment takes its stock automatically, once. If stock is short it waits in an exceptions list.
+- **Purchasing:** suppliers, reorder suggestions, purchase orders with approval limits, part deliveries, returns to suppliers, and **stock counts**.
+- **First-time setup guide** with a **CSV import** that shows every row before anything is saved.
+- **Reports** with **CSV export**; cost columns are removed on the server for anyone who can't see costs.
+- **Product photos and catalogue:** up to 4 photos per product, a **Catalogue** view, **bulk photo upload** matched by product code, and a **printable catalogue**.
 
-**Email** (built in 5 parts; plan and decisions in [`EMAIL_PLAN.md`](EMAIL_PLAN.md); setup in [Setting up email](#setting-up-email)). When email is set up, the app sends:
-
-| What | Who starts it | Goes to |
-|---|---|---|
-| Occasion offer | Staff press **Send email**, or automatically for campaigns set to *Send automatically by email* | The customer, only if they allowed offers by email (with an unsubscribe link) |
-| Bill with its PDF | **Email bill** on an issued bill (front desk for their branch, owners for theirs) | The customer's email, or one typed in |
-| Password link | **Forgot password?** on the login page, or an owner's **Email a password link** / *Email them a link* when adding a login | The person themselves |
-| Test email | The business owner, on the **Email** page | Their own login email |
-
-The **Email** page shows the business owner whether email is set up, the daily limit and a test email; owners (branch owners for their branches) see **Recent emails** with the reason for any that weren't sent. WhatsApp and SMS are still sent by staff from their own phone.
-
-**Birthday & Anniversary Offers** (built from the *Customer Occasions & Offers PRD v1.1*; full plan and decisions in [`OCCASION_OFFERS_PLAN.md`](OCCASION_OFFERS_PLAN.md)). The business owner switches it on in **Occasion offers** (Settings); it is off by default.
+**Birthday & Anniversary Offers.** The business owner switches it on in **Occasion offers**; it is off by default.
 
 | | Business owner | Branch owner | Front desk |
 |---|---|---|---|
 | Switch on, consent wording, "Check now" | Yes | See only | No |
-| Campaigns (Birthday / Anniversary, versions, turn off, archive) | All | "This branch only" campaigns of their branches; all-branches ones read-only | No (a refused try is logged) |
+| Campaigns | All | "This branch only" campaigns of their branches; all-branches ones read-only | No |
 | Emergency withdraw of unused offers | Yes | No | No |
-| Customer birthday / anniversary, home branch, messaging permission | Yes | Yes | Yes (must tick "Customer asked for this" to record permission) |
+| Customer dates, home branch, messaging permission | Yes | Yes | Yes |
 | Import dates (CSV), remove occasion data | Import: all; remove: yes | Import: their branches' customers | No |
 | Occasion list: send offer, record call, assign, book | Every branch | Their branches | Their branch |
 | Apply an offer at checkout | Yes | Yes | Yes |
 | Reports and CSV | Every branch | Their branches | Widget counts only |
 
-- **Customer dates:** birthday and wedding anniversary as **month + optional day, never the year**. Old dates of birth were copied into the birthday month and day at start-up (marked *From the old date of birth*). Every customer has a **home branch**.
-- **Messaging permission** per channel (WhatsApp, SMS, Email) with the exact wording and its version, how it was given, and a history that can't be edited. "Not recorded" counts as no. A customer without permission still gets and can use their offer in the salon.
-- **Campaigns** set up once and repeated every year: % off (with a maximum) or ₹ off, a minimum spend, and the services that count. A **3-step quick setup** with starting suggestions. A branch can have its own campaign that replaces the all-branches one for its customers. Editing a live campaign makes a **new version**; offers already given keep their terms.
-- **Offers appear by themselves** from 01:00 on the 1st of each month, in each branch's own time zone, valid to 23:59:59 on the last day; customers added or corrected mid-month get theirs within moments. One offer per customer, occasion and year, even when the run repeats or two servers run at once.
-- **Front desk occasion list** (with tiles, tabs, filters, tablet cards and a side panel): **Send offer** opens WhatsApp / SMS / email on the staff member's phone with the message ready (only with permission, at most one offer message per customer every 7 days), **Record call** (no answer twice closes it as unreachable), **Assign**, **Create booking**. A widget on the Dashboard and the Today page.
-- **Checkout:** the offer comes off the eligible services **before GST**, shown as "Birthday offer −₹300"; one offer per bill, no mixing with other discounts. It is **used only when the bill is issued**; two desks can never use the same offer; a voided bill in the same month gives it back.
-- **Reports:** offers issued, customers contacted, offer-linked appointments, used offers, discounts given and **associated sales** (bills that used an offer, after refunds; never called ROI), by branch and staff, with CSV. The billing *Discounts given* report has an *Occasion offer* column.
-- **Not in this build:** automatic sending (WhatsApp Business API, DLT SMS, email domain), a public booking page or signed booking links, customer merge, and a full privacy / erasure workflow ("Remove occasion data" stands in).
+- **Customer dates:** birthday and anniversary as **month + optional day, never the year**.
+- **Messaging permission** per channel with the exact wording, how it was given, and a history that can't be edited. A customer without permission can still use their offer in the salon.
+- **Campaigns** repeat every year: % off (with a maximum) or ₹ off, a minimum spend and the services that count. Editing a live campaign makes a **new version**; offers already given keep their terms.
+- **Offers appear by themselves** from 01:00 on the 1st of each month, in each branch's time zone. One offer per customer, occasion and year.
+- **Front desk occasion list:** **Send offer** (at most one offer message per customer every 7 days), **Record call**, **Assign**, **Create booking**.
+- **Checkout:** the offer comes off the eligible services **before GST**, one per bill, used only when the bill is issued. A voided bill in the same month gives it back.
+- **Reports:** offers issued, customers contacted, linked appointments, used offers, discounts and associated sales, with CSV.
 
-**Help assistant:** owners, front desk and inventory users also get a round chat button at the bottom right. Ask it *"how do I take a split payment?"* or *"what does Salon Pulse mean?"* and it answers with the steps **for your role**, links you to the right screen, and tells a front desk user who to ask for owner-only tasks. The **Need help?** link in the sidebar still emails GrowwPilot support.
+**Email.** The app sends:
+
+| What | Who starts it | Goes to |
+|---|---|---|
+| Occasion offer | Staff press **Send email**, or automatically for campaigns set to *Send automatically by email* | The customer, only if they allowed offers by email (with an unsubscribe link) |
+| Bill with its PDF | **Email bill** on an issued bill | The customer's email, or one typed in |
+| Password link | **Forgot password?**, or an owner's **Email a password link** | The person themselves |
+| Test email | The business owner, on the **Email** page | Their own login email |
+
+The **Email** page shows the daily limit and a test email; owners see **Recent emails** with the reason for any that weren't sent. WhatsApp and SMS are sent by staff from their own phone.
+
+**Help assistant.** A round chat button at the bottom right. Ask *"how do I take a split payment?"* and it answers with the steps **for your role** and links to the right screen.
 
 ---
 
@@ -160,26 +154,21 @@ flowchart LR
 ```
 server/src/
   config/        env.js (checks env vars at start-up), db.js, constants.js
-  middleware/    auth (who are you), tenantContext (which salon/branches), requireRole, requireAddon, idempotency, validate (Zod), errorHandler
+  middleware/    auth, tenantContext (which salon/branches), requireRole, requireAddon, idempotency, validate (Zod), errorHandler
   modules/       one folder per feature: *.routes.js, *.controller.js, *.service.js, *.schemas.js
-                 admin, auth, branches, staff, users, services, combos, customers, appointments
-                 (+ scheduling.service.js = the booking engine), leads, invoices, attendance, dashboard, analytics,
-                 payroll (pay setups, commission, monthly payroll, payments, payslips, advances), activity, notifications,
-                 inventory (permissions.js, stock/stock.engine.js = the only code that writes stock, products, locations,
-                 imports, allocations, movements, approvals, recipes, automation, suppliers, purchasing, stockCounts, reports)
-  models/        one Mongoose model per collection (inventory/ for the add-on's collections)
-  utils/         time (branch time <-> UTC), money (paise), phone, scoped, stateMachine, appointmentAlerts
-  scripts/       seed.js, isolation-smoke-test.js
+  models/        one Mongoose model per collection
+  utils/         time, money, phone, mask, scoped, csv, pdf, text, stateMachine, appointmentAlerts
+  scripts/       seed.js, migrations, isolation-smoke-test.js
 server/tests/    Vitest tests (in-memory MongoDB replica set)
 client/src/
   api/           axios client + React Query hooks per feature
   components/    ui/ kit (Button, Input, Modal, Drawer, Table...) + shared pieces
-  features/      admin, auth, dashboard, appointments, customers, leads, checkout, attendance, team, catalog, branches, analytics, payroll, inventory
+  features/      one folder per feature
   layouts/       AdminLayout, AppLayout (role-based sidebar + branch switcher)
   routes/        router.jsx, ProtectedRoute.jsx
 ```
 
-**Every request** to salon data goes through `requireAuth` (loads the user from the database on every request, so deactivation takes effect immediately) → `tenantContext` (builds `req.ctx = { orgId, allowedBranchIds, activeBranchId }` from the user, never from the request) → `requireRole` → `validate` → the controller.
+**Every request** to salon data goes through `requireAuth` (loads the user from the database, so deactivation takes effect immediately) → `tenantContext` (builds `req.ctx = { orgId, allowedBranchIds, activeBranchId }` from the user, never from the request) → `requireRole` → `validate` → the controller.
 
 ---
 
@@ -260,13 +249,13 @@ Also: `inventory_settings` (front desk switches, approval limits), `inventory_ap
 
 **Billing** (every row has `orgId` and `branchId`): `invoices` (draft → issued → void; lines with their tax snapshot; `version` for stale edits), `payments` (money in or handed back) and `payment_allocations` (which bill each payment, or advance, paid), `customer_advances`, `refunds` and `credit_notes`, `cash_sessions` and `cash_movements` (append-only), and `billing_settings` (one per salon: GST, limits, branch GSTINs and prefixes, what branch owners and the front desk may do). Bill numbers come from `counters` (`invoice:<branch>:<financial year>`).
 
-**Important indexes:** `customer (orgId, phone)` unique (no duplicate customers), `invoice.appointmentId` unique while the bill isn't void (no double checkout), `invoice (orgId, invoiceNumber)` unique (drafts have none yet), one open cash day per branch, one refund waiting per bill, `attendance (staffId, date)` unique, `appointment (orgId, branchId, startAt)` and `appointment (items.staffId, items.startAt)` for the day board and clash checks. Payroll: `payPlan (staffId, effectiveFrom)`, `commissionEntry (invoiceId, itemId, type, eventKey)`, `payrollRun (branchId, month)`, `payrollItem (runId, staffId)` and `payrollPayment (orgId, idempotencyKey)` are all unique, so nothing is counted or paid twice. Payroll also has pay change requests, special commission rates, bonuses/deductions, the activity log and notifications (not drawn).
+**Important indexes:** `customer (orgId, phone)` unique, `invoice.appointmentId` unique while the bill isn't void, `invoice (orgId, invoiceNumber)` unique, one open cash day per branch, one refund waiting per bill, `attendance (staffId, date)` unique. Payroll: `payPlan (staffId, effectiveFrom)`, `commissionEntry (invoiceId, itemId, type, eventKey)`, `payrollRun (branchId, month)`, `payrollItem (runId, staffId)` and `payrollPayment (orgId, idempotencyKey)` are all unique, so nothing is counted or paid twice.
 
 ---
 
 ## 4. Run it locally
 
-You need **Node 20+** and a free **MongoDB Atlas** cluster (Atlas is a replica set, which transactions need; a plain local `mongod` is not).
+You need **Node 20+** and a free **MongoDB Atlas** cluster (transactions need a replica set, which Atlas is).
 
 ```bash
 # 1. API  ->  http://localhost:5000 (or the PORT in .env)
@@ -283,7 +272,7 @@ npm install
 npm run dev
 ```
 
-**Demo data** (`npm run seed`): 2 salons, 3 branches (Mumbai and Dubai timezones), 8 staff, 10 services, 2 combos, 13 customers, 9 leads (every status and source, some overdue), about 100 appointments over 4 weeks (every status, multi-service and combo bookings, split payments, discounts) with 85 invoices, and 2 weeks of attendance. **Today's appointments are placed around the current time**, so the day board and dashboard always show something happening: a customer waiting, a possible no-show, one running late, a bill not collected, and tomorrow's booking with a stylist on leave. **Payroll:** every Glamour stylist has a pay setup (one of each kind), front desk members Kavya (Andheri, ₹15,000/month) and Ritu (Bandra, ₹600/day) are linked to their logins, Rahul has a special 15% rate on Hair Colour, a front desk pay request waits for approval, Andheri's payroll from two months ago is locked and partly paid, last month has a bonus, and Neha has an advance. Desert Rose staff have no pay setup, to show that state. **Inventory:** Glamour Studio has the add-on. Andheri is set up with 9 products (bottles, kits, measured colour and developer, and 2 retail products for sale on bills), 2 stations, 2 suppliers, recipes for Facial, Hair Colour and Haircut, 4 hand-outs, a part-delivered order and a draft, a write-off waiting for approval and a front desk problem report. 4 products have simple generated photos for the catalogue. Bandra has nothing yet, so Vikram sees the setup guide. Desert Rose doesn't have the add-on. **Billing:** Glamour Studio is GST registered (demo GSTINs for Andheri and Bandra); Desert Rose is not, so its bills are plain. The older bills are moved onto the new bill records by the same migration real salons get. Andheri has a part-paid bill and a "pay later" bill (see **Dues**), a ₹2,000 advance for Sneha Kapoor, two retail products for sale, a serum sale with one bottle refunded (credit note `CN-AND/26-27/001`) and a mask return waiting for the owner, and yesterday's cash day closed ₹50 short. Today's cash day is left for the desk to open. (Seed during opening hours for the best picture: after closing time, today's later bookings are already in the past and show up as possible no-shows.) The seed refuses to run when `NODE_ENV=production` unless you pass `-- --force`.
+**Demo data** (`npm run seed`): 2 salons, 3 branches (Mumbai and Dubai timezones), 6 staff, 7 services, 1 combo, 10 customers, 6 leads, 42 appointments, 34 bills and 20 attendance records. **Today's appointments are placed around the current time**, so the day board and dashboard always show something happening. Also: pay setups, a locked payroll month, a pay request waiting, an advance; Glamour Studio is GST registered with the Inventory add-on (5 products at Andheri, an order, a write-off waiting for approval, a problem report; Bandra shows the setup guide) and has offers switched on; a part-paid bill, a refund and a return waiting, closed cash days and a few sample emails. Desert Rose stays plain: no GST, no add-on, no pay setups. Seed during opening hours for the best picture. The seed refuses to run when `NODE_ENV=production` unless you pass `-- --force`.
 
 ---
 
@@ -292,106 +281,23 @@ npm run dev
 ```bash
 cd server
 npm test                  # 788 Vitest tests, on a temporary in-memory MongoDB replica set (never your real data)
-npm run smoke:isolation   # tenant isolation check against a running API with the demo seed (see section 12)
+npm run smoke:isolation   # tenant isolation check against a running API with the demo seed (see section 7)
 ```
 
 The tests cover the parts where a bug would cost money or trust:
 
-- **Booking engine:** the PDF's overlap example (2:00–2:45 vs 2:30), back-to-back bookings allowed, **two and five simultaneous bookings where exactly one wins**, opening hours, inactive/absent/other-branch stylists, another salon's ids, Kolkata vs Dubai time, availability, rescheduling onto its own slot.
+- **Booking engine:** overlaps, back-to-back bookings, **simultaneous bookings where exactly one wins**, opening hours, unavailable stylists, another salon's ids, timezones.
 - **State machines:** every allowed and blocked appointment and lead status change.
-- **Lead conversion:** links to an existing customer by phone; a clash rolls back everything (no customer, no booking, lead unchanged).
-- **Billing:** every PRD acceptance test that applies (map below), plus the bill maths (GST in and on top of prices, rounding per line, discounts shared to the paisa, credits that add up exactly), discount approval, guest sales, refunds on part-paid bills, voids, cash closing, reports that reconcile with the bills and payments, the old-bill migration (run twice), and an API test that logs in as each role and tries **every billing action**.
+- **Lead conversion:** links to an existing customer by phone; a clash rolls everything back.
+- **Billing:** GST and rounding, discount approval, guest sales, refunds, voids, cash closing, reports that reconcile, the old-bill migration, and an API test that logs in as each role and tries **every billing action**.
 - **Dashboard warnings:** no-show, waiting and running-late rules.
-- **Payroll:** each way of paying; mid-month pay changes; absences not cutting salary; the PRD's commission example (₹2,500 service, ₹200 off, 10% = ₹230); combos and two stylists on one bill; a rate change never changing past commission; commission and payments never counted twice (including two identical requests at the same moment); locking refused while something must be fixed, and a locked month refusing every change; part payments, overpayment rules, cancelled payments, staff who have left; advances; and that branch owners, the front desk and another salon only reach what they're allowed to. **Front desk pay:** never booked, no commission, moving a stylist to the front desk only once their pay fits, the separate front desk totals, and an API test that logs in as each role and tries every front desk pay action (owners only; front desk logins can't reach any of it).
-- **Inventory:** every PRD acceptance test that applies (map below), plus: stock never going below zero when five people take the last bottles at once, the same request sent twice changing stock once, approval limits for write-offs and orders, CSV import duplicates, recipe versions never overlapping, the add-on switch, photo uploads (type and 2 MB limits, at most 4, another salon's photo not found, the front desk can view but not upload, bulk matching by code), and an API test that logs in as the business owner, a branch owner of another branch, an inventory login and the front desk and tries **every inventory action** (and cost visibility in screens and CSV exports).
-- **Birthday & Anniversary Offers:** every PRD acceptance test that applies (map below), plus the start-up migration run twice, consent history that can't be edited, campaign versions that never change, branch time zones, date corrections, the send check and 7-day limit, bill maths with GST, an API test that logs in as each role and tries **every occasion action**, and a speed test with **100,000 customers** (monthly run ~1.5 s against a 15-minute target; the list ~5 ms per 50 rows against 2 s; the checkout offer preview ~3 ms against 700 ms).
-- **Email:** bill emails with the PDF (customer's email or a typed one, drafts refused, front desk and branch owners only for their branches, PDF by the script when there's no SMTP), recent emails by role and filter without bodies, all four kinds under the daily limit (password and test emails first); password links (same reply for known, unknown and deactivated emails; per-person and per-IP limits; one-time, expiring, cancelled by a newer link; other devices logged out; the link never in replies or the stored email; owners only for people they manage; a new login by link instead of a temporary password); automatic offer emails only inside send hours (branch time zone), the salon's daily limit and the platform's, two servers never emailing an offer twice, WhatsApp-only and opted-out customers left for staff, a failed automatic email going back to staff and never retried automatically, email not set up → nothing sent and a warning, the report column; offer emails queued once even when two desks press Send together, permission re-checked before sending (withdrawn or unsubscribed → not sent, 7-day limit given back, task reopened, bell), a bad address then a successful resend, `mailto:` kept when email isn't set up, escaped customer names, the unsubscribe page (opening changes nothing, pressing twice is harmless, forged and other-salon links refused, Gmail one-click); and the mail foundation: the Apps Script reply rules (an HTML page = script down, an empty reply = sent, only `status: "error"` fails), moving to SMTP only on Gmail's quota or a dead script, PDFs going by SMTP first, retries after 1, 5, 15 and 60 minutes then *Failed*, a quota pause with no backup, batches of 40 with a quota stop halfway, two mailers never sending the same email, the daily limit letting password emails through, escaped names and one-line subjects, and that only the business owner reaches the Email page and never sees another salon's emails.
-- **Help assistant:** 48 typical questions land on the right topic; answers are limited to the asker's role (front desk vs owner, main owner vs branch owner); unknown questions get an honest "not sure" with suggestions.
+- **Payroll:** each way of paying, mid-month changes, commission never counted twice, locking, part payments, advances, and role and salon access including front desk pay.
+- **Inventory:** stock never going below zero under simultaneous requests, the same request sent twice, approval limits, CSV import, recipe versions, the add-on switch, photo uploads, and an API test for **every inventory action** by role, with cost visibility.
+- **Birthday & Anniversary Offers:** the monthly run repeated, consent history, campaign versions, branch time zones, the send check and 7-day limit, bill maths with GST, **every occasion action** by role, and a speed test with 100,000 customers.
+- **Email:** the Apps Script reply rules, retries and limits, two mailers never sending the same email, bill emails with PDF, password links, automatic offer emails, unsubscribe, and role and salon access.
+- **Help assistant:** typical questions land on the right topic, answers are limited to the asker's role, and unknown questions get an honest "not sure".
 
-**Inventory acceptance tests (PRD AC01–AC30)** — all in `server/tests/`:
-
-| PRD test | What it checks | File |
-|---|---|---|
-| AC01 | Opening receipt of 10 bottles: store 10 and a movement | `inventoryProducts.test.js` |
-| AC02–AC09 | Issue, finish, finish & replace, replacement out of stock, duplicate finish, simultaneous finishes, moving a hand-out, returning unused | `inventoryDaily.test.js` |
-| AC10–AC14 | Facial takes one kit, duplicate completion, cancelled visit, finish-mode shampoo never per wash, measured use and corrections posting only the difference | `inventoryRecipes.test.js` |
-| AC15 | Retail sale deducts once; refund doesn't restock | `billingPhase2.test.js` (product sales and returns, built with Billing) |
-| AC16–AC18 | Waste kept apart from use, low stock on available-to-issue, front desk can't see costs or write off | `inventoryDaily.test.js`, `inventoryRolesMatrix.test.js` |
-| AC19 | Branch owner can't reach other branches | `inventoryRolesMatrix.test.js`, `inventoryAccess.test.js` |
-| AC20 | Another salon's ids are refused | `inventoryProducts.test.js`, `inventoryDaily.test.js` |
-| AC21, AC22 | Part receipt posts only what arrived; a stock count posts movements, never overwrites | `inventoryPurchasing.test.js` |
-| AC23 | Recipe edits don't change past use | `inventoryRecipes.test.js` |
-| AC24 | Every balance matches the movement history after mixed actions | `inventoryProducts`, `inventoryDaily`, `inventoryRecipes`, `inventoryPurchasing`, `inventoryImport` |
-| AC25, AC26 | A closed hand-out can't be finished twice; a stylist leaving flags their hand-outs | `inventoryDaily.test.js` |
-| AC27 | Exports respect cost permissions | `inventoryRolesMatrix.test.js` |
-| AC28 | A failed event replays without double deduction | `inventoryRecipes.test.js` |
-| AC29 | CSV import previews duplicates before saving | `inventoryImport.test.js` |
-| AC30 | Reorder suggestions count approved orders | `inventoryPurchasing.test.js` |
-
-**Billing acceptance tests (PRD AC01–AC25)** — all in `server/tests/`:
-
-| PRD test | What it checks | File |
-|---|---|---|
-| AC01 | Old checkout still works; old bills moved onto the new records (keeping their numbers), safe to run twice | `invoices.test.js` |
-| AC02 | Service-only and retail-only checkout | `invoices.test.js`, `billingPhase2.test.js` |
-| AC03 | Services and products on one bill | `billingPhase2.test.js` |
-| AC04, AC05 | GST included in or added to prices; mixed rates and rounding | `invoices.test.js` |
-| AC06 | Bills issued at the same moment get unique numbers, none skipped | `invoices.test.js`, `billingPhase4.test.js` |
-| AC07 | Flat and % discounts per line and per bill, shared over the lines with their tax | `invoices.test.js` |
-| AC08 | Front desk can't change a price | `invoices.test.js` |
-| AC09, AC10 | UPI + cash split; part payment and paying the rest later | `invoices.test.js`, `billingAccess.test.js` |
-| AC11 | The same payment request twice is saved once | `invoices.test.js` |
-| AC12 | Paying more than is due is refused (also two desks at once) | `invoices.test.js` |
-| AC13 | Payment provider sending the same webhook twice | *Not applicable:* no payment gateway in this release (PRD: optional later) |
-| AC14 | Advance taken, used, never used twice | `billingPhase2.test.js` |
-| AC15 | Refunding a service doesn't put products back | `billingPhase2.test.js` |
-| AC16 | Returned products: sellable back to the shelf, damaged written off | `billingPhase2.test.js` |
-| AC17 | Refund with credit note and commission taken back | `billingPhase2.test.js` |
-| AC18 | Stock taken exactly once, also on a retried request; a failed bill takes nothing | `billingPhase2.test.js`, `billingPhase4.test.js` |
-| AC19 | Cash closing gap and adjustment | `billingPhase3.test.js` |
-| AC20 | Customer history; reports add up to the bills and payments | `billingPhase3.test.js` |
-| AC21 | Other salons and other branches refused, every route and role | `billingRolesMatrix.test.js`, `billingAccess.test.js`, `invoices.test.js` |
-| AC22 | A stale draft edit is refused | `invoices.test.js` |
-| AC23 | A bill (and its PDF) doesn't change when the catalogue or settings change | `invoices.test.js`, `billingPhase3.test.js` |
-| AC24 | Payment reversal keeps the record; money records can't be edited | `billingPhase2.test.js`, `billingPhase4.test.js` |
-| AC25 | Speed with 20,000 bills on file: opening checkout ~25 ms (target 2 s), a quote ~3 ms (target 500 ms) | `billingSpeed.test.js` |
-
-**Birthday & Anniversary Offers acceptance tests (PRD AT-01–AT-36)** — all in `server/tests/`:
-
-| PRD test | What it checks | File |
-|---|---|---|
-| AT-01, AT-03 | Every matching customer gets one offer for the whole month from 01:00 on the 1st; month-only dates too | `occasionsPhase3.test.js` |
-| AT-02 | A customer saved without dates works | `occasionsPhase1.test.js` |
-| AT-04 | A 29 Feb birthday gets the whole of February in a non-leap year | `occasionsPhase3.test.js` |
-| AT-05 | A customer added mid-month gets their offer straight away | `occasionsPhase3.test.js` |
-| AT-06 | The run repeated 5 times: one offer, one task | `occasionsPhase3.test.js` |
-| AT-07 | A branch campaign wins for its customers | `occasionsPhase2.test.js`, `occasionsPhase3.test.js` |
-| AT-08 | Moving branch mid-month keeps the one offer | `occasionsPhase3.test.js` |
-| AT-09 | Both occasions in one month: two offers; the second message waits 7 days | `occasionsPhase3.test.js`, `occasionsPhase4.test.js` |
-| AT-10 | No permission: the offer is still given and usable, but no message | `occasionsPhase3.test.js`, `occasionsPhase4.test.js` |
-| AT-11 | WhatsApp opted out, SMS opted in: sent by SMS | `occasionsPhase4.test.js` |
-| AT-12 | Permission withdrawn between preview and send: refused and logged | `occasionsPhase4.test.js` |
-| AT-13, AT-14, AT-15 | Provider delivery, retries and fallback | **Email only:** automatic offer emails go through the email outbox (retries, Apps Script → SMTP fallback, daily limits): `mail.test.js`, `autoEmailOffers.test.js`. WhatsApp and SMS are still sent by staff, so not applicable there |
-| AT-16 | No answer twice: closed as unreachable, full history | `occasionsPhase4.test.js` |
-| AT-17, AT-18 | A booking from the list links the offer without using it; a cancelled booking leaves it usable | `occasionsPhase5.test.js` |
-| AT-19, AT-20 | No eligible service; ₹1,499.99 against a ₹1,500 minimum is refused | `occasionsPhase5.test.js` |
-| AT-21, AT-22, AT-23 | 15% of ₹2,000 (max ₹500) = ₹300 spread over lines; flat ₹300 on ₹200 = ₹200; mixed GST rates, prices with and without GST | `occasionsPhase5.test.js` |
-| AT-24 | No mixing with other discounts | `occasionsPhase5.test.js` |
-| AT-25 | Two bills issued at the same moment: one wins, the other gets "redeemed elsewhere" and nothing is used | `occasionsPhase5.test.js` |
-| AT-26 | A failed payment leaves the offer unused | `occasionsPhase5.test.js` |
-| AT-27, AT-28 | A void in the month gives it back once; after the month it stays expired | `occasionsPhase5.test.js` |
-| AT-29 | A turned-off campaign gives no new offers; given ones still work | `occasionsPhase3.test.js` |
-| AT-30 | Emergency withdraw: unused only, a task for contacted customers, a bell for owners | `occasionsPhase3.test.js` |
-| AT-31 | A front desk edit is refused with 403, logged, and nothing changes | `occasionsPhase2.test.js` |
-| AT-32 | Another salon reaches nothing | `occasionsPhase1–6.test.js`, `npm run smoke:isolation` |
-| AT-33 | The month ends at 23:59:59 branch time, Dubai included | `occasionsPhase3.test.js` |
-| AT-34 | A partial import saves good rows, lists bad ones, never turns on permission | `occasionsPhase1.test.js` |
-| AT-35 | The report after a refund matches billing | `occasionsPhase6.test.js` |
-| AT-36 | Remove occasion data (partly: no full erasure workflow yet) | `occasionsPhase1.test.js` |
-
-> **Before sending offers, have a lawyer check the consent wording and how permission is recorded (India's DPDP Act).** The app keeps the wording, its version, who recorded it and how, but whether that is enough is a legal question.
-
-> **Before going live with GST bills, have a tax professional check the GST rates, SAC/HSN codes and bill and credit note wording.** Salon services moved from 18% to 5% GST (without input tax credit) from 22 Sep 2025; the app's default for services is still 18%, and each salon sets its own rate in Billing settings.
+Test names carry the acceptance test numbers from the product requirements (`AC01`, `AT-01`...).
 
 ---
 
@@ -399,183 +305,61 @@ The tests cover the parts where a bug would cost money or trust:
 
 The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 
-1. **MongoDB Atlas:** create a database user. Under *Network Access* allow `0.0.0.0/0` (Render's free plan has no fixed IP). Copy the connection string and keep `/growwpilot` as the database name.
-2. **Render (API):** *New → Blueprint →* this repo. Fill in `MONGODB_URI` and `CLIENT_ORIGIN` (your Vercel URL). `JWT_SECRET` is generated for you and `TRUST_PROXY=2` is already set. Check `https://<your-service>.onrender.com/api/health` shows `"db":"connected"`.
+1. **MongoDB Atlas:** create a database user. Under *Network Access* allow `0.0.0.0/0`. Copy the connection string and keep `/growwpilot` as the database name.
+2. **Render (API):** *New → Blueprint →* this repo. Fill in `MONGODB_URI` and `CLIENT_ORIGIN` (your Vercel URL). `JWT_SECRET` is generated for you. Check `https://<your-service>.onrender.com/api/health` shows `"db":"connected"`.
 3. **Vercel (web app):** import the repo with **root directory `client`** (framework: Vite). In `client/vercel.json`, replace `YOUR-RENDER-SERVICE` with your Render service name. Deploy.
 4. **Seed production once, on purpose:** in Render's shell run `npm run seed -- --force`.
 5. Log in on the Vercel URL. Optionally run `API_URL=https://<your-vercel-url> npm run smoke:isolation` from your machine.
-6. **Inventory add-on (per salon):** log in as Super Admin, open the salon and click **Switch on** next to Inventory. The owner then creates the first inventory login in **Team → Inventory logins** (one branch each, temporary password shown once). Completed services take stock in a background job inside the API process; it also retries every 3 minutes, so no extra service is needed.
-7. **Billing:** nothing to switch on. When the API starts, it moves any older bills onto the new bill records and updates two indexes (it does nothing once that's done; `npm run migrate:billing` does the same by hand). Salons start as **Not GST registered**, so bills look as before until the business owner fills in **Bills → Billing settings**. Shared bill links use the web app's own address (`/api/public/bills/...`, forwarded to the API by `vercel.json`).
-8. **Product photos** are stored in MongoDB GridFS (`IMAGE_STORAGE=gridfs`, already set in `render.yaml`): up to 4 per product, 2 MB each before resizing, kept as WebP at 1000 px and 240 px (usually 50–150 kB per product). They count towards your Atlas storage (the free tier has 512 MB), so a salon with 1,000 products and photos uses roughly 100 MB. The screens upload one photo per request, so they stay well under proxy size limits.
-9. **Email:** optional. Without it the app works as before (staff send offer emails from their own device). See below.
+6. **Inventory add-on (per salon):** log in as Super Admin, open the salon and click **Switch on** next to Inventory. The owner then creates inventory logins in **Team → Inventory logins**.
+7. **Billing:** nothing to switch on. Older bills are moved onto the current bill records when the API starts (`npm run migrate:billing` does the same by hand). Salons start as **Not GST registered** until the business owner fills in **Bills → Billing settings**.
+8. **Product photos** are stored in MongoDB GridFS and count towards your Atlas storage: 1,000 products with photos use roughly 100 MB.
+
+**Before going live:**
+
+- Have a lawyer check the consent wording and how permission is recorded (India's DPDP Act) before sending offers.
+- Have a tax professional check the GST rates, SAC/HSN codes and bill and credit note wording. Salon services moved from 18% to 5% GST (without input tax credit) from 22 Sep 2025; the app's default for services is 18%, and each salon sets its own rate in Billing settings.
 
 ### Setting up email
 
-The app sends email through a small **Google Apps Script** web app running on a Gmail account (free, over HTTPS). **Gmail SMTP** can be added as a backup. Every email goes into an outbox and is sent in the background, with retries; nothing waits for it.
+The app sends email through a small **Google Apps Script** web app on a Gmail account. **Gmail SMTP** can be added as a backup. Every email goes into an outbox and is sent in the background, with retries.
 
-1. **Deploy the script:** follow [`server/mail-script/README.md`](server/mail-script/README.md) (about 10 minutes). You end up with an `/exec` link and a secret.
-2. **Set on Render** (Environment):
-   - `MAIL_SCRIPT` = the `/exec` link
-   - `MAIL_SCRIPT_SECRET` = the same secret as the script's `MAIL_SECRET` (at least 24 characters). The script refuses calls without it.
-3. **Check it:** log in as the business owner → **Email** in the menu. It should say *Set up* and *The mail script is answering*. Press **Send test email** and look in your inbox (and spam folder).
+1. **Deploy the script:** follow [`server/mail-script/README.md`](server/mail-script/README.md). You end up with an `/exec` link and a secret.
+2. **Set on Render** (Environment): `MAIL_SCRIPT` = the `/exec` link, and `MAIL_SCRIPT_SECRET` = the same secret as the script's `MAIL_SECRET` (at least 24 characters).
+3. **Check it:** log in as the business owner → **Email** in the menu. It should say *On* and *The mail script is answering*. Press **Send test email**.
 
 | Variable | What it is | Default |
 |---|---|---|
 | `MAIL_SCRIPT` | Apps Script `/exec` link for all emails | not set |
 | `MAIL_SCRIPT_SECRET` | Secret the script checks (needed with `MAIL_SCRIPT`) | not set |
-| `MAIL_FORGOT_PASSWORD` | A second script for password emails (only useful on a **second** Gmail account, which has its own limit) | `MAIL_SCRIPT` |
+| `MAIL_FORGOT_PASSWORD` | A second script for password emails (only useful on a second Gmail account) | `MAIL_SCRIPT` |
 | `MAIL_SCRIPT_TIMEOUT_MS` | How long to wait for the script | 30000 |
 | `EMAIL_HOST` / `EMAIL_PORT` | SMTP backup server | `smtp.gmail.com` / 587 |
-| `EMAIL_USER` / `EMAIL_PASS` | Gmail address and a Gmail **app password** (Google Account → Security → 2-Step Verification → App passwords). SMTP is on only when both are real values. | not set |
+| `EMAIL_USER` / `EMAIL_PASS` | Gmail address and a Gmail **app password**. SMTP is on only when both are real values. | not set |
 | `MAIL_DAILY_LIMIT` | Most emails per 24 hours for the whole app | 90 |
 
-- **Use the same Gmail account** for the script and SMTP, so emails look the same either way. Emails show the **salon's name** as the sender, and replies go to the salon's contact email.
-- **SMTP on Render's free plan doesn't work:** Render blocks outgoing SMTP ports (25, 465, 587) on free services. The app gives up on SMTP within 10 seconds and keeps using the script. SMTP only helps on a paid Render plan or another host.
-- **When each route is used:** emails without an attachment go through the script; SMTP is used only if the script hits Gmail's daily limit or is down. Emails with a PDF go through SMTP first (the script is slow with big bodies), then the script.
-- **Limits:** a free Gmail account sends about **100 emails a day** through Apps Script (about 500 through SMTP; Google Workspace accounts more). The app stops at `MAIL_DAILY_LIMIT` (90) for the whole platform; the rest wait for the next day, except password and test emails. If Gmail's limit is hit with no backup, sending pauses for an hour. For real volume, move to a paid sender (Resend, Brevo, Amazon SES) — only `server/src/modules/mail/transport/` changes — and use a proper sending domain before sending many salons' offers.
-- **Without any of these set:** in development emails are printed in the API's terminal and marked *Logged*; in production the Email page says *Not set up* and the Email channel of occasion offers opens the staff member's own email app, as before.
-- **Offer emails:** pressing **Send email** on an occasion offer queues the email; the offer shows *Email queued*, then *Email sent* or *Email not sent* with the reason. Just before sending, the app checks again that the customer still allows offer emails, the offer is still running and the address hasn't changed. If it isn't sent, the 7-day limit is given back, the task goes back to *To contact*, and the person who pressed Send gets a bell message.
-- **Automatic offer emails:** on a campaign (or in the quick setup's step 3) choose **Send automatically by email**. Every 10 minutes the offer engine emails this month's offers whose customer allows email, only between the send hours (default 10:00–19:00, each branch's own time) and at most the salon's daily limit (default 30 per 24 hours, also kept under the platform's `MAIL_DAILY_LIMIT`); the rest go the next day. Settings → Occasion offers → **Automatic offer emails** changes both. They use the same send check and 7-day limit as staff, so a staff member and the app never both message a customer. Customers who allow only WhatsApp or SMS stay on the staff list; an automatic email that fails goes back to the staff list and isn't tried automatically again. Switching a campaign back to **Staff sends offers** stops it at once. If email isn't set up, nothing is sent and the campaign shows a warning.
-- **Password emails:** **Forgot password?** on the login page (shown only when email can be sent) emails a link that works once, for 1 hour; **Team → (a person) → Email a password link**, or the *Email them a link* box when adding a login, emails a link that works for 48 hours instead of showing a temporary password. The reply is the same whether or not an email has an account; at most 5 requests per IP every 15 minutes and 3 emails per person an hour. Only a hash of each link is stored, a new link cancels older ones, and the stored copy of the email loses the link once it's sent. New passwords need at least 8 characters with a letter and a number. Changing a password (by link, or an owner's **Reset password**) logs the person out on their other devices. Password emails go first, even at the daily limit; they use `MAIL_FORGOT_PASSWORD` if set.
-- **Unsubscribe link:** every offer email ends with the salon's details, why the customer gets it, and an **Unsubscribe** link (`/api/public/unsubscribe/<token>`; the token is signed with a key derived from `JWT_SECRET`, so changing `JWT_SECRET` breaks links in emails already sent). The link opens a page with a button (email scanners open links on their own, so opening alone changes nothing); pressing it opts the customer out of **Email** only, recorded in their permission history as *Customer request, Email unsubscribe link*. SMTP emails also carry Gmail's one-click unsubscribe headers.
-- **Bill emails:** **Email bill** on an issued bill sends it to the customer's email (or one typed in) with the bill as a PDF, made again from the bill when the email goes out (phone partly hidden, as on a shared link). The bill shows *Email queued / sent / not sent*. Bills only: credit notes and refund receipts don't have a PDF yet.
-- **Recent emails** (Email page): the business owner sees every email of the salon, a branch owner their branches' emails (test and password emails belong to no branch, so only the business owner sees those). Filters by kind, status and date; the email itself isn't shown, addresses are partly hidden, and password emails show only "Password link".
-- **Moving to a paid sender later** (Resend, Brevo, Amazon SES): add a transport next to `appsScript.js` and `smtp.js` and use it in `transport/send.js`. The outbox, retries, limits and every feature stay the same. Use a proper sending domain (with SPF/DKIM) before sending many salons' offers.
-- Sent emails are kept in the outbox for 180 days, then removed automatically.
+- **Use the same Gmail account** for the script and SMTP. Emails show the salon's name as the sender, and replies go to the salon's contact email.
+- **Render's free plan blocks outgoing SMTP**, so the app gives up on SMTP within 10 seconds and uses the script.
+- **Limits:** a free Gmail account sends about 100 emails a day through Apps Script. The app stops at `MAIL_DAILY_LIMIT`; the rest wait for the next day, except password and test emails.
+- **With none of these set:** in development emails are printed in the API's terminal; in production the Email page says *Off* and the Email channel of offers opens the staff member's own email app.
+- **Unsubscribe links** are signed with a key derived from `JWT_SECRET`, so changing `JWT_SECRET` breaks links in emails already sent.
 
 ---
 
-## 7. Assumptions
-
-1. **Customers are shared by all branches of a salon.** One phone number = one customer per salon (a unique index enforces it). The same phone can exist in another salon.
-2. **Services and combos are defined once per salon** and each can be limited to some branches. The price is the same at every branch.
-3. **A lead's "assigned employee" is a login user** (owner or front desk), because they make the follow-up calls. Stylists don't log in.
-4. **Leads belong to a branch**, because the branch that took the enquiry follows it up.
-5. **The front desk doesn't see revenue**: no dashboard, analytics or PDF export.
-6. **Only the primary owner** creates branches, services, combos and other owners. Branch owners manage staff and front desk logins for their own branches.
-7. **"Delete" means archive** (branches, staff) or disable (services, combos), so history stays correct.
-8. **Phone numbers are Indian 10-digit mobiles**; `+91 98765 43210`, `098765-43210` and `9876543210` are the same number.
-9. **"Today" and every date filter mean the branch's own local day.** An analytics report across branches in different timezones reads each branch's dates in its own time.
-10. **Revenue = invoices paid** in the period, so cancelled bookings never count. Analytics also shows **service value** (list price of completed services, before discounts and combo prices).
-
----
-
-## 8. Product and UX decisions
-
-- **The day board is the receptionist's home screen.** It answers *"who is free right now?"* at a glance: one column per stylist, time running down the page, colour by status, and one-click buttons to move a booking along (**Mark arrived → Start → Complete → Checkout**). Absent stylists are hidden unless they still have bookings. The **list view** is for searching and filtering (date, status, stylist, customer name or phone), and its filters live in the URL so a refresh keeps them.
-- **Booking is one page in five steps**: customer (search by phone or add inline), services or a combo, stylist (changeable per service), date and a free time, then review and confirm. The free times refresh every 60 s; if another desk takes the slot first, the page says *"This slot was just booked by another desk. Please pick another time."*, refreshes the times and keeps everything else that was entered.
-- **The owner's dashboard gives one verdict and a short to-do list, not ten reports.** An owner opening the app wants to know *"Is my salon doing fine, and what needs me?"*. So the top card, **Salon Pulse**, gives one verdict (Doing well / Keep an eye / Needs action) from three simple signals, each with a one-line reason:
-  1. **Revenue vs usual:** today so far, compared with the average of the same weekday over the last 4 weeks up to the same time of day (a quiet Monday morning isn't compared with a busy Saturday evening).
-  2. **Chairs filled:** booked stylist time as a share of the stylist time available today.
-  3. **Attention count:** how many urgent items are waiting.
-
-  Below it, **Requires attention** lists what to do, most urgent first, each with a one-click action: customers waiting or not showing up, bills not collected, bookings whose stylist is absent or inactive, overdue follow-ups and leads nobody contacted in 24 hours.
-- **Checkout makes mistakes hard:** a live "Remaining ₹30" bar, a "Rest" button that fills in what's left, and the Pay button only works at exactly ₹0.
-- **Deactivating a stylist who has future bookings** first shows those bookings and asks to confirm; they then appear in Requires attention so they get reassigned.
-- **Converting a lead** reuses the booking form and says upfront whether the customer already exists (*"Existing customer found: Priya S. The booking will be linked to her profile."*).
-- **The help assistant feels like a chat, but stays honest.** It shows typing dots, then the answer types itself out, like an AI chat. Every answer says which help article it came from and offers a button to open that screen. It answers for *your* role only: a front desk user asking how to add a stylist is told that owners do that, not given steps for a page they can't open. When it doesn't understand, it says so and suggests questions instead of guessing. It stays open with its history as you move between pages, and it doesn't replace the **Need help?** email link.
-- **Payroll is built for the owner, not an accountant.** The pay form asks "How do you pay this person?" in plain words and shows a worked example month. The monthly payroll opens on a single total and a short "things to check" list, each with a link to fix it; details live in a side panel per person. Mistakes are hard to make: locking needs a tick-box confirmation, payments can't exceed what's owed, and nothing is ever deleted (it's cancelled or corrected with a reason, and logged).
-- **Inventory is built for the salon floor, not a warehouse.** The Overview has three big buttons (Issue product, Mark finished, Adjust stock) and a list of what's in use; *Finish & replace* is one step with the replacement ticked and filled in. Adding a product asks for five things only. Measured products are typed as *full bottles + an open amount*. A barcode scanner works in every product search. Things that need someone (write-offs to approve, problem reports, services that couldn't take stock, hand-outs of a stylist who left) wait on the Overview with one-click actions, and the bell tells the right people.
-- **Charts:** every chart shows one series in one colour, the heatmap uses a single hue from light to dark (checked with a palette validator), and every chart has a table of the same numbers, so nothing depends on hovering or on colour alone. Statuses always pair an icon with a text label.
-
----
-
-## 9. Technical decisions
-
-- **Tenant isolation on the server.** `orgId` and the allowed branches come from the logged-in user. Every query goes through `scoped(ctx, filter)`, which adds `orgId`; records are loaded with `findOne({ _id, orgId })`, never `findById` alone. Ids from another salon simply aren't found (**404**). Ids in request bodies (customer, stylist, service, branch, assignee) are each loaded inside the salon before use. The `X-Branch-Id` header is only accepted if it's one of the user's branches (**403** otherwise), and a front desk user only has one.
-- **No double booking (the concurrency fix).** A booking runs in one MongoDB transaction: (1) "touch" each chosen stylist's `Staff` document (`scheduleVersion + 1`), (2) check for overlapping bookings, (3) save. MongoDB won't let two open transactions change the same document, so a second desk booking the same stylist at the same moment gets a write conflict; Mongoose retries it, and on the retry it **sees** the first booking and returns 409 *"Rahul is already booked from 2:00 PM to 2:45 PM"*. A test fires simultaneous bookings and checks exactly one wins; with the lock removed, both were saved every time. Rescheduling uses the same lock and ignores the appointment's own current slot.
-- **Transactions wherever several writes must succeed together:** booking, rescheduling, salon onboarding (salon + branch + owner), lead conversion (customer + appointment + lead), checkout (invoice number + invoice + mark the appointment paid).
-- **Times are stored in UTC.** Each branch has an IANA timezone; Luxon converts "28 Sep, 2:30 PM at Andheri" to UTC and back. Opening hours, "today", the day board, availability, attendance dates and the analytics heatmap all use the branch's own time.
-- **Money is stored as whole paise** (₹1,530.50 = `153050`), so no floating-point rounding errors. The server recalculates every price; the browser never sends one.
-- **Snapshots.** Appointment items and invoice lines keep the service name, stylist name and price at booking time, so renaming or disabling a service never changes history.
-- **Calculated, not stored.** Customer visits, spend and last visit, and every dashboard and analytics number, come from aggregations over appointments and invoices, so they can't drift out of sync.
-- **Fixed status rules.** Appointment and lead statuses follow a small state machine (`utils/stateMachine.js`). Status updates also check the status hasn't changed since it was read, so two clicks at once can't both win. "Appointment booked" for a lead can only be set by the convert flow.
-- **Paying only once**, three ways: a check before saving, an "only if still unpaid" update inside the transaction, and a unique index on `invoice.appointmentId` as the final safety net.
-- **Auth:** JWT (holding only the user id) in an httpOnly, SameSite=Lax cookie (Secure in production); passwords hashed with bcrypt; the user and their salon are reloaded on every request, so deactivating a user or a salon logs them out on their next click. Failed logins are rate-limited.
-- **Validation twice:** Zod on the server for every request (the source of truth), and on the client for instant feedback.
-- **Security basics:** helmet headers, CORS limited to the client URL, a 100 kB body limit, env vars checked at start-up, error responses without stack traces in production, and no secrets in the repo.
-- **Payroll money can always be explained.** Pay setups are dated and never edited once started. Commission lines and payroll items can't be updated (the models refuse it), and each commission line keeps the rate it used. Locking a month saves a fingerprint (SHA-256) of every amount. Payments carry an `Idempotency-Key`, so a double click is recorded once, and each payment bumps the month's paid total inside its transaction, so two payments at the same moment can't both slip under the amount owed (the same write-conflict trick as bookings). Every payroll change goes into an append-only activity log in the same transaction as the change.
-- **One place writes stock.** `inventory/stock/stock.engine.js` posts every movement inside a transaction: each line changes its balance with a conditional `$inc` that only matches when enough is left (so two people can't both take the last bottle), then writes the append-only header and lines. Balances can always be rebuilt from the lines; owners can run that check from Settings. Average cost is moving, per product per branch.
-- **Safe to repeat.** Every inventory change needs an `Idempotency-Key`; the answer is saved in the same transaction as the change (`middleware/idempotency.js`), so a double click or retry gets the first answer back.
-- **Automatic use with an outbox.** Completing an appointment writes a "service completed" event in the same transaction; a background job handles it right after and a sweep retries failures. Each service line and recipe line has a unique key, so replays never deduct twice.
-- **Permissions in one table** (`inventory/permissions.js`): `can(ctx, 'inventory.writeOff', { settings, value })` returns allowed / needs approval, with the branch's front desk switches and limits. The server checks it on every request; hidden buttons are only a convenience. Cost fields are stripped on the server.
-- **Photos behind one switch.** `inventory/images/imageStore.js` offers `save`, `stream` and `remove`, chosen by `IMAGE_STORAGE`. Today it is GridFS; a Cloudinary store can be added there without touching the screens. Every upload is checked to really be a picture (not just by its name), resized with sharp, and read back only after two checks: the product belongs to your salon, and so does the file.
-- **Help assistant = the simplest possible retrieval** (`server/src/modules/help/`). There's no AI model, no document upload and no chunking: the "documents" are 50 hand-written help topics in `help.knowledge.js`, each with keywords, the roles it's for, and an answer (optionally a different answer per role). For each question the server:
-  1. **cleans the text:** lower case, no punctuation, drops filler words ("how do I…"), trims plurals and maps synonyms (stylist / barber / beautician → *staff*, appointment → *booking*);
-  2. **scores every topic:** a keyword counts when all its words are in the question, worth 1 point per word (strong single words like *checkout* are worth 2); on a tie a specific topic ("cancel a booking") beats a general one ("booking");
-  3. **answers for the asker:** the role comes from the session, never from the request. If the role is allowed it gets the steps (and a link); if not, it gets *who* can do it instead; below 2 points it says it isn't sure and suggests questions.
-
-  The matching is a pure function, so it's unit-tested without a database.
-
----
-
-## 10. Trade-offs
-
-- **Polling instead of WebSockets.** Live screens refresh every 60 s (and when the tab regains focus). That's enough for a salon and much simpler; the server still decides every clash, so a stale screen can never cause a double booking.
-- **A lock document per stylist instead of a special locking library.** It uses a normal MongoDB transaction and write conflict, which is easy to explain and test, at the cost of retrying the losing booking.
-- **Availability shows the main stylist's free times.** When one booking uses several stylists, the slot picker shows the first stylist; the server checks every stylist on confirm.
-- **Revenue signal compares with the last 4 same weekdays.** Simple and explainable, but it says "No data" for a new salon's first month.
-- **Some pages load all rows for the selected day or branch** (with a limit) instead of full pagination. Customers are paginated because that list grows forever.
-- **Server-side PDF** uses pdfkit's built-in fonts, so amounts show as "Rs." instead of "₹".
-- **Inventory's background job runs inside the API process** instead of a separate queue service. It's simpler to deploy on one Render service; events are stored in MongoDB (the outbox), so a restart only delays them until the next sweep.
-- **Keyword matching instead of a real AI model for the help assistant.** It's free, instant, can't make things up, and every answer is written and checked by us, but it only understands questions whose words overlap its keywords, and it has no memory of the conversation. Swapping the matcher for an LLM later only changes `help.matcher.js`; the role rules and the chat window stay the same.
-
----
-
-## 11. Known limitations
-
-- No real-time push: another desk's booking appears within 60 s (or immediately after your own action or a 409).
-- With email set up, a new login can get an email link to set their own password, and anyone can use **Forgot password?**; without email, owners share a temporary password by hand. There's no forced password change and no "change my password" screen while logged in (use Forgot password?), and the Super Admin can't reset their own password by email.
-- Prices are the same at every branch; per-branch pricing isn't supported.
-- Phone validation assumes Indian mobile numbers, even for the Dubai demo salon.
-- No buffer time between appointments and no stylist-specific working hours (the branch's opening hours apply to everyone).
-- The Render free plan sleeps when idle, so the first request after a while can take 30–60 s.
-- Analytics "utilisation" counts every day in the range as a working day (minus marked absences).
-- Billing: no payment gateway or card machine link (payments are recorded by the desk); no IGST (every bill is CGST + SGST, for salons selling where they are); no composition scheme; no rounding to the nearest rupee; no email or SMS sending (the share link is copied or sent on WhatsApp by hand); refunds give money back by any method but not back into an advance; packages, memberships and gift cards aren't built yet (the bill line kinds and payment sources are ready for them, see `billing/lineKinds.js` and `payments/paymentSources.js`); GST rules must be checked by a tax professional before going live.
-- Inventory: no moving stock between branches, a completed service can't be reversed (the app has no "un-complete"), no camera barcode scanning (USB/Bluetooth scanners work), photos are stored in the database (GridFS) rather than a CDN, and reports cover one or all of your branches but not a custom set.
-- Birthday & Anniversary Offers: staff send WhatsApp and SMS from their own phone; offer emails are sent by the app when email is set up, and campaigns can email automatically (automatic WhatsApp/SMS isn't built; *Sent* means Gmail accepted it, not that it was opened); messages say "Reply or call to book" because there is no public booking page; every day counts as a working day for follow-up times; branches have no phone of their own, so messages use the salon's contact number; no customer merge, and "Remove occasion data" stands in for a full erasure workflow.
-- Payroll: stylists don't log in, so there's no "My earnings" screen (owners download payslips instead); front desk members can't see their own payslip yet; no PF, ESI, TDS or professional tax (add them as deductions until a payroll expert has reviewed them); one service can't be split between two stylists; notifications are in the app only (no email); monthly pay periods only.
-
----
-
-## 12. Tenant isolation smoke test
+## 7. Tenant isolation smoke test
 
 `npm run smoke:isolation` logs in as **Desert Rose** to collect its real ids, then logs in as **Glamour Studio** and tries to use them. Result against the local API with the demo seed:
 
 | Where | Attempt (as Glamour, with Desert Rose's ids) | Result |
 |---|---|---|
-| URL | read their branch / customer / appointment / lead / invoice | 404 ✅ |
-| URL | edit their stylist, change their service price, cancel their appointment, deactivate their front desk | 404 ✅ |
-| Body | book their customer | 404 ✅ |
-| Body | book their stylist / their service | 400 `INVALID_STAFF` / `INVALID_SERVICE` ✅ |
-| Body | check out their appointment | 404 ✅ |
-| Body | add a stylist to their branch, offer a service at their branch | 400 `INVALID_BRANCH` ✅ |
-| Body | assign a lead to their user, make their stylist a customer's favourite | 400 `INVALID_ASSIGNEE` / `INVALID_STAFF` ✅ |
+| URL | read or edit their branch, customer, appointment, lead, invoice, stylist, service, front desk | 404 ✅ |
+| Body | book their customer, check out their appointment | 404 ✅ |
+| Body | book their stylist or service, add a stylist to their branch, assign a lead to their user | 400 ✅ |
 | Query | analytics for their branch | 404 ✅ |
-| URL | read or set their stylist's pay, give their stylist an advance, pay their payroll line, download their payslip | 404 ✅ |
-| Header | `X-Branch-Id` = their branch (staff list, dashboard, monthly payroll, inventory overview and reports) | 403 `BRANCH_FORBIDDEN` ✅ |
-| Inventory | Desert Rose (no add-on) opening, editing or finishing Glamour's products, orders and hand-outs | 403 `ADDON_DISABLED` ✅ |
-| Billing (URL) | download their bill PDF, read its history, make a share link, void it, reverse their payment, adjust their cash day, read their customer's money | 404 ✅ |
-| Billing (body/query) | pay their bill, refund it, take an advance for their customer, read their customer's advances | 404 ✅ |
-| Header | `X-Branch-Id` = their branch (billing reports, cash drawer, new sale) | 403 `BRANCH_FORBIDDEN` ✅ |
-| Occasions | open or withdraw their campaign, preview or record a call on their offer, read or change their customer's dates and permission; `X-Branch-Id` on the occasion list and reports | 404 / 403 ✅ |
-| Email | email their bill, read their bill's emails or test email, find their emails in our recent emails, email their front desk a password link, unsubscribe with a forged link | 404 ✅ |
+| URL | read or set their stylist's pay, give an advance, pay their payroll line, download their payslip | 404 ✅ |
+| Header | `X-Branch-Id` = their branch (staff, dashboard, payroll, inventory, billing reports, cash drawer, offers) | 403 ✅ |
+| Inventory | Desert Rose (no add-on) opening or changing Glamour's products, orders and hand-outs | 403 ✅ |
+| Billing | their bill PDF, history, share link, void, payment, refund, advance, cash day, customer's money | 404 ✅ |
+| Occasions | their campaign, offer, customer's dates and permission | 404 ✅ |
+| Email | email their bill, read their emails, email their front desk a password link, unsubscribe with a forged link | 404 ✅ |
 
-**All 62 attempts were blocked.** (Two salons that both have Inventory are tested in `server/tests`: another salon's inventory ids are not found, 404.) A front desk user sending another branch of their *own* salon in `X-Branch-Id` is also refused (403).
-
----
-
-## 13. AI usage
-
-This project was built with assistance from **Claude Code** (Anthropic's AI coding assistant) as a pair programmer:
-
-- **Planning:** I wrote the requirements and the agreed changes; the AI helped turn them into `IMPLEMENTATION_PLAN.md` (data model, business rules, 15 phases with "done when" checks).
-- **Building:** phase by phase, the AI wrote code following the plan, and I reviewed each phase, and committed it myself.
-- **Testing:** for every phase the AI wrote and ran API checks against the real database, browser checks in headless Chrome (with screenshots), and Vitest tests. These caught real bugs that were then fixed, for example logout not clearing the session, availability hiding an appointment's own slot when rescheduling, a Zod default silently resetting a service's branches on edit, and a heatmap colour that was too faint to read.
-- **What I checked myself:** the business rules (booking conflicts, checkout maths, tenant isolation), the UX on each screen, and that I can explain every part of the code.
-
----
-
-## 14. Future scope
-
-Ordered roughly by value (from the plan's bonus phases): automated API/E2E test suite, walk-in quick add, an audit log for the rest of the app (payroll already has one), drag-to-reschedule and a week view, a staff free/busy view, real-time sync with WebSockets, a "win back" list of customers who haven't returned, WhatsApp confirmations and reminders, before/after photos, emailing the sales PDF and payslips, automatic WhatsApp/SMS offers (through a WhatsApp Business provider), a paid email sender with its own domain, credit note and refund receipt PDFs (then emailing them), an LLM-backed help assistant that can also answer questions about your own data (the current one matches keywords over a fixed help knowledge base), staff logins with their own earnings page, commission slabs and target bonuses, statutory deductions (PF, ESI, TDS) after legal review, and no-show tracking with reminders. **Inventory:** retail selling at checkout, moving stock between branches, reversing a completed service, photo/AI catalogue import, camera barcode scanning, Cloudinary image storage, plan-based billing for add-ons, and stock events for other systems.
+**All 62 attempts were blocked.** A front desk user sending another branch of their *own* salon in `X-Branch-Id` is also refused (403).

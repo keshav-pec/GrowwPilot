@@ -4,7 +4,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import { useServices } from '../../api/catalog';
 import { useRemoveServiceRate, useSetServiceRate } from '../../api/payroll';
 import { formatPercent } from '../../lib/payroll';
-import { Button, Input, Modal, Select } from '../../components/ui';
+import { Button, Input, Modal, ModalFooter, Select } from '../../components/ui';
 
 // Add or change one special rate
 function ServiceRateModal({ staff, rate, takenServiceIds, onClose }) {
@@ -39,14 +39,9 @@ function ServiceRateModal({ staff, rate, takenServiceIds, onClose }) {
       onClose={onClose}
       title={rate ? `Change ${staff.name}'s rate on ${rate.serviceId.name}` : `Special commission for ${staff.name}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={save} loading={setRate.isPending}>
+        <ModalFooter onClose={onClose} onClick={save} loading={setRate.isPending}>
             Save
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">

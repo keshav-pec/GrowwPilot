@@ -7,14 +7,16 @@ import { staffNames } from '../../lib/appointments';
 import { formatMoney } from '../../lib/money';
 import { formatDate, formatDateTime } from '../../lib/time';
 import { DATE_SOURCE_LABEL, formatOccasion } from '../../lib/occasions';
-import { Button, Card, EmptyState, PageHeader, Spinner, Table, Tabs } from '../../components/ui';
-import AppointmentStatusBadge from '../../components/AppointmentStatusBadge';
+import { Button, Card, Detail, EmptyState, PageHeader, PageSpinner, StatTile, Table, Tabs } from '../../components/ui';
+import { AppointmentStatusBadge } from '../../components/StatusBadge';
 import AppointmentDrawer from '../appointments/AppointmentDrawer';
 import CustomerFormModal from './CustomerFormModal';
 import AdvancesCard from './AdvancesCard';
 import CustomerMoneyTab from './CustomerMoneyTab';
 import MessagesPermissionTab from './MessagesPermissionTab';
 import OccasionOffersCard from './OccasionOffersCard';
+
+const Stat = (props) => <StatTile {...props} className="" />;
 
 // "November (day not provided)", with where it came from in small grey text
 function OccasionDetail({ date }) {
@@ -24,24 +26,6 @@ function OccasionDetail({ date }) {
       {formatOccasion(date)}
       <span className="block text-xs text-muted">{DATE_SOURCE_LABEL[date.source]}</span>
     </>
-  );
-}
-
-function Detail({ label, children }) {
-  return (
-    <div>
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className="text-sm">{children || '—'}</dd>
-    </div>
-  );
-}
-
-function Stat({ label, value }) {
-  return (
-    <div>
-      <p className="text-xs text-muted">{label}</p>
-      <p className="text-2xl font-bold text-brown">{value}</p>
-    </div>
   );
 }
 
@@ -56,11 +40,7 @@ export default function CustomerProfilePage() {
   const [selectedId, setSelectedId] = useState(null);
 
   if (profileQuery.isPending) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner size={28} />
-      </div>
-    );
+    return <PageSpinner />;
   }
   if (profileQuery.isError) {
     return <EmptyState title="Customer not found" message={profileQuery.error.message} action={<Link to="/app/customers" className="text-sm underline">All customers</Link>} />;

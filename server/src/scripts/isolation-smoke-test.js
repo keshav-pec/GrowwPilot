@@ -1,4 +1,4 @@
-// Tenant isolation smoke test (plan, Phase 15).
+// Tenant isolation smoke test.
 // Logs in as Salon B to collect its real ids, then logs in as Salon A and tries to use those ids
 // in the URL, in the request body and in the X-Branch-Id header. Every attempt must fail.
 //

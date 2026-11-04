@@ -53,7 +53,7 @@ function HomeRedirect() {
   return <Navigate to={user ? ROLE_HOME[user.role] : '/login'} replace />;
 }
 
-// The screen map (plan, Phase 2).
+// The screen map.
 export const router = createBrowserRouter([
   { path: '/', element: <HomeRedirect /> },
   { path: '/login', element: <LoginPage /> },

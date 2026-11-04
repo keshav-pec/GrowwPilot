@@ -7,7 +7,6 @@ import {
   InventorySku,
   InventorySkuBranch,
   InventorySupplier,
-  User,
 } from '../../../models/index.js';
 import { OPEN_PO_STATUSES } from '../../../models/inventory/InventoryPurchaseOrder.js';
 import { AppError } from '../../../utils/AppError.js';
@@ -15,11 +14,11 @@ import { scoped } from '../../../utils/scoped.js';
 import { formatAmount } from '../../../utils/money.js';
 import { todayInZone } from '../../../utils/time.js';
 import { runOnce } from '../../../middleware/idempotency.js';
-import { notify } from '../../notifications/notifications.service.js';
+import { approverIdsWhere, notify } from '../../notifications/notifications.service.js';
 import { branchCode } from '../../billing/settings.service.js';
 import { assertCan, can } from '../permissions.js';
 import { getBranchSettings } from '../settings/settings.service.js';
-import { recordInventoryAction } from '../activity.js';
+import { logActivity, personOf } from '../../activity/activity.service.js';
 import { postMovement } from '../stock/stock.engine.js';
 import { availableToIssue, branchStock } from '../stock/stock.queries.js';
 import { ensureBranchLocations } from '../locations/locations.service.js';
@@ -27,14 +26,13 @@ import { findSupplier } from '../suppliers/suppliers.service.js';
 import { describeQty } from '../units.js';
 
 // ---------------------------------------------------------------------------
-// Purchasing (INV-11, INV-12): purchase orders, receiving, returns to suppliers and reorder suggestions.
+// Purchasing: purchase orders, receiving, returns to suppliers and reorder suggestions.
 // Quantities are in each product's counting unit; prices are per stock unit (per bottle), in paise.
 // Only people who may see costs see or type prices.
 // ---------------------------------------------------------------------------
 
 const SKU_FIELDS = 'name code stockUnit wayOfUse baseUnit unitsPerStockUnit status';
 const ordersLink = (id) => `/app/inventory?tab=purchasing${id ? `&order=${id}` : ''}`;
-const me = (ctx) => ({ id: ctx.userId, name: ctx.userName });
 
 async function access(ctx, branchId = ctx.activeBranchId) {
   const settings = await getBranchSettings(ctx, branchId);
@@ -103,9 +101,8 @@ async function nextOrderNumber(ctx, branchId, session) {
 }
 
 // Owners who may approve an order of this value at this branch
-async function approverIds(ctx, branchId, value, settings) {
-  const owners = await User.find(scoped(ctx, { role: 'OWNER', status: 'active', $or: [{ allBranches: true }, { branchIds: branchId }] })).lean();
-  return owners.filter((o) => can({ role: 'OWNER', isPrimaryOwner: o.allBranches }, 'inventory.approvePurchaseOrder', { settings, value: value ?? undefined }).allowed).map((o) => o._id);
+function approverIds(ctx, branchId, value, settings) {
+  return approverIdsWhere(ctx, branchId, (owner) => can(owner, 'inventory.approvePurchaseOrder', { settings, value: value ?? undefined }).allowed);
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +161,7 @@ export async function createOrder(ctx, input, key) {
           total: orderTotal(lines, skuOf),
           expectedDate: input.expectedDate ?? null,
           note: input.note,
-          createdBy: me(ctx),
+          createdBy: personOf(ctx),
         },
       ],
       { session }
@@ -210,12 +207,12 @@ export async function submitOrder(ctx, id, key) {
 
   return runOnce(ctx, { key, operation: 'inventory.po.submit' }, async (session) => {
     const now = new Date();
-    const changes = approvedNow ? { status: 'APPROVED', submittedAt: now, approvedBy: me(ctx), approvedAt: now } : { status: 'PENDING_APPROVAL', submittedAt: now };
+    const changes = approvedNow ? { status: 'APPROVED', submittedAt: now, approvedBy: personOf(ctx), approvedAt: now } : { status: 'PENDING_APPROVAL', submittedAt: now };
     const updated = await InventoryPurchaseOrder.findOneAndUpdate(scoped(ctx, { _id: po._id, status: 'DRAFT' }), { $set: changes, $inc: { version: 1 } }, { returnDocument: 'after', session }).lean();
     if (!updated) throw new AppError(409, 'STALE_VERSION', 'This order was just changed. Open it again.');
     const value = po.total != null ? ` (${formatAmount(po.total)})` : '';
     if (approvedNow) {
-      await recordInventoryAction(ctx, { action: 'inventory.po_approved', branchId: po.branchId, summary: `Approved ${po.number} from ${po.supplierName}${value}`, link: ordersLink(po._id) }, session);
+      await logActivity(ctx, { action: 'inventory.po_approved', branchId: po.branchId, summary: `Approved ${po.number} from ${po.supplierName}${value}` }, session);
     } else {
       await notify(ctx, await approverIds(ctx, po.branchId, po.total, settings), { message: `${ctx.userName} asks to approve ${po.number} from ${po.supplierName}${value}`, link: ordersLink(po._id) }, session);
     }
@@ -234,11 +231,11 @@ export async function decideOrder(ctx, id, { approve, note }, key) {
   }
 
   return runOnce(ctx, { key, operation: 'inventory.po.decide' }, async (session) => {
-    const changes = approve ? { status: 'APPROVED', approvedBy: me(ctx), approvedAt: new Date(), decisionNote: note } : { status: 'DRAFT', decisionNote: note };
+    const changes = approve ? { status: 'APPROVED', approvedBy: personOf(ctx), approvedAt: new Date(), decisionNote: note } : { status: 'DRAFT', decisionNote: note };
     const updated = await InventoryPurchaseOrder.findOneAndUpdate(scoped(ctx, { _id: po._id, status: 'PENDING_APPROVAL' }), { $set: changes, $inc: { version: 1 } }, { returnDocument: 'after', session }).lean();
     if (!updated) throw new AppError(409, 'ALREADY_DECIDED', 'This order has already been decided');
     const verb = approve ? 'Approved' : 'Sent back';
-    await recordInventoryAction(ctx, { action: approve ? 'inventory.po_approved' : 'inventory.po_sent_back', branchId: po.branchId, summary: `${verb} ${po.number} from ${po.supplierName}${note ? `: ${note}` : ''}`, link: ordersLink(po._id) }, session);
+    await logActivity(ctx, { action: approve ? 'inventory.po_approved' : 'inventory.po_sent_back', branchId: po.branchId, summary: `${verb} ${po.number} from ${po.supplierName}${note ? `: ${note}` : ''}` }, session);
     await notify(ctx, [po.createdBy.id], { message: `${ctx.userName} ${verb.toLowerCase()} ${po.number}${note ? `: ${note}` : ''}`, link: ordersLink(po._id) }, session);
     return { order: present(updated, canSeeCosts) };
   });
@@ -266,13 +263,13 @@ export async function moveOrder(ctx, id, step, { note } = {}, key) {
       { returnDocument: 'after', session }
     ).lean();
     if (!updated) throw new AppError(409, 'STALE_VERSION', 'This order was just changed. Open it again.');
-    await recordInventoryAction(ctx, { action: `inventory.po_${step}`, branchId: po.branchId, summary: `${rule.words} ${po.number} from ${po.supplierName}${note ? `: ${note}` : ''}`, link: ordersLink(po._id) }, session);
+    await logActivity(ctx, { action: `inventory.po_${step}`, branchId: po.branchId, summary: `${rule.words} ${po.number} from ${po.supplierName}${note ? `: ${note}` : ''}` }, session);
     return { order: present(updated, canSeeCosts) };
   });
 }
 
 // ---------------------------------------------------------------------------
-// Receiving (INV-12): only what physically arrived goes into the store and updates the average cost.
+// Receiving: only what physically arrived goes into the store and updates the average cost.
 // Part deliveries are fine. More than was ordered needs the business owner, with a reason.
 // input: { invoiceNumber?, locationId?, overReceiptReason?, lines: [{ lineId, qty, unitCost?, batch?, expiryDate? }] }
 // ---------------------------------------------------------------------------
@@ -300,7 +297,7 @@ export async function receiveOrder(ctx, id, input, key) {
   if (over) {
     if (!ctx.isPrimaryOwner) throw new AppError(403, 'OVER_RECEIPT', 'More than was ordered arrived. Only the business owner can accept it; receive what was ordered for now.');
     if (!input.overReceiptReason) throw new AppError(400, 'NOTE_REQUIRED', 'More than was ordered: say why you are accepting it');
-    overReceipt = { reason: input.overReceiptReason, approvedBy: me(ctx) };
+    overReceipt = { reason: input.overReceiptReason, approvedBy: personOf(ctx) };
   }
 
   return runOnce(ctx, { key, operation: 'inventory.po.receive' }, async (session) => {
@@ -322,13 +319,13 @@ export async function receiveOrder(ctx, id, input, key) {
     });
     const { transaction } = await postReceipt(ctx, { branchId, store, lines: received, skuOf, note: `${po.number}${input.invoiceNumber ? `, invoice ${input.invoiceNumber}` : ''}`, reference: { kind: 'purchase_order', id: po._id }, key }, session);
     await InventoryGoodsReceipt.create(
-      [{ orgId: ctx.orgId, branchId, poId: po._id, poNumber: po.number, supplierId: po.supplierId, supplierName: po.supplierName, invoiceNumber: input.invoiceNumber, locationId: store._id, lines: received, overReceipt, transactionId: transaction._id, by: me(ctx) }],
+      [{ orgId: ctx.orgId, branchId, poId: po._id, poNumber: po.number, supplierId: po.supplierId, supplierName: po.supplierName, invoiceNumber: input.invoiceNumber, locationId: store._id, lines: received, overReceipt, transactionId: transaction._id, by: personOf(ctx) }],
       { session }
     );
     const what = received.map((l) => `${describeQty(l.qty, skuOf[String(l.skuId)])} ${l.skuName}`).join(', ');
-    await recordInventoryAction(
+    await logActivity(
       ctx,
-      { action: 'inventory.po_received', branchId, summary: `Received ${what} on ${po.number}${overReceipt ? ` (more than ordered: ${overReceipt.reason})` : ''}`, link: ordersLink(po._id) },
+      { action: 'inventory.po_received', branchId, summary: `Received ${what} on ${po.number}${overReceipt ? ` (more than ordered: ${overReceipt.reason})` : ''}` },
       session
     );
     return { order: present(updated, canSeeCosts), transactionId: transaction._id };
@@ -378,11 +375,11 @@ export async function directReceipt(ctx, input, key) {
   return runOnce(ctx, { key, operation: 'inventory.receipt.direct' }, async (session) => {
     const { transaction } = await postReceipt(ctx, { branchId, store, lines: received, skuOf, note: input.invoiceNumber ? `Invoice ${input.invoiceNumber}` : undefined, key }, session);
     const [receipt] = await InventoryGoodsReceipt.create(
-      [{ orgId: ctx.orgId, branchId, supplierId: supplier?._id, supplierName: supplier?.name, invoiceNumber: input.invoiceNumber, locationId: store._id, lines: received, transactionId: transaction._id, by: me(ctx) }],
+      [{ orgId: ctx.orgId, branchId, supplierId: supplier?._id, supplierName: supplier?.name, invoiceNumber: input.invoiceNumber, locationId: store._id, lines: received, transactionId: transaction._id, by: personOf(ctx) }],
       { session }
     );
     const what = received.map((l) => `${describeQty(l.qty, skuOf[String(l.skuId)])} ${l.skuName}`).join(', ');
-    await recordInventoryAction(ctx, { action: 'inventory.received', branchId, summary: `Received ${what} without an order${supplier ? ` from ${supplier.name}` : ''}`, link: ordersLink() }, session);
+    await logActivity(ctx, { action: 'inventory.received', branchId, summary: `Received ${what} without an order${supplier ? ` from ${supplier.name}` : ''}` }, session);
     return { receiptId: receipt._id, transactionId: transaction._id };
   });
 }
@@ -412,11 +409,11 @@ export async function returnToSupplier(ctx, input, key) {
       session
     );
     await InventoryGoodsReceipt.create(
-      [{ orgId: ctx.orgId, branchId, kind: 'RETURN', poId: po?._id, poNumber: po?.number, supplierId: supplier._id, supplierName: supplier.name, locationId: store._id, lines: lines.map((l) => ({ skuId: l.skuId, skuName: l.skuName, qty: l.qty })), reason: input.reason, transactionId: transaction._id, by: me(ctx) }],
+      [{ orgId: ctx.orgId, branchId, kind: 'RETURN', poId: po?._id, poNumber: po?.number, supplierId: supplier._id, supplierName: supplier.name, locationId: store._id, lines: lines.map((l) => ({ skuId: l.skuId, skuName: l.skuName, qty: l.qty })), reason: input.reason, transactionId: transaction._id, by: personOf(ctx) }],
       { session }
     );
     const what = lines.map((l) => `${describeQty(l.qty, skuOf[String(l.skuId)])} ${l.skuName}`).join(', ');
-    await recordInventoryAction(ctx, { action: 'inventory.returned_to_supplier', branchId, summary: `Returned ${what} to ${supplier.name}: ${input.reason}`, link: ordersLink() }, session);
+    await logActivity(ctx, { action: 'inventory.returned_to_supplier', branchId, summary: `Returned ${what} to ${supplier.name}: ${input.reason}` }, session);
     return { transactionId: transaction._id };
   });
 }
@@ -431,7 +428,7 @@ export async function listReceipts(ctx) {
 
 // ---------------------------------------------------------------------------
 // Reorder suggestions: products whose available stock (store only) plus what is already on approved orders
-// is at or below the reorder point (AC30). Grouped by each product's usual supplier.
+// is at or below the reorder point. Grouped by each product's usual supplier.
 // ---------------------------------------------------------------------------
 export async function suggestions(ctx) {
   const branchId = ctx.activeBranchId;
@@ -515,7 +512,7 @@ export async function createFromSuggestions(ctx, { lines }, key) {
     for (const supplier of suppliers) {
       const { lines: clean, skuOf: skus } = await cleanLines(ctx, bySupplier.get(String(supplier._id)), { canSeeCosts: true });
       const [po] = await InventoryPurchaseOrder.create(
-        [{ orgId: ctx.orgId, branchId, number: await nextOrderNumber(ctx, branchId, session), supplierId: supplier._id, supplierName: supplier.name, lines: clean, total: orderTotal(clean, skus), createdBy: me(ctx) }],
+        [{ orgId: ctx.orgId, branchId, number: await nextOrderNumber(ctx, branchId, session), supplierId: supplier._id, supplierName: supplier.name, lines: clean, total: orderTotal(clean, skus), createdBy: personOf(ctx) }],
         { session }
       );
       orders.push(present(po.toObject(), canSeeCosts));

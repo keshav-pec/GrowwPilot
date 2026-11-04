@@ -1,10 +1,10 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
+import { keyed, send as sendChange } from './request';
 import { downloadFile } from './download';
 
-// Money changes are sent with an Idempotency-Key (see newRequestKey in lib/billing.js)
-const send = (method, url, key, body) =>
-  api.request({ method, url, data: body, headers: key ? { 'Idempotency-Key': key } : undefined }).then((res) => res.data.invoice);
+// Money changes are sent with an Idempotency-Key, and the reply is the bill
+const send = (...request) => sendChange(...request).then((data) => data.invoice);
 
 // After a bill changes: the bill itself, lists, the day board, customer spend, the dashboard and the bell
 function useBillMutation(mutationFn) {
@@ -82,7 +82,7 @@ export function useDiscardDraft() {
 export const useVoidInvoice = () => useBillMutation(({ _id, key, reason }) => send('post', `/invoices/${_id}/void`, key, { reason }));
 // { paymentId, key, reason } -> the bill (or null for an advance)
 export const useReversePayment = () =>
-  useBillMutation(({ paymentId, key, reason }) => api.post(`/payments/${paymentId}/reverse`, { reason }, { headers: { 'Idempotency-Key': key } }).then((res) => res.data.invoice));
+  useBillMutation(({ paymentId, key, reason }) => api.post(`/payments/${paymentId}/reverse`, { reason }, keyed(key)).then((res) => res.data.invoice));
 
 // { _id, key, version, payments, useAdvance?, keepExtraAsAdvance?, billDiscount?, lines? }
 export const useIssueInvoice = () => useBillMutation(({ _id, key, ...body }) => send('post', `/invoices/${_id}/issue`, key, body));
@@ -127,7 +127,7 @@ export function useBillEmails(id, enabled = true) {
 export function useEmailBill() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, key, to }) => api.post(`/invoices/${id}/email`, { to: to || undefined }, { headers: { 'Idempotency-Key': key } }).then((res) => res.data),
+    mutationFn: ({ id, key, to }) => api.post(`/invoices/${id}/email`, { to: to || undefined }, keyed(key)).then((res) => res.data),
     onSuccess: (_, { id }) => queryClient.invalidateQueries({ queryKey: ['invoice', id, 'emails'] }),
   });
 }

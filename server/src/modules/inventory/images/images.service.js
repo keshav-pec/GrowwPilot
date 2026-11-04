@@ -3,14 +3,14 @@ import { IdempotencyRecord, InventorySku } from '../../../models/index.js';
 import { AppError } from '../../../utils/AppError.js';
 import { scoped } from '../../../utils/scoped.js';
 import { runOnce } from '../../../middleware/idempotency.js';
-import { assertCan } from '../permissions.js';
-import { getBranchSettings } from '../settings/settings.service.js';
-import { recordInventoryAction } from '../activity.js';
+import { assertCanHere } from '../settings/settings.service.js';
+import { logActivity } from '../../activity/activity.service.js';
 import { canEditProduct, findSku } from '../skus/skus.service.js';
 import { imageStore } from './imageStore.js';
+import { plural } from '../../../utils/text.js';
 
 // ---------------------------------------------------------------------------
-// Product photos (Phase 8): up to 4 per product, one main. JPEG, PNG or WebP up to 2 MB each.
+// Product photos: up to 4 per product, one main. JPEG, PNG or WebP up to 2 MB each.
 // Each upload is checked to really be an image, then saved as a 1000 px picture and a 240 px thumbnail.
 // Anyone who can see stock can see photos; adding or removing them follows the rule for editing the product.
 // ---------------------------------------------------------------------------
@@ -21,7 +21,7 @@ export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const SIZES = { full: 1000, thumb: 240 };
 
 async function assertCanChangePhotos(ctx, sku) {
-  assertCan(ctx, 'inventory.editProducts', { settings: await getBranchSettings(ctx, ctx.activeBranchId) });
+  await assertCanHere(ctx, 'inventory.editProducts');
   if (!(await canEditProduct(ctx, sku))) {
     throw new AppError(403, 'PERMISSION_DENIED', 'This product is also used at other branches. Ask the business owner to change its photos.');
   }
@@ -75,9 +75,9 @@ export async function addImages(ctx, id, files, key) {
         fresh.images.push({ ...file.stored, isMain: !hasMain && i === 0, originalName: file.originalname, uploadedBy: { id: ctx.userId, name: ctx.userName } });
       });
       await fresh.save({ session });
-      await recordInventoryAction(
+      await logActivity(
         ctx,
-        { action: 'inventory.photos_added', branchId: ctx.activeBranchId, summary: `Added ${files.length} photo${files.length === 1 ? '' : 's'} to ${fresh.name} (${fresh.code})`, link: `/app/inventory?tab=products&product=${fresh._id}` },
+        { action: 'inventory.photos_added', branchId: ctx.activeBranchId, summary: `Added ${plural(files.length, 'photo')} to ${fresh.name} (${fresh.code})` },
         session
       );
       return { images: fresh.toObject().images };
@@ -123,9 +123,9 @@ export async function removeImage(ctx, id, imageId, key) {
     gone.deleteOne();
     if (!fresh.images.some((i) => i.isMain) && fresh.images.length > 0) fresh.images[0].isMain = true;
     await fresh.save({ session });
-    await recordInventoryAction(
+    await logActivity(
       ctx,
-      { action: 'inventory.photo_removed', branchId: ctx.activeBranchId, summary: `Removed a photo of ${fresh.name} (${fresh.code})${image.originalName ? `: ${image.originalName}` : ''}`, link: `/app/inventory?tab=products&product=${fresh._id}` },
+      { action: 'inventory.photo_removed', branchId: ctx.activeBranchId, summary: `Removed a photo of ${fresh.name} (${fresh.code})${image.originalName ? `: ${image.originalName}` : ''}` },
       session
     );
     return { images: fresh.toObject().images };
@@ -137,7 +137,7 @@ export async function removeImage(ctx, id, imageId, key) {
 
 // One photo, for showing. Checked twice: the product belongs to my salon, and so does the file.
 export async function openImage(ctx, id, imageId, size) {
-  assertCan(ctx, 'inventory.view', { settings: await getBranchSettings(ctx, ctx.activeBranchId) });
+  await assertCanHere(ctx, 'inventory.view');
   const sku = await findSku(ctx, id);
   const image = findImage(sku, imageId);
   const fileId = size === 'thumb' ? image.thumbId : image.fileId;
@@ -157,7 +157,7 @@ export function codeFromFileName(fileName) {
 }
 
 export async function matchBulkFiles(ctx, fileNames) {
-  assertCan(ctx, 'inventory.editProducts', { settings: await getBranchSettings(ctx, ctx.activeBranchId) });
+  await assertCanHere(ctx, 'inventory.editProducts');
   const wanted = fileNames.map((name) => ({ fileName: name, code: codeFromFileName(name) }));
   // A file whose whole name is a code (e.g. a code that itself ends in -12) wins over the shortened guess
   const exactCodes = fileNames.map((name) => name.replace(/\.[a-z0-9]+$/i, '').trim().toUpperCase());

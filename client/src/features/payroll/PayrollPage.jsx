@@ -10,7 +10,7 @@ import MonthlyPayrollTab from './MonthlyPayrollTab';
 import StaffPayDrawer from './StaffPayDrawer';
 import { GROUPS } from './GroupSwitch';
 
-// Owners: "Payroll". Front desk: "Staff pay" (pay setup and requests only, see PAYROLL_PLAN.md)
+// Owners: "Payroll". Front desk: "Staff pay" (pay setup and requests only)
 export default function PayrollPage() {
   const { user, activeBranch } = useAuth();
   const isOwner = user.role === 'OWNER';

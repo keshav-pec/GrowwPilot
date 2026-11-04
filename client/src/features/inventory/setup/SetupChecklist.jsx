@@ -1,7 +1,7 @@
 import toast from 'react-hot-toast';
 import { CheckCircle2, Circle } from 'lucide-react';
 import { useMarkSetupStep } from '../../../api/inventory/setup';
-import { newRequestKey } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { Button, Card } from '../../../components/ui';
 
 // Stays on the Overview until the branch's setup is finished

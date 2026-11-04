@@ -1,17 +1,9 @@
-import * as staffService from './staff.service.js';
+import { crudController } from '../crud.controller.js';
+import { createStaff, listStaff, setStaffStatus, updateStaff } from './staff.service.js';
 
-export async function list(req, res) {
-  res.json({ staff: await staffService.listStaff(req.ctx) });
-}
+export const { list, create, update } = crudController({ one: 'staff', many: 'staff' }, { list: listStaff, create: createStaff, update: updateStaff });
 
-export async function create(req, res) {
-  res.status(201).json({ staff: await staffService.createStaff(req.ctx, req.valid.body) });
-}
-
-export async function update(req, res) {
-  res.json({ staff: await staffService.updateStaff(req.ctx, req.params.id, req.valid.body) });
-}
-
+// The status change can also carry "the owner has seen the future bookings and still wants to go ahead"
 export async function setStatus(req, res) {
-  res.json({ staff: await staffService.setStaffStatus(req.ctx, req.params.id, req.valid.body) });
+  res.json({ staff: await setStaffStatus(req.ctx, req.params.id, req.valid.body) });
 }

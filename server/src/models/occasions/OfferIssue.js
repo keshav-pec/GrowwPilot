@@ -10,8 +10,8 @@ const taskSchema = new mongoose.Schema(
     kind: { type: String, enum: TASK_KINDS, default: 'CONTACT' },
     dueAt: Date,
     assigneeId: ref('User', { default: null }),
-    attempts: { type: Number, default: 0 }, // calls with no answer (Phase 4)
-    outcome: { type: String, default: null }, // the last call outcome (Phase 4)
+    attempts: { type: Number, default: 0 }, // calls with no answer
+    outcome: { type: String, default: null }, // the last call outcome
     contactedAt: { type: Date, default: null }, // when the customer was first reached or messaged
     sentAt: { type: Date, default: null }, // the last offer message sent for this offer
     sentVia: { type: String, default: null }, // its channel (WHATSAPP, SMS, EMAIL), for the reports

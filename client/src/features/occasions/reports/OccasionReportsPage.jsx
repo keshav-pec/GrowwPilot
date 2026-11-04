@@ -6,17 +6,8 @@ import { ArrowLeft, Download } from 'lucide-react';
 import { useAuth } from '../../../auth/AuthContext';
 import { downloadOccasionReport, useOccasionReport } from '../../../api/occasions';
 import { formatMoney } from '../../../lib/money';
-import { CHANNEL_LABEL, MONTHS } from '../../../lib/occasions';
-import { Button, Card, EmptyState, Input, PageHeader, Select, Spinner, Table } from '../../../components/ui';
-
-// This month and the 12 before it
-function monthOptions(zone) {
-  const now = DateTime.now().setZone(zone);
-  return Array.from({ length: 13 }, (_, i) => {
-    const d = now.minus({ months: i });
-    return { value: d.toFormat('yyyy-MM'), label: `${MONTHS[d.month - 1]} ${d.year}` };
-  });
-}
+import { CHANNEL_LABEL, monthOptions } from '../../../lib/occasions';
+import { Button, Card, EmptyState, Input, PageHeader, PageSpinner, Select, StatTile, Table } from '../../../components/ui';
 
 // Reports → Occasion offers (owners; a branch owner sees their branches): offers issued, contacted, linked bookings
 // and used, the steps from eligible to used, discounts and associated sales, by branch and by staff, with CSV.
@@ -101,18 +92,16 @@ export default function OccasionReportsPage() {
       </Card>
 
       {reportQuery.isPending ? (
-        <div className="flex justify-center py-12">
-          <Spinner size={28} />
-        </div>
+        <PageSpinner />
       ) : reportQuery.isError ? (
         <EmptyState title="Couldn’t load the report" message={reportQuery.error.message} />
       ) : (
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Tile label="Offers issued" value={r.tiles.issued} />
-            <Tile label="Customers contacted" value={r.tiles.customersContacted} />
-            <Tile label="Offer-linked appointments" value={r.tiles.linkedBookings} />
-            <Tile label="Redeemed offers" value={r.tiles.used} />
+            <StatTile label="Offers issued" value={r.tiles.issued} />
+            <StatTile label="Customers contacted" value={r.tiles.customersContacted} />
+            <StatTile label="Offer-linked appointments" value={r.tiles.linkedBookings} />
+            <StatTile label="Redeemed offers" value={r.tiles.used} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -153,15 +142,6 @@ export default function OccasionReportsPage() {
         </div>
       )}
     </>
-  );
-}
-
-function Tile({ label, value }) {
-  return (
-    <div className="rounded-xl border border-border p-4">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="text-2xl font-bold text-brown">{value}</p>
-    </div>
   );
 }
 

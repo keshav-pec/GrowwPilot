@@ -5,7 +5,8 @@ import { Link } from 'react-router-dom';
 import { Images, LayoutGrid, List, Package, Plus, Printer, Search, Upload } from 'lucide-react';
 import { fetchSkus, useSkus, useUseSkuHere } from '../../../api/inventory/skus';
 import { useSuppliers } from '../../../api/inventory/suppliers';
-import { WAYS_OF_USE, WAY_OF_USE_LABEL, formatQty, newRequestKey } from '../../../lib/inventory';
+import { WAYS_OF_USE, WAY_OF_USE_LABEL, formatQty } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { formatAmount } from '../../../lib/money';
 import { useDebounce } from '../../../lib/useDebounce';
 import { Badge, Button, EmptyState, Pagination, Select, Table } from '../../../components/ui';
@@ -20,7 +21,7 @@ const STATUS_OPTIONS = [
   { value: 'all', label: 'Active and inactive' },
 ];
 
-// Products screen (INV-02): search by name, code or barcode. A barcode scanner types into the search box
+// Products screen: search by name, code or barcode. A barcode scanner types into the search box
 // and presses Enter, which opens the product straight away.
 export default function ProductsTab({ can, onOpenProduct }) {
   const queryClient = useQueryClient();

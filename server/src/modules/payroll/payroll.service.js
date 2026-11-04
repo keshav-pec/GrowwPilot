@@ -5,20 +5,19 @@ import { scoped } from '../../utils/scoped.js';
 import { todayInZone } from '../../utils/time.js';
 import { findPayStaff } from '../staff/staff.service.js';
 import { SERVICE_STAFF } from '../../config/constants.js';
-import { actorRole, logActivity } from '../activity/activity.service.js';
-import { branchApproverIds, businessOwnerIds, notify } from '../notifications/notifications.service.js';
+import { logActivity } from '../activity/activity.service.js';
+import { branchApproverIds, notify } from '../notifications/notifications.service.js';
 import { PAY_PARTS, checkNewStart, checkPayModelFor, cleanPayParts, currentAndUpcoming, dayBefore, describePay, formatDay, formatPercent, planStatus } from './payPlan.rules.js';
 import { monthCommission, monthTotals, syncCommissions } from './commission.service.js';
 import { markPayrollStale } from './payrollStale.js';
 
-// Who can do what (PAYROLL_PLAN.md):
+// Who can do what:
 // - business owner: every branch; branch owner: only their branches (findPayStaff checks the branch)
 // - front desk: sees stylists' pay setups at their branch and can only REQUEST a change; an owner approves it.
 //   Front desk members' own pay is for owners only.
 // - front desk members: monthly salary, per day or per hour only (no commission)
 // - every change goes in the activity log, and the business owner is notified of changes made by others
 
-const ACTIVITY_LINK = '/app/payroll?tab=activity';
 const REQUESTS_LINK = '/app/payroll?tab=requests';
 
 async function todayAt(branchId) {
@@ -36,11 +35,10 @@ function payValues(plan) {
 
 const startsOn = (plan) => `${describePay(plan)} from ${formatDay(plan.effectiveFrom)}`;
 
-// Log a change and tell the business owner(s) about it (unless they made it themselves)
+// Log a change; a draft month that it affects gets worked out again
 async function recordChange(ctx, { action, staff, summary, before, after }, session) {
   await logActivity(ctx, { action, branchId: staff.branchId, staffId: staff._id, summary, before, after }, session);
   await markPayrollStale(ctx.orgId, staff.branchId);
-  await notify(ctx, await businessOwnerIds(ctx), { message: `${ctx.userName} (${actorRole(ctx)}): ${summary}`, link: ACTIVITY_LINK }, session);
 }
 
 function latestPlan(ctx, staffId, session) {

@@ -82,9 +82,8 @@ describe('Salary payments', () => {
     expect(extra.overpaid).toBe(true);
     expect((await PayrollRun.findOne({ month: lastMonth }).lean()).paidTotal).toBe(2010000);
 
-    // Paying is logged, and a branch owner's payment is sent to the business owner's bell
+    // Paying is logged
     expect(await ActivityLog.countDocuments({ action: 'payroll.payment_recorded' })).toBe(3);
-    expect((await Notification.findOne({ userId: owner.userId }).sort({ createdAt: 1 }).lean()).message).toContain('Meera (Branch owner): Paid Rahul ₹5,000 by cash');
   });
 
   it('the same request twice records one payment', async () => {

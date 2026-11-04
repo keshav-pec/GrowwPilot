@@ -3,10 +3,11 @@ import { Branch, Customer, OfferEvent, OfferIssue, User } from '../../../models/
 import { AppError } from '../../../utils/AppError.js';
 import { scoped } from '../../../utils/scoped.js';
 import { escapeRegex } from '../../../utils/regex.js';
-import { CONSENT_CHANNELS, maskPhone } from '../../../config/occasions.js';
+import { CONSENT_CHANNELS } from '../../../config/occasions.js';
 import { assertCan } from '../permissions.js';
 import { describeOffer } from '../campaigns/campaign.rules.js';
 import { localMonth } from '../engine/window.js';
+import { maskPhone } from '../../../utils/mask.js';
 
 const { ObjectId } = mongoose.Types;
 
@@ -132,7 +133,7 @@ export async function listOffers(ctx, query) {
   return { year, month, offers: page.map((o) => toRow(o, names, branchNames)), nextCursor: offers.length > limit ? encodeCursor(page.at(-1)) : null };
 }
 
-// GET /api/occasions/offers/summary — the four tiles (and the Dashboard / Today widget)
+// GET /api/occasions/offers/summary — the four tiles (and the Today widget)
 export async function offerSummary(ctx, query) {
   assertListOpen(ctx);
   const { year, month } = await monthOf(ctx, query);

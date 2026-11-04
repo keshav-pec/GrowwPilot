@@ -5,8 +5,9 @@ import { useAuth } from '../../auth/AuthContext';
 import { useAdvances, useTakeAdvance } from '../../api/advances';
 import { formatMoney, isValidRupees, toPaise } from '../../lib/money';
 import { formatDate } from '../../lib/time';
-import { PAYMENT_METHODS, newRequestKey } from '../../lib/billing';
-import { Button, Card, Input, Modal, Select, Spinner } from '../../components/ui';
+import { PAYMENT_METHODS } from '../../lib/billing';
+import { newRequestKey } from '../../lib/requestKey';
+import { Button, Card, Input, Modal, ModalFooter, Select, Spinner } from '../../components/ui';
 
 // Money the customer paid ahead: what's left, each advance and the bills it paid, and "Take advance".
 // Advances can be used at checkout at any branch of the salon.
@@ -88,14 +89,9 @@ function TakeAdvanceModal({ customer, onClose }) {
       onClose={onClose}
       title={`Take an advance from ${customer.name}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={save} disabled={!valid} loading={take.isPending}>
+        <ModalFooter onClose={onClose} onClick={save} disabled={!valid} loading={take.isPending}>
             Take advance
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">

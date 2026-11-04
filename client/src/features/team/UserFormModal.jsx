@@ -33,7 +33,7 @@ export default function UserFormModal({ role, account, onClose, onCredentials })
   const setStatus = useSetUserStatus();
   const resetPassword = useResetPassword();
   const emailLink = useEmailPasswordLink();
-  const canEmail = Boolean(useAuthOptions().data?.passwordEmails); // email is set up on the server
+  const canEmail = Boolean(useAuthOptions().data?.passwordEmails); // email is on
 
   const {
     register,

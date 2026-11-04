@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import toast from 'react-hot-toast';
 import { ImagePlus, Star, Trash2 } from 'lucide-react';
 import { imageUrl, useAddImages, useRemoveImage, useSetMainImage } from '../../../api/inventory/images';
-import { newRequestKey } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { Badge, Button } from '../../../components/ui';
 
 const MAX = 4;

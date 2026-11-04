@@ -6,7 +6,7 @@ import { scoped } from '../../utils/scoped.js';
 import { formatAmount } from '../../utils/money.js';
 import { todayInZone } from '../../utils/time.js';
 import { findStaff } from '../staff/staff.service.js';
-import { recordPayrollAction } from './monthlyPayroll.service.js';
+import { logActivity } from '../activity/activity.service.js';
 import { markPayrollStale } from './payrollStale.js';
 import { advanceRepayment, monthName } from './monthlyPay.rules.js';
 
@@ -81,7 +81,7 @@ export async function recordPayment(ctx, itemId, input, idempotencyKey) {
       const left = owed - input.amount;
       const status = left <= 0 ? 'paid in full' : `${formatAmount(left)} still owed`;
       const summary = `Paid ${item.staffName} ${formatAmount(input.amount)} by ${METHOD_LABEL[input.method]} for ${monthName(item.month)} (${status}).${overpaid ? ` More than owed: ${input.note}` : ''}`;
-      await recordPayrollAction(ctx, { action: 'payroll.payment_recorded', branchId: item.branchId, staffId: item.staffId, summary, after: { month: item.month, amount: input.amount, method: input.method } }, session);
+      await logActivity(ctx, { action: 'payroll.payment_recorded', branchId: item.branchId, staffId: item.staffId, summary, after: { month: item.month, amount: input.amount, method: input.method } }, session);
       return payment;
     });
   } catch (err) {
@@ -105,7 +105,7 @@ export async function cancelPayment(ctx, paymentId, { reason }) {
     await PayrollRun.updateOne({ _id: payment.runId }, { $inc: { paidTotal: -payment.amount } }, { session });
 
     const summary = `Cancelled a payment of ${formatAmount(payment.amount)} to ${payment.staffName} for ${monthName(payment.month)} (paid ${DateTime.fromISO(payment.paidOn).toFormat('d LLL')}). Reason: ${reason}`;
-    await recordPayrollAction(ctx, { action: 'payroll.payment_cancelled', branchId: payment.branchId, staffId: payment.staffId, summary, before: { month: payment.month, amount: payment.amount } }, session);
+    await logActivity(ctx, { action: 'payroll.payment_cancelled', branchId: payment.branchId, staffId: payment.staffId, summary, before: { month: payment.month, amount: payment.amount } }, session);
     return cancelled;
   });
 }
@@ -163,7 +163,7 @@ export async function giveAdvance(ctx, staffId, input, idempotencyKey) {
         { session }
       );
       const summary = `Gave ${staff.name} an advance of ${formatAmount(input.amount)} by ${METHOD_LABEL[input.method]}, taken back ${formatAmount(input.monthlyRepayment)}/month from ${monthName(input.firstMonth)}. Reason: ${input.reason}`;
-      await recordPayrollAction(ctx, { action: 'advance.given', branchId: staff.branchId, staffId: staff._id, summary, after: { month: input.firstMonth, amount: input.amount, monthlyRepayment: input.monthlyRepayment } }, session);
+      await logActivity(ctx, { action: 'advance.given', branchId: staff.branchId, staffId: staff._id, summary, after: { month: input.firstMonth, amount: input.amount, monthlyRepayment: input.monthlyRepayment } }, session);
       return advance;
     });
     await markPayrollStale(ctx.orgId, staff.branchId);
@@ -190,7 +190,7 @@ export async function closeAdvance(ctx, advanceId, { fromMonth, reason }) {
     advance.closeReason = reason;
     await advance.save({ session });
     const summary = `Stopped repayments of ${staff.name}'s ${formatAmount(advance.amount)} advance from ${monthName(fromMonth)}. Reason: ${reason}`;
-    await recordPayrollAction(ctx, { action: 'advance.closed', branchId: advance.branchId, staffId: staff._id, summary, after: { month: fromMonth } }, session);
+    await logActivity(ctx, { action: 'advance.closed', branchId: advance.branchId, staffId: staff._id, summary, after: { month: fromMonth } }, session);
   });
   await markPayrollStale(ctx.orgId, advance.branchId);
 }

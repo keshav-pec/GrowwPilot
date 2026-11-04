@@ -1,4 +1,4 @@
-// Birthday & Anniversary Offers (OCCASION_OFFERS_PLAN.md): the fixed lists and small date rules.
+// Birthday & Anniversary Offers: the fixed lists and small date rules.
 
 export const OCCASION_TYPES = ['BIRTHDAY', 'ANNIVERSARY'];
 // Where a birthday or anniversary came from
@@ -28,13 +28,8 @@ export function describeOccasionDate(date) {
   return date.day ? `${date.day} ${month}` : `${month} (day not provided)`;
 }
 
-// "9876543210" -> "98******10"
-export function maskPhone(phone) {
-  const text = String(phone ?? '');
-  return text.length > 4 ? `${text.slice(0, 2)}${'*'.repeat(text.length - 4)}${text.slice(-2)}` : text;
-}
 
-// Campaigns (Phase 2)
+// Campaigns
 export const CAMPAIGN_SCOPES = ['BUSINESS_DEFAULT', 'BRANCH_ONLY']; // all branches, or one branch (overrides the salon-wide one)
 export const CAMPAIGN_STATUSES = ['DRAFT', 'PUBLISHED', 'DISABLED', 'ARCHIVED'];
 export const DISCOUNT_TYPES = ['PERCENT', 'FLAT'];
@@ -46,15 +41,15 @@ export const DELIVERY_LABELS = { STAFF_ASSISTED: 'staff sends offers', AUTO_EMAI
 export const AUTO_EMAIL_DEFAULTS = { dailyLimit: 30, sendFrom: '10:00', sendUntil: '19:00' };
 export const OCCASION_LABELS = { BIRTHDAY: 'Birthday', ANNIVERSARY: 'Anniversary' };
 
-// Offers given to customers (Phase 3)
+// Offers given to customers
 export const OFFER_STATUSES = ['ISSUED', 'REDEEMED', 'EXPIRED', 'REVOKED', 'SUPERSEDED'];
 export const TASK_STATES = ['OPEN', 'CONTACTED', 'CLOSED'];
 // CONTACT: get in touch about the offer. WITHDRAWN_NOTICE: tell a contacted customer the offer was withdrawn.
 export const TASK_KINDS = ['CONTACT', 'WITHDRAWN_NOTICE'];
 export const OFFER_EVENT_KINDS = ['ISSUED', 'ASSIGNED', 'CONTACT', 'SENT', 'BOOKED', 'REDEEMED', 'RESTORED', 'EXPIRED', 'REVOKED', 'SUPERSEDED', 'MOVED', 'EMAIL_SENT', 'EMAIL_FAILED'];
-// An offer email sent by the app (EMAIL_PLAN.md Part 2): waiting in the outbox, delivered to Gmail, or not sent
+// An offer email sent by the app: waiting in the outbox, delivered to Gmail, or not sent
 export const EMAIL_SEND_STATUSES = ['QUEUED', 'SENT', 'FAILED'];
 
-// Staff follow-up (Phase 4)
+// Staff follow-up
 export const CALL_OUTCOMES = ['REACHED', 'NO_ANSWER', 'NOT_INTERESTED', 'CALL_LATER', 'WRONG_DETAILS'];
 export const PROMO_GAP_DAYS = 7; // at most one promotional message per customer per 7 days

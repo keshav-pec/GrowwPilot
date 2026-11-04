@@ -2,8 +2,8 @@ import { useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { CheckCircle2, Upload, XCircle } from 'lucide-react';
 import { matchBulkFiles, useAddImages } from '../../../api/inventory/images';
-import { newRequestKey } from '../../../lib/inventory';
-import { Button, Modal } from '../../../components/ui';
+import { newRequestKey } from '../../../lib/requestKey';
+import { Button, Modal, ModalFooter } from '../../../components/ui';
 
 const TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -67,14 +67,9 @@ export default function BulkPhotosModal({ onClose }) {
       title="Upload photos in bulk"
       footer={
         matches && (
-          <>
-            <Button variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={uploadAll} loading={Boolean(progress)} disabled={ready.length === 0}>
+          <ModalFooter onClose={onClose} onClick={uploadAll} loading={Boolean(progress)} disabled={ready.length === 0}>
               {progress ? `Uploading ${progress.done} of ${progress.total}` : `Upload ${ready.length} photo${ready.length === 1 ? '' : 's'}`}
-            </Button>
-          </>
+            </ModalFooter>
         )
       }
     >

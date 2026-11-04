@@ -1,4 +1,7 @@
 import Papa from 'papaparse';
+import { DateTime } from 'luxon';
+import { readCsvFile } from './csv';
+import { toPaise } from './money';
 
 // Birthday & Anniversary Offers: months, channels and permission words shared by the screens.
 // The server checks everything again; these only help the forms.
@@ -8,6 +11,15 @@ export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', '
 export const MAX_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 export const MONTH_OPTIONS = MONTHS.map((label, i) => ({ value: String(i + 1), label }));
+
+// This month and the 12 before it, e.g. { value: '2026-11', label: 'November 2026' }. valueOf: how the value is written.
+export function monthOptions(zone, valueOf = (d) => d.toFormat('yyyy-MM')) {
+  const now = DateTime.now().setZone(zone);
+  return Array.from({ length: 13 }, (_, i) => {
+    const d = now.minus({ months: i });
+    return { value: valueOf(d), label: `${MONTHS[d.month - 1]} ${d.year}` };
+  });
+}
 export const dayOptions = (month) => (month ? Array.from({ length: MAX_DAYS[month - 1] }, (_, i) => ({ value: String(i + 1), label: String(i + 1) })) : []);
 
 // { month: 11, day: null } -> "November (day not provided)"; { month: 2, day: 29 } -> "29 February"
@@ -45,19 +57,10 @@ export const IMPORT_COLUMNS = ['customer_id', 'name', 'phone', 'birthday_month',
 
 // Resolves to { rows } or { problem: 'what is wrong with the file' }
 export function readDatesFile(file) {
-  return new Promise((resolve) => {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: 'greedy',
-      transformHeader: (h) => h.replace(/^﻿/, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_'),
-      complete: ({ data, meta }) => {
-        if (!meta.fields?.includes('customer_id')) return resolve({ problem: 'The file has no customer_id column. Start from the downloaded template.' });
-        if (data.length === 0) return resolve({ problem: 'The file has no rows.' });
-        if (data.length > MAX_IMPORT_ROWS) return resolve({ problem: `The file has ${data.length} rows. Import at most ${MAX_IMPORT_ROWS} at a time.` });
-        resolve({ rows: data.map((r) => Object.fromEntries(IMPORT_COLUMNS.map((c) => [c, String(r[c] ?? '').trim()]))) });
-      },
-      error: () => resolve({ problem: 'This file could not be read. Save it as CSV and try again.' }),
-    });
+  return readCsvFile(file, {
+    columns: IMPORT_COLUMNS,
+    maxRows: MAX_IMPORT_ROWS,
+    checkColumns: (fields) => (fields.includes('customer_id') ? null : 'The file has no customer_id column. Start from the downloaded template.'),
   });
 }
 
@@ -98,7 +101,6 @@ export function toRulesForm(rules, allServiceIds = []) {
 }
 
 const amount = (text) => /^\d+(\.\d{1,2})?$/.test(String(text).trim());
-const toPaise = (text) => Math.round(Number(text) * 100);
 
 export function fromRulesForm(form) {
   const percent = form.discountType === 'PERCENT';

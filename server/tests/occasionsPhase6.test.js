@@ -1,7 +1,6 @@
 // Birthday & Anniversary Offers, Phase 6: reports with CSV, the discounts report, the full role table (PRD section 3)
 // and salon walls. PRD AT-32 (isolation), AT-35 (the report after a refund matches billing).
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
 import { ActivityLog, Appointment, Customer, Invoice, OfferIssue, Organization, User } from '../src/models/index.js';
 import { hashPassword } from '../src/utils/password.js';

@@ -2,10 +2,10 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Truck } from 'lucide-react';
 import { useSaveSupplier, useSuppliers } from '../../../api/inventory/suppliers';
-import { newRequestKey } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { Badge, Button, EmptyState, Input, Modal, Table, Textarea } from '../../../components/ui';
 
-// Suppliers (INV-10): who the salon buys from. Prices are on the orders, so nothing here is a cost.
+// Suppliers: who the salon buys from. Prices are on the orders, so nothing here is a cost.
 export default function SuppliersList({ canManage }) {
   const suppliersQuery = useSuppliers({ includeInactive: true });
   const [editing, setEditing] = useState(null); // 'new' | supplier

@@ -4,9 +4,10 @@ import toast from 'react-hot-toast';
 import { CheckCircle2, Clock, Minus, Pencil, Plus, ShieldAlert, ShoppingBag, Trash2 } from 'lucide-react';
 import { useAddProduct, useApproveDiscount, useDiscardDraft, useIssueInvoice, useQuote, useRejectDiscount, useRemoveLine, useRequestApproval, useSaveDraft } from '../../api/invoices';
 import { formatMoney, isValidRupees, toPaise } from '../../lib/money';
-import { newRequestKey, percentLabel } from '../../lib/billing';
+import { percentLabel } from '../../lib/billing';
+import { newRequestKey } from '../../lib/requestKey';
 import { useDebounce } from '../../lib/useDebounce';
-import { Button, Card, Input, Modal, Spinner, Textarea } from '../../components/ui';
+import { Button, Card, Input, Modal, ModalFooter, Spinner, SummaryRow, Textarea } from '../../components/ui';
 import DiscountInput, { discountText, parseDiscount } from '../billing/DiscountInput';
 import PaymentRows, { emptyPayment, paidTotal, paymentsPayload, rowsInvalid } from '../billing/PaymentRows';
 import ProductPickerModal from '../billing/ProductPickerModal';
@@ -243,10 +244,10 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
         </ul>
 
         <dl className="mt-3 flex flex-col gap-2 border-t border-border pt-3 text-sm">
-          <Row label="Subtotal" value={formatMoney(shown.subtotal)} />
-          {shown.comboDiscountTotal > 0 && <Row label="Combo price" value={`−${formatMoney(shown.comboDiscountTotal)}`} muted />}
-          {shown.occasionDiscountTotal > 0 && <Row label={offerLabel} value={`−${formatMoney(shown.occasionDiscountTotal)}`} muted />}
-          {lineDiscounts > 0 && <Row label="Line discounts" value={`−${formatMoney(lineDiscounts)}`} muted />}
+          <SummaryRow label="Subtotal" value={formatMoney(shown.subtotal)} />
+          {shown.comboDiscountTotal > 0 && <SummaryRow label="Combo price" value={`−${formatMoney(shown.comboDiscountTotal)}`} muted />}
+          {shown.occasionDiscountTotal > 0 && <SummaryRow label={offerLabel} value={`−${formatMoney(shown.occasionDiscountTotal)}`} muted />}
+          {lineDiscounts > 0 && <SummaryRow label="Line discounts" value={`−${formatMoney(lineDiscounts)}`} muted />}
           {offerOn ? (
             <p className="text-xs text-muted">Other discounts are off while the occasion offer is on this bill.</p>
           ) : (
@@ -260,11 +261,11 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
           )}
           {shown.gstRegistered && (
             <>
-              <Row label="Taxable value" value={formatMoney(shown.taxableTotal)} muted />
+              <SummaryRow label="Taxable value" value={formatMoney(shown.taxableTotal)} muted />
               {shown.taxSummary.map((t) => (
                 <div key={t.rateBps}>
-                  <Row label={`CGST ${percentLabel(t.rateBps / 2)}`} value={formatMoney(t.cgst)} muted />
-                  <Row label={`SGST ${percentLabel(t.rateBps / 2)}`} value={formatMoney(t.sgst)} muted />
+                  <SummaryRow label={`CGST ${percentLabel(t.rateBps / 2)}`} value={formatMoney(t.cgst)} muted />
+                  <SummaryRow label={`SGST ${percentLabel(t.rateBps / 2)}`} value={formatMoney(t.sgst)} muted />
                 </div>
               ))}
             </>
@@ -391,15 +392,6 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
   );
 }
 
-function Row({ label, value, muted = false }) {
-  return (
-    <div className={`flex justify-between ${muted ? 'text-muted' : ''}`}>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
-  );
-}
-
 // The front desk discount limit, and asking an owner to approve a bigger discount
 function ApprovalBox({ limits, approval, permissions, note, onNote, busy, onRequest, onApprove, onReject, canRequest }) {
   if (approval.status === 'PENDING') {
@@ -468,14 +460,9 @@ function PriceModal({ line, current, onClose, onSave }) {
       onClose={onClose}
       title={`Price of ${line.name}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button disabled={!valid || (!backToList && reason.trim().length < 2)} onClick={() => onSave(toPaise(price), backToList ? '' : reason.trim())}>
+        <ModalFooter onClose={onClose} disabled={!valid || (!backToList && reason.trim().length < 2)} onClick={() => onSave(toPaise(price), backToList ? '' : reason.trim())}>
             Use this price
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="flex flex-col gap-4">
@@ -494,14 +481,9 @@ function RejectModal({ loading, onClose, onReject }) {
       onClose={onClose}
       title="Turn down the discount"
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="danger" disabled={reason.trim().length < 2} loading={loading} onClick={() => onReject(reason.trim())}>
+        <ModalFooter onClose={onClose} variant="danger" disabled={reason.trim().length < 2} loading={loading} onClick={() => onReject(reason.trim())}>
             Turn down
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <Textarea label="Reason (the front desk sees this)" value={reason} onChange={(e) => setReason(e.target.value)} />

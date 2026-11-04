@@ -83,7 +83,7 @@ export function answerQuestion(question, who) {
       topicId: entry.id,
       topic: entry.title,
       answer: isOwner
-        ? 'Inventory is a paid add-on and isn’t switched on for your salon yet. Use the **Need help?** link to ask GrowwPilot support about it.'
+        ? 'Inventory is a paid add-on and isn’t switched on for your salon. Use the **Need help?** link to ask GrowwPilot support about it.'
         : 'Inventory isn’t switched on for your salon. Please ask your salon owner.',
       link: null,
       suggestions: [],

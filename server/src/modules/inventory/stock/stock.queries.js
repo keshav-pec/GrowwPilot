@@ -20,6 +20,6 @@ export async function branchStock(ctx, branchId, skuIds, session = null) {
   return stock;
 }
 
-// Available to issue = in store minus anything blocked (nothing can be blocked yet).
+// Available to issue = what is in the store.
 // Low stock and reorder suggestions use this, never the total that includes stock in use.
 export const availableToIssue = ({ inStore }) => inStore;

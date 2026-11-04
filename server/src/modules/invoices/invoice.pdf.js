@@ -3,37 +3,17 @@
 // the tax table, totals, payments and refunds.
 import PDFDocument from 'pdfkit';
 import { DateTime } from 'luxon';
-import { formatMoney } from '../../utils/money.js';
+import { BROWN, MUTED, pdfMoney as money, pdfRow } from '../../utils/pdf.js';
+import { maskPhone } from '../../utils/mask.js';
 
-const BROWN = '#6B4226';
-const MUTED = '#6B6B6B';
-const LINE = '#E5E5E0';
 const METHOD = { CASH: 'Cash', UPI: 'UPI', CARD: 'Card', OTHER: 'Other', ADVANCE: 'From advance' };
 
-// The built-in PDF fonts have no ₹ sign, so the PDF writes "Rs." instead
-const money = (paise) => formatMoney(paise).replace('₹', 'Rs. ');
 const percent = (bps) => `${bps / 100}%`;
-
-// "9876543210" -> "98XXXXXX10" (a shared link can be forwarded, so the full number is not printed)
-export const maskPhone = (phone) => (phone && phone.length > 4 ? `${phone.slice(0, 2)}${'X'.repeat(phone.length - 4)}${phone.slice(-2)}` : phone);
 
 // "AND/26-27/00001" -> "Bill_AND-26-27-00001.pdf"
 export const invoicePdfName = (invoice) => `Bill_${(invoice.invoiceNumber ?? 'draft').replace(/[^a-z0-9]+/gi, '-')}.pdf`;
 
-function row(doc, columns, cells, { bold = false, color = 'black' } = {}) {
-  if (doc.y > doc.page.height - doc.page.margins.bottom - 24) doc.addPage();
-  const y = doc.y;
-  let x = doc.page.margins.left;
-  doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(9).fillColor(color);
-  let height = 18;
-  cells.forEach((cell, i) => {
-    doc.text(String(cell ?? ''), x + 4, y + 4, { width: columns[i].width - 8, align: columns[i].align ?? 'left' });
-    height = Math.max(height, doc.y - y + 4);
-    x += columns[i].width;
-  });
-  doc.moveTo(doc.page.margins.left, y + height).lineTo(x, y + height).strokeColor(LINE).lineWidth(0.5).stroke();
-  doc.y = y + height;
-}
+const row = (doc, columns, cells, options = {}) => pdfRow(doc, columns, cells, { ...options, wrap: true });
 
 // A label and an amount on the right-hand side (the totals block)
 function total(doc, label, value, { bold = false, color = 'black' } = {}) {
@@ -76,7 +56,7 @@ export function writeInvoicePdf(stream, invoice, { maskPhone: mask = false } = {
   const customer = invoice.customerSnapshot ?? {};
   doc.font('Helvetica').fontSize(8).fillColor(MUTED).text('Billed to', left);
   doc.font('Helvetica-Bold').fontSize(10).fillColor('black').text(customer.name ?? 'Guest');
-  if (customer.phone) doc.font('Helvetica').fontSize(9).fillColor(MUTED).text(mask ? maskPhone(customer.phone) : customer.phone);
+  if (customer.phone) doc.font('Helvetica').fontSize(9).fillColor(MUTED).text(mask ? maskPhone(customer.phone, 'X') : customer.phone);
   doc.moveDown(1);
 
   // ----- Lines -----

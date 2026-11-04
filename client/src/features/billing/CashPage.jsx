@@ -2,13 +2,12 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
 import { useAddPettyCash, useAdjustCashDay, useCashDay, useCloseCashDay, useOpenCashDay } from '../../api/cash';
-import { formatMoney, isValidRupees, toPaise } from '../../lib/money';
+import { formatMoney, paiseOf } from '../../lib/money';
 import { formatDateTime, formatDay } from '../../lib/time';
-import { newRequestKey } from '../../lib/billing';
-import { Badge, Button, Card, EmptyState, Input, Modal, PageHeader, Select, Spinner, Table, Textarea } from '../../components/ui';
+import { newRequestKey } from '../../lib/requestKey';
+import { Badge, Button, Card, EmptyState, Input, Modal, ModalFooter, PageHeader, PageSpinner, Select, Table, Textarea } from '../../components/ui';
 
-// Rupees typed in a box -> paise, or null if it isn't an amount
-const paiseOf = (text) => (isValidRupees(text) ? toPaise(text) : null);
+const paiseOrNull = (text) => paiseOf(text, null);
 const signed = (paise) => `${paise < 0 ? '−' : paise > 0 ? '+' : ''}${formatMoney(Math.abs(paise))}`;
 
 // The daily cash drawer at the selected branch: open with a float, petty cash, count and close.
@@ -18,11 +17,7 @@ export default function CashPage() {
   const [adjusting, setAdjusting] = useState(null); // a closed day
 
   if (cashQuery.isPending) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner size={28} />
-      </div>
-    );
+    return <PageSpinner />;
   }
   if (cashQuery.isError) return <EmptyState title="Couldn’t load the cash drawer" message={cashQuery.error.message} />;
   const { branch, today, session, suggestedFloat, cashSoFar, recent, permissions } = cashQuery.data;
@@ -67,7 +62,7 @@ function OpenDay({ suggestedFloat, cashSoFar }) {
   const [float, setFloat] = useState(String(suggestedFloat / 100));
   const [key] = useState(newRequestKey);
   const open = useOpenCashDay();
-  const amount = paiseOf(float);
+  const amount = paiseOrNull(float);
   return (
     <Card title="Open today’s cash day">
       <p className="mb-3 text-sm text-muted">Count the cash in the drawer before the first customer and enter it as the float.{cashSoFar > 0 && ` ${formatMoney(cashSoFar)} in cash has already been taken today; it will be counted.`}</p>
@@ -133,8 +128,8 @@ function OpenSession({ session, today, canClose }) {
   const addPetty = useAddPettyCash();
   const close = useCloseCashDay();
 
-  const pettyAmount = paiseOf(petty.amount);
-  const countedAmount = paiseOf(counted);
+  const pettyAmount = paiseOrNull(petty.amount);
+  const countedAmount = paiseOrNull(counted);
   const difference = countedAmount === null ? null : countedAmount - session.expectedCash;
 
   return (
@@ -260,18 +255,14 @@ function AdjustModal({ day, onClose }) {
   const [reason, setReason] = useState('');
   const [key] = useState(newRequestKey);
   const adjust = useAdjustCashDay();
-  const value = paiseOf(amount);
+  const value = paiseOrNull(amount);
   return (
     <Modal
       open
       onClose={onClose}
       title={`Adjust the cash day of ${formatDay(day.day)}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
+        <ModalFooter onClose={onClose}
             disabled={!value || reason.trim().length < 3}
             loading={adjust.isPending}
             onClick={() =>
@@ -288,8 +279,7 @@ function AdjustModal({ day, onClose }) {
             }
           >
             Add adjustment
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <p className="mb-3 text-sm text-muted">A closed day is never changed. The adjustment is added next to it, with your reason.</p>

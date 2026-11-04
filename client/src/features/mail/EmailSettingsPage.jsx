@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { CircleAlert, CircleCheck, Mail } from 'lucide-react';
 import { useMailStatus, useSendTestEmail, useTestEmail } from '../../api/mail';
-import { newRequestKey } from '../../lib/billing';
+import { newRequestKey } from '../../lib/requestKey';
 import { formatDateTime } from '../../lib/time';
-import { Badge, Button, Card, EmptyState, PageHeader, Spinner } from '../../components/ui';
+import { Badge, Button, Card, EmptyState, PageHeader, PageSpinner, StatTile } from '../../components/ui';
 import RecentEmailsCard from './RecentEmailsCard';
 
-const ROUTE_LABELS = { APPS_SCRIPT: 'Google Apps Script', SMTP: 'Gmail SMTP (backup)', LOG: 'not sent: email isn’t set up, so it was printed in the server log' };
+const Stat = ({ danger, ...props }) => <StatTile {...props} tone={danger ? 'text-danger' : 'text-ink'} valueClass="text-lg font-semibold" className="rounded-lg border border-border bg-surface px-3 py-2" />;
 
-// Email (owners): is email set up, how much of today's limit is used, a test email (business owner), and the
+const ROUTE_LABELS = { APPS_SCRIPT: 'Google Apps Script', SMTP: 'Gmail SMTP (backup)', LOG: 'not sent: printed in the server log' };
+
+// Email (owners): is email on, how much of today's limit is used, a test email (business owner), and the
 // recent emails (branch owners: only this, for their branches)
 export default function EmailSettingsPage() {
   const statusQuery = useMailStatus();
@@ -21,11 +23,7 @@ export default function EmailSettingsPage() {
     );
   }
   if (statusQuery.isPending) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner size={28} />
-      </div>
-    );
+    return <PageSpinner />;
   }
   if (statusQuery.isError) return <EmptyState icon={Mail} title="Couldn’t load email settings" message={statusQuery.error.message} />;
 
@@ -51,7 +49,7 @@ function StatusCard({ status }) {
           <>
             <p>
               Sends through <strong>{routes.appsScript ? 'Google Apps Script' : 'Gmail SMTP'}</strong>
-              {routes.appsScript && (routes.smtp ? ', with Gmail SMTP as a backup.' : '. No backup is set up.')}
+              {routes.appsScript && routes.smtp ? ', with Gmail SMTP as a backup.' : '.'}
             </p>
             {script && (
               <p className={`flex items-center gap-1.5 ${script.reachable ? 'text-ink' : 'text-danger'}`}>
@@ -62,10 +60,7 @@ function StatusCard({ status }) {
           </>
         ) : (
           <p className="text-muted">
-            {mode === 'log'
-              ? 'Test mode: emails are printed in the server’s log instead of being sent. '
-              : 'The app can’t send emails yet. Until it can, staff send offer emails from their own phone or computer. '}
-            Whoever runs the server can set it up with “Setting up email” in the README.
+            {mode === 'log' ? 'Test mode: emails are printed in the server’s log instead of being sent.' : 'Email is off. Staff send offer emails from their own phone or computer.'}
           </p>
         )}
 
@@ -89,19 +84,9 @@ function StatusCard({ status }) {
 }
 
 function StatusBadge({ mode }) {
-  if (mode === 'live') return <Badge tone="gold">Set up</Badge>;
-  if (mode === 'log') return <Badge tone="yellow">Not set up (test mode)</Badge>;
-  return <Badge tone="danger">Not set up</Badge>;
-}
-
-function Stat({ label, value, hint, danger = false }) {
-  return (
-    <div className="rounded-lg border border-border bg-surface px-3 py-2">
-      <p className="text-xs text-muted">{label}</p>
-      <p className={`text-lg font-semibold ${danger ? 'text-danger' : 'text-ink'}`}>{value}</p>
-      {hint && <p className="text-xs text-muted">{hint}</p>}
-    </div>
-  );
+  if (mode === 'live') return <Badge tone="gold">On</Badge>;
+  if (mode === 'log') return <Badge tone="yellow">Test mode</Badge>;
+  return <Badge tone="danger">Off</Badge>;
 }
 
 function TestEmailCard({ to }) {

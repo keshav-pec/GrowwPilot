@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { DateTime } from 'luxon';
 import toast from 'react-hot-toast';
 import { useDecideRequest, useDismissReport, useRequests } from '../../../api/inventory/requests';
-import { REASON_LABEL, formatQty, newRequestKey } from '../../../lib/inventory';
+import { REASON_LABEL, formatQty } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { formatAmount } from '../../../lib/money';
-import { Badge, Button, Card, Input, Modal } from '../../../components/ui';
+import { Badge, Button, Card } from '../../../components/ui';
+import ReasonModal from '../../../components/ReasonModal';
 import WriteOffModal from '../actions/WriteOffModal';
 
 const STATUS = { PENDING: ['Waiting', 'gold'], RESOLVED: ['Dealt with', 'brown'], DISMISSED: ['Closed', 'neutral'] };
@@ -86,40 +88,28 @@ export default function RequestsCard({ handlesRequests }) {
 function DismissModal({ report, onClose }) {
   const dismiss = useDismissReport();
   const [key] = useState(newRequestKey);
-  const [note, setNote] = useState('');
-
   return (
-    <Modal
-      open
-      onClose={onClose}
+    <ReasonModal
+      singleLine
+      danger={false}
       title={`Close ${report.requestedBy.name}’s report`}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            loading={dismiss.isPending}
-            disabled={note.trim().length < 3}
-            onClick={() =>
-              dismiss.mutate(
-                { key, id: report._id, note },
-                {
-                  onSuccess: () => {
-                    toast.success('Closed');
-                    onClose();
-                  },
-                }
-              )
-            }
-          >
-            Close report
-          </Button>
-        </>
+      label="Why (they’ll see this)"
+      placeholder="e.g. Found it in the back room"
+      confirmLabel="Close report"
+      loading={dismiss.isPending}
+      error={dismiss.error?.message}
+      onClose={onClose}
+      onConfirm={(note) =>
+        dismiss.mutate(
+          { key, id: report._id, note },
+          {
+            onSuccess: () => {
+              toast.success('Closed');
+              onClose();
+            },
+          }
+        )
       }
-    >
-      <Input id="dismiss-note" label="Why (they’ll see this)" autoFocus placeholder="e.g. Found it in the back room" value={note} onChange={(e) => setNote(e.target.value)} />
-      {dismiss.isError && <p className="mt-2 text-sm text-danger">{dismiss.error.message}</p>}
-    </Modal>
+    />
   );
 }

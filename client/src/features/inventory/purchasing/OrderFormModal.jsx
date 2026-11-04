@@ -2,9 +2,9 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useSaveOrder } from '../../../api/inventory/purchasing';
 import { useSuppliers } from '../../../api/inventory/suppliers';
-import { newRequestKey } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { toPaise } from '../../../lib/money';
-import { Button, Input, Modal, Select } from '../../../components/ui';
+import { Input, Modal, ModalFooter, Select } from '../../../components/ui';
 import LinesEditor, { linesValid } from './LinesEditor';
 
 // New purchase order (saved as a draft), or changes to a draft. Only owners see and type prices.
@@ -42,14 +42,9 @@ export default function OrderFormModal({ order, canSeeCosts, onClose, onSaved })
       size="wide"
       title={order ? `Edit ${order.number}` : 'New purchase order'}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={save} loading={saveOrder.isPending} disabled={!supplierId || !linesValid(lines)}>
+        <ModalFooter onClose={onClose} onClick={save} loading={saveOrder.isPending} disabled={!supplierId || !linesValid(lines)}>
             Save draft
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="flex flex-col gap-4">

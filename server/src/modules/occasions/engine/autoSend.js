@@ -4,12 +4,12 @@ import { Customer, EmailOutbox, OccasionCampaign, OfferIssue, Organization } fro
 import { AUTO_EMAIL_DEFAULTS, PROMO_GAP_DAYS } from '../../../config/occasions.js';
 import { mailMode, mailSettings } from '../../mail/config.js';
 import { kickMailer, queueEmail, sentLast24h } from '../../mail/outbox.js';
-import { buildOfferEmail } from '../outreach/emailOffer.js';
+import { buildOfferEmail, offerEmailFields } from '../outreach/emailOffer.js';
 import { checkSend } from '../outreach/gate.js';
 import { birthdayFirst } from '../outreach/followup.service.js';
 import { addOfferEvents } from './events.js';
 
-// Automatic offer emails (EMAIL_PLAN.md Part 3), run in the offer engine's tick for one branch (under its lock).
+// Automatic offer emails, run in the offer engine's tick for one branch (under its lock).
 // For campaigns set to "Send automatically by email":
 //   - offers given this month, not messaged yet, task still open, whose customer allows email
 //   - only inside the salon's send hours, in the branch's time zone
@@ -21,7 +21,7 @@ import { addOfferEvents } from './events.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const GAP_MS = PROMO_GAP_DAYS * DAY_MS;
-export const AUTO_PRIORITY = 5; // after password, test, bill and staff-sent emails
+const AUTO_PRIORITY = 5; // after password, test, bill and staff-sent emails
 
 // "10:00" <= branch time < "19:00"
 export function insideSendHours(now, zone, { sendFrom, sendUntil }) {
@@ -112,18 +112,9 @@ async function sendOne(ctx, { offer, org, campaign, branch, settings, now }) {
       const row = await queueEmail(
         ctx,
         {
-          kind: 'OCCASION_OFFER',
+          ...offerEmailFields({ offer, customer, org, email }),
           priority: AUTO_PRIORITY,
           dedupeKey: `offer:${offer._id}:auto`, // one automatic email per offer, ever
-          branchId: offer.homeBranchId,
-          to: customer.email,
-          subject: email.subject,
-          text: email.text,
-          html: email.html,
-          headers: email.headers,
-          fromName: org.name,
-          replyTo: org.contactEmail,
-          ref: { offerId: offer._id },
         },
         session
       );

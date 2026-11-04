@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from './client';
 
-// No login needed: can "Forgot password?" work here (email set up), and the password rule
+// No login needed: can "Forgot password?" work here (email is on), and the password rule
 export function useAuthOptions() {
   return useQuery({ queryKey: ['auth-options'], queryFn: () => api.get('/auth/options').then((res) => res.data), staleTime: 5 * 60_000 });
 }

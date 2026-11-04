@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { ref } from './fields.js';
 
-export const PASSWORD_TOKEN_PURPOSES = ['RESET', 'INVITE']; // RESET: "Forgot password?" (1 hour); INVITE: set-password link from an owner (48 hours)
+const PASSWORD_TOKEN_PURPOSES = ['RESET', 'INVITE']; // RESET: "Forgot password?" (1 hour); INVITE: set-password link from an owner (48 hours)
 
 // A one-time link to choose a password. Only a hash of the token is kept, so someone reading the database
 // can't use it. A new link cancels the person's older ones. Rows are removed a week after they expire.

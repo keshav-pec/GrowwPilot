@@ -17,3 +17,5 @@ export function requirePrimaryOwner(req, res, next) {
   }
   next();
 }
+
+export const primaryOwnerOnly = [requireRole('OWNER'), requirePrimaryOwner];

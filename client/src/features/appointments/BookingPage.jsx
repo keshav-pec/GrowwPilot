@@ -4,7 +4,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useAppointment } from '../../api/appointments';
 import { useCustomerProfile } from '../../api/customers';
 import { todayIn } from '../../lib/time';
-import { EmptyState, PageHeader, Spinner } from '../../components/ui';
+import { EmptyState, PageHeader, PageSpinner } from '../../components/ui';
 import BookingForm from './BookingForm';
 
 // Turns a saved appointment back into the booking form's starting values
@@ -39,11 +39,7 @@ export default function BookingPage() {
 
   if (id) {
     if (appointmentQuery.isPending) {
-      return (
-        <div className="flex justify-center py-12">
-          <Spinner size={28} />
-        </div>
-      );
+      return <PageSpinner />;
     }
     if (appointmentQuery.isError || appointmentQuery.data.status !== 'BOOKED') {
       return (
@@ -57,11 +53,7 @@ export default function BookingPage() {
   }
 
   if (!id && customerId && customerQuery.isPending) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner size={28} />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   const initial = id

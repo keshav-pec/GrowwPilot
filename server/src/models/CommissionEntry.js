@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { appendOnly, ref, money } from './fields.js';
+import { appendOnly, ref } from './fields.js';
 
 // One line of commission: one service on one paid bill, for the stylist who did it.
 // It keeps the rate and where it came from, so later rate changes never change past earnings.

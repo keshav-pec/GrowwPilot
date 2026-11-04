@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAssignOffer, useAssignees } from '../../../api/occasions';
-import { newRequestKey } from '../../../lib/billing';
+import { newRequestKey } from '../../../lib/requestKey';
 import { Select } from '../../../components/ui';
 
 // Assign the follow-up to a front desk person of the customer's branch, or an owner. The history is kept.

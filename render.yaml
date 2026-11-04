@@ -20,8 +20,6 @@ services:
         sync: false
       - key: TRUST_PROXY # requests arrive through Vercel, then Render's own proxy
         value: 2
-      - key: IMAGE_STORAGE # where product photos are kept: MongoDB GridFS (stored in Atlas)
-        value: gridfs
       # Email (optional, see "Setting up email" in the README). Apps Script is the main route.
       - key: MAIL_SCRIPT # the Apps Script /exec link
         sync: false

@@ -13,7 +13,8 @@ import { addPettyCash, adjustCashDay, closeCashDay, currentCashDay, openCashDay 
 import { customerMoney, duesOverview, runReport } from '../src/modules/billing/reports.service.js';
 import { updateSettings } from '../src/modules/billing/settings.service.js';
 import { getDashboard } from '../src/modules/dashboard/dashboard.service.js';
-import { maskPhone, writeInvoicePdf } from '../src/modules/invoices/invoice.pdf.js';
+import { writeInvoicePdf } from '../src/modules/invoices/invoice.pdf.js';
+import { maskPhone } from '../src/utils/mask.js';
 import { toCsv } from '../src/utils/csv.js';
 import { gstinCheckChar } from '../src/config/billing.js';
 import { todayInZone } from '../src/utils/time.js';
@@ -74,7 +75,6 @@ describe('Daily cash closing', () => {
     await expect(closeCashDay(desk, day._id, { countedCash: 184000 }, key())).rejects.toMatchObject({ code: 'REASON_REQUIRED', message: 'The drawer is ₹10.00 short. Add a note saying why.' });
     const closed = await closeCashDay(desk, day._id, { countedCash: 184000, note: 'Gave ₹10 change twice' }, key());
     expect(closed).toMatchObject({ status: 'CLOSED', expectedCash: 185000, countedCash: 184000, difference: -1000, closedByName: 'Kavya' });
-    expect(await Notification.countDocuments({ userId: owner.userId })).toBeGreaterThan(0);
 
     await expect(addPettyCash(desk, day._id, { kind: 'PETTY_OUT', amount: 100, reason: 'Late tea' }, key())).rejects.toMatchObject({ code: 'CASH_DAY_CLOSED' });
     await expect(adjustCashDay(desk, day._id, { amount: 1000, reason: 'Found it' }, key())).rejects.toMatchObject({ status: 403 });
@@ -205,7 +205,7 @@ describe('Bill PDF, share link and history', () => {
     expect(days).toBe(30);
     expect((await sharedInvoice(token)).invoiceNumber).toBe(bill.invoiceNumber);
     await expect(sharedInvoice(`${token}x`)).rejects.toMatchObject({ status: 404 });
-    expect(maskPhone('9876543210')).toBe('98XXXXXX10');
+    expect(maskPhone('9876543210', 'X')).toBe('98XXXXXX10');
   });
 
   it('writes a real PDF', async () => {

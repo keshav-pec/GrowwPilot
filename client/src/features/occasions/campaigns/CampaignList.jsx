@@ -3,8 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle2, Plus, Wand2 } from 'lucide-react';
 import { useCampaigns } from '../../../api/occasions';
 import { CAMPAIGN_STATUS, DELIVERY_LABEL, OCCASION_LABEL } from '../../../lib/occasions';
-import { Badge, Button, Card, EmptyState, Spinner, Table } from '../../../components/ui';
+import { Badge, Button, Card, EmptyState, Spinner, StatTile, Table } from '../../../components/ui';
 import CampaignFormModal from './CampaignFormModal';
+
+const Tile = (props) => <StatTile {...props} className="rounded-lg border border-border p-3" />;
 
 // Settings → Occasion offers: the campaigns, delivery readiness and this month's audience
 export default function CampaignList() {
@@ -84,7 +86,6 @@ export default function CampaignList() {
         </div>
         <Tile label="Offers due this month" value={audience.eligible} />
         <Tile label="Can be messaged" value={audience.canMessage} />
-        <Tile label="Still to do" value={audience.toDo ?? '—'} hint={audience.toDo == null ? 'Shown once the occasion list is ready' : null} />
       </div>
       <Table
         columns={columns}
@@ -97,12 +98,3 @@ export default function CampaignList() {
   );
 }
 
-function Tile({ label, value, hint }) {
-  return (
-    <div className="rounded-lg border border-border p-3">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="text-2xl font-bold text-brown">{value}</p>
-      {hint && <p className="text-xs text-muted">{hint}</p>}
-    </div>
-  );
-}

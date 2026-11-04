@@ -15,7 +15,7 @@ const discount = z
   .refine((d) => d.type !== 'flat' || Number.isInteger(d.value), { message: 'Discount must be in whole paise', path: ['value'] })
   .refine((d) => d.type !== 'percent' || (d.value <= 100 && Math.abs(d.value * 100 - Math.round(d.value * 100)) < 1e-9), { message: 'A percentage is 0 to 100, with at most 2 decimals', path: ['value'] });
 
-export const paymentsSchema = z
+const paymentsSchema = z
   .array(
     z.object({
       method: z.enum(PAYMENT_METHODS),

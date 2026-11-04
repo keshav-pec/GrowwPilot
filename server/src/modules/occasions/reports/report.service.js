@@ -1,14 +1,15 @@
-import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
 import { Appointment, Branch, Invoice, OccasionCampaign, OccasionCampaignVersion, OfferEvent, OfferIssue } from '../../../models/index.js';
 import { AppError } from '../../../utils/AppError.js';
-import { scoped } from '../../../utils/scoped.js';
+import { oid, scoped } from '../../../utils/scoped.js';
 import { logActivity } from '../../activity/activity.service.js';
-import { CHANNEL_LABELS, MONTH_NAMES, OCCASION_LABELS, maskPhone } from '../../../config/occasions.js';
+import { CHANNEL_LABELS, MONTH_NAMES, OCCASION_LABELS } from '../../../config/occasions.js';
 import { assertCan } from '../permissions.js';
+import { maskPhone } from '../../../utils/mask.js';
+import { plural } from '../../../utils/text.js';
 
 // ---------------------------------------------------------------------------
-// Reports → Occasion offers (owners; a branch owner sees their branches). The words (PRD section 16):
+// Reports → Occasion offers (owners; a branch owner sees their branches). The words:
 //   Offers issued       offers given in the period (a replaced one doesn't count)
 //   Contacted           an offer message sent through the app, or a call marked "Reached"
 //   Linked bookings     appointments booked for the offer (from the occasion list, or with the offer ticked)
@@ -19,7 +20,6 @@ import { assertCan } from '../permissions.js';
 // An offer is in the period when its month overlaps the dates, in its branch's own time zone.
 // ---------------------------------------------------------------------------
 
-const oid = (id) => new mongoose.Types.ObjectId(String(id));
 const pct = (part, whole) => (whole ? Math.round((part / whole) * 1000) / 10 : 0);
 
 // The branches to report on: 'all' (all mine), 'current', or one id
@@ -187,7 +187,7 @@ export async function occasionReportCsv(ctx, query) {
   const filters = [period.label, branches.length === 1 ? branches[0].name : 'all my branches', query.type && OCCASION_LABELS[query.type], query.channel && `via ${CHANNEL_LABELS[query.channel]}`, query.canMessage && (query.canMessage === 'yes' ? 'can be messaged' : 'in-salon only'), query.campaignId && 'one campaign']
     .filter(Boolean)
     .join(', ');
-  await logActivity(ctx, { action: 'occasions.report_exported', branchId: branches.length === 1 ? branches[0]._id : null, summary: `Downloaded the occasion offers report as CSV (${filters}): ${rows.length} offer${rows.length === 1 ? '' : 's'}` });
+  await logActivity(ctx, { action: 'occasions.report_exported', branchId: branches.length === 1 ? branches[0]._id : null, summary: `Downloaded the occasion offers report as CSV (${filters}): ${plural(rows.length, 'offer')}` });
 
   return {
     fileName: `occasion-offers-${period.from}-to-${period.to}.csv`,

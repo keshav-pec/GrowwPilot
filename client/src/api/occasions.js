@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
+import { keyed } from './request';
 import { downloadFile } from './download';
 
 // Birthday & Anniversary Offers
@@ -14,7 +15,7 @@ export function useSaveOccasionSettings() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ key, version, ...values }) =>
-      api.put('/occasions/settings', values, { headers: { 'Idempotency-Key': key, 'If-Match': `"${version}"` } }).then((res) => res.data),
+      api.put('/occasions/settings', values, keyed(key, { 'If-Match': `"${version}"` })).then((res) => res.data),
     onSuccess: (settings) => {
       queryClient.setQueryData(['occasions', 'settings'], settings);
       queryClient.invalidateQueries({ queryKey: ['me'] });
@@ -38,7 +39,7 @@ export function useConsentHistory(customerId) {
 export function useChangeConsent(customerId) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ key, ...body }) => api.post(`/occasions/customers/${customerId}/consents`, body, { headers: { 'Idempotency-Key': key } }).then((res) => res.data),
+    mutationFn: ({ key, ...body }) => api.post(`/occasions/customers/${customerId}/consents`, body, keyed(key)).then((res) => res.data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['occasions', 'consents', customerId] }),
   });
 }
@@ -47,7 +48,7 @@ export function useChangeConsent(customerId) {
 export function useRemoveOccasionData(customerId) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ key, reason }) => api.post(`/occasions/customers/${customerId}/remove-data`, { reason }, { headers: { 'Idempotency-Key': key } }).then((res) => res.data),
+    mutationFn: ({ key, reason }) => api.post(`/occasions/customers/${customerId}/remove-data`, { reason }, keyed(key)).then((res) => res.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['occasions'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
@@ -61,7 +62,7 @@ export const downloadDatesTemplate = () => downloadFile('/occasions/import/templ
 export function useImportDates() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ key, ...body }) => api.post('/occasions/import', body, { headers: key ? { 'Idempotency-Key': key } : {} }).then((res) => res.data),
+    mutationFn: ({ key, ...body }) => api.post('/occasions/import', body, key ? keyed(key) : {}).then((res) => res.data),
     onSuccess: (result) => {
       if (result.saved > 0) {
         queryClient.invalidateQueries({ queryKey: ['occasions', 'settings'] });
@@ -101,7 +102,6 @@ function useCampaignMutation(request) {
   });
 }
 
-const keyed = (key, extra = {}) => ({ headers: { 'Idempotency-Key': key, ...extra } });
 
 // { key, ...campaign } -> { campaign: { _id } }
 export const useCreateCampaign = () => useCampaignMutation(({ key, ...body }) => api.post('/occasions/campaigns', body, keyed(key)).then((res) => res.data.campaign));
@@ -131,7 +131,7 @@ export function useOffers(filters) {
   });
 }
 
-// { year, month, eligible, needsAction, booked, used } for the tiles and the Dashboard / Today widget
+// { year, month, eligible, needsAction, booked, used } for the tiles and the Today widget
 export function useOfferSummary(filters = {}, enabled = true) {
   return useQuery({ queryKey: ['occasions', 'offers', 'summary', filters], queryFn: () => api.get('/occasions/offers/summary', { params: clean(filters) }).then((res) => res.data), enabled });
 }
@@ -165,13 +165,13 @@ export function useRunNow() {
 export function useRevokeOffers() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ key, id, year, reason }) => api.post(`/occasions/campaigns/${id}/revoke`, { year, reason }, { headers: { 'Idempotency-Key': key } }).then((res) => res.data),
+    mutationFn: ({ key, id, year, reason }) => api.post(`/occasions/campaigns/${id}/revoke`, { year, reason }, keyed(key)).then((res) => res.data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['occasions'] }),
   });
 }
 
 // ---------------------------------------------------------------------------
-// Follow-up (Phase 4)
+// Follow-up
 // ---------------------------------------------------------------------------
 
 // Who it goes to, on which channel, and the finished message — or why it can't be sent now
@@ -189,11 +189,11 @@ function useOfferMutation(request) {
 }
 
 // { key, offerId, channel } -> { link, body, subject, channel, to }
-export const useSendOffer = () => useOfferMutation(({ key, offerId, channel }) => api.post(`/occasions/offers/${offerId}/send`, { channel }, { headers: { 'Idempotency-Key': key } }).then((res) => res.data));
+export const useSendOffer = () => useOfferMutation(({ key, offerId, channel }) => api.post(`/occasions/offers/${offerId}/send`, { channel }, keyed(key)).then((res) => res.data));
 
 // { key, offerId, outcome, note?, callbackAt? } -> { outcome, fixDetails }
 export const useRecordContact = () =>
-  useOfferMutation(({ key, offerId, ...body }) => api.post(`/occasions/offers/${offerId}/contact`, body, { headers: { 'Idempotency-Key': key } }).then((res) => res.data));
+  useOfferMutation(({ key, offerId, ...body }) => api.post(`/occasions/offers/${offerId}/contact`, body, keyed(key)).then((res) => res.data));
 
 export function useAssignees(offerId) {
   return useQuery({ queryKey: ['occasions', 'offers', offerId, 'assignees'], queryFn: () => api.get(`/occasions/offers/${offerId}/assignees`).then((res) => res.data.assignees) });
@@ -201,14 +201,14 @@ export function useAssignees(offerId) {
 
 // { key, offerId, assigneeId | null }
 export const useAssignOffer = () =>
-  useOfferMutation(({ key, offerId, assigneeId }) => api.post(`/occasions/offers/${offerId}/assign`, { assigneeId }, { headers: { 'Idempotency-Key': key } }).then((res) => res.data));
+  useOfferMutation(({ key, offerId, assigneeId }) => api.post(`/occasions/offers/${offerId}/assign`, { assigneeId }, keyed(key)).then((res) => res.data));
 
 // { key, id, version, WHATSAPP, SMS, EMAIL } -> the campaign
 export function useSaveCampaignMessages() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ key, id, version, ...messages }) =>
-      api.put(`/occasions/campaigns/${id}/messages`, messages, { headers: { 'Idempotency-Key': key, 'If-Match': `"${version}"` } }).then((res) => res.data.campaign),
+      api.put(`/occasions/campaigns/${id}/messages`, messages, keyed(key, { 'If-Match': `"${version}"` })).then((res) => res.data.campaign),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['occasions', 'campaigns'] }),
   });
 }

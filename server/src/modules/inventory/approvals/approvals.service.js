@@ -2,13 +2,12 @@ import { InventoryAllocation, InventoryApproval, InventoryLocation, InventorySku
 import { AppError } from '../../../utils/AppError.js';
 import { scoped } from '../../../utils/scoped.js';
 import { runOnce } from '../../../middleware/idempotency.js';
-import { notify } from '../../notifications/notifications.service.js';
+import { notify, stockKeeperIds } from '../../notifications/notifications.service.js';
 import { assertCan, can } from '../permissions.js';
 import { getBranchSettings } from '../settings/settings.service.js';
-import { recordInventoryAction } from '../activity.js';
-import { stockKeeperIds } from '../stock/lowStock.js';
+import { logActivity, personOf } from '../../activity/activity.service.js';
+import { REASON_WORDS } from '../movements/movements.service.js';
 import { describeQty } from '../units.js';
-import { personOf, REASON_WORDS } from '../movements/movements.service.js';
 
 // ---------------------------------------------------------------------------
 // Requests waiting for someone: write-offs above a limit (owners approve) and problems the front desk
@@ -104,7 +103,7 @@ export async function dismissReport(ctx, id, { note }, key) {
       { session }
     );
     if (closed.modifiedCount === 0) throw new AppError(409, 'ALREADY_DECIDED', 'This problem report has already been dealt with');
-    await recordInventoryAction(ctx, { action: 'inventory.problem_dismissed', branchId, summary: `Closed ${report.requestedBy.name}’s report about ${report.skuName}: ${note}` }, session);
+    await logActivity(ctx, { action: 'inventory.problem_dismissed', branchId, summary: `Closed ${report.requestedBy.name}’s report about ${report.skuName}: ${note}` }, session);
     await notify(ctx, [report.requestedBy.id], { message: `${ctx.userName} looked at your report about ${report.skuName}: ${note}`, link: '/app/inventory?tab=overview' }, session);
     return { status: 'DISMISSED' };
   });

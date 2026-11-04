@@ -2,8 +2,8 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useRecordPayment } from '../../api/invoices';
 import { formatMoney, isValidRupees, toPaise } from '../../lib/money';
-import { newRequestKey } from '../../lib/billing';
-import { Button, Input, Modal } from '../../components/ui';
+import { newRequestKey } from '../../lib/requestKey';
+import { Input, Modal, ModalFooter } from '../../components/ui';
 import PaymentRows, { emptyPayment, paidTotal, paymentsPayload, rowsInvalid } from './PaymentRows';
 
 // Take money for what's still due on an issued bill (all of it, or part of it again), or use the customer's advance
@@ -38,14 +38,9 @@ export default function RecordPaymentModal({ invoice, onClose }) {
       onClose={onClose}
       title={`Record payment · ${invoice.invoiceNumber}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={save} disabled={!valid} loading={record.isPending}>
+        <ModalFooter onClose={onClose} onClick={save} disabled={!valid} loading={record.isPending}>
             Record {formatMoney(paying + advanceUse)}
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <p className="mb-3 text-sm">

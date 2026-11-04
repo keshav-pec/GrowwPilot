@@ -3,11 +3,12 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../../auth/AuthContext';
 import { useLocations } from '../../../api/inventory/locations';
 import { useIssue } from '../../../api/inventory/allocations';
-import { formatQty, isMeasured, newRequestKey, recipientFromValue, rememberChoice, rememberedChoice } from '../../../lib/inventory';
-import { Button, Modal } from '../../../components/ui';
+import { formatQty, isMeasured, recipientFromValue, rememberChoice, rememberedChoice } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
+import { Modal, ModalFooter } from '../../../components/ui';
 import { ProductPicker, QtyField, RecipientSelect, StoreSelect } from './fields';
 
-// Issue product (INV-05): a product, the store, who gets it and how many. The store and the person
+// Issue product: a product, the store, who gets it and how many. The store and the person
 // are remembered for next time.
 export default function IssueModal({ sku: presetSku, onClose }) {
   const { activeBranchId } = useAuth();
@@ -49,14 +50,9 @@ export default function IssueModal({ sku: presetSku, onClose }) {
       title={sku ? `Issue ${sku.name}` : 'Issue product'}
       footer={
         sku && (
-          <>
-            <Button variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={save} loading={issueStock.isPending} disabled={!recipient || !store || qty < 1}>
+          <ModalFooter onClose={onClose} onClick={save} loading={issueStock.isPending} disabled={!recipient || !store || qty < 1}>
               Issue
-            </Button>
-          </>
+            </ModalFooter>
         )
       }
     >

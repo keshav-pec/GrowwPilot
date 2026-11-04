@@ -15,7 +15,7 @@ const recipeLineSchema = new mongoose.Schema({
 
 // One version of a service's recipe, salon-wide (branchId null) or for one branch (the branch recipe wins).
 // Changing a recipe adds a new version from a start time and ends the previous one there, so versions never
-// overlap and stock already used keeps the version it used (AC23).
+// overlap and stock already used keeps the version it used.
 const inventoryRecipeSchema = new mongoose.Schema(
   {
     orgId: ref('Organization', { required: true }),

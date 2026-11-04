@@ -20,9 +20,9 @@ const LOCK_MS = 5 * 60 * 1000; // a SENDING row older than this was cut off: sen
 const SWEEP_EVERY_MS = 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const URGENT = 2; // at the daily limit only priority 1–2 (password, test) still go out
-export const DEFAULT_PRIORITY = { PASSWORD: 1, TEST: 2, BILL: 3, OCCASION_OFFER: 4 }; // 5 = automatic offers
+const DEFAULT_PRIORITY = { PASSWORD: 1, TEST: 2, BILL: 3, OCCASION_OFFER: 4 }; // 5 = automatic offers
 
-// Hooks other parts register by kind (Part 2: offers; Part 5: bill PDFs)
+// Hooks other features register by kind (offers, bill PDFs)
 const beforeSendChecks = new Map(); // kind -> async (row) => ({ skip: true, reason }) or nothing
 const resultHooks = new Map(); // kind -> async (row) after SENT / FAILED / SKIPPED
 const attachmentBuilders = new Map(); // attachment type -> async (row) => { fileName, mimeType, content: Buffer }
@@ -70,7 +70,7 @@ export async function queueEmail(ctx, email, session) {
 
 let running = false;
 let runAgain = false;
-let pausedUntil = 0; // Gmail's quota was hit with no backup: nothing goes out until then
+let pausedUntil = 0; // Gmail's quota was hit and there's no other route: nothing goes out until then
 
 let held = false; // tests: nothing is sent in the background, only by calling processOutbox()
 

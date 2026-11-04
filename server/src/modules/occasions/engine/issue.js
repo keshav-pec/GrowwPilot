@@ -9,7 +9,7 @@ const BATCH = 1000;
 const { ObjectId } = mongoose.Types;
 
 // The channels a customer may be messaged on right now (opted in, with somewhere to send it)
-export function messageChannels(customer) {
+function messageChannels(customer) {
   return CONSENT_CHANNELS.filter((channel) => customer.marketing?.[channel]?.status === 'OPTED_IN' && (channel !== 'EMAIL' || customer.email) && (channel === 'EMAIL' || customer.phone));
 }
 

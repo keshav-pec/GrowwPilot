@@ -104,7 +104,7 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
-  configureMail(); // email not set up: development "log" mode (emails are kept in memory, marked Logged)
+  configureMail(); // email off: development "log" mode (emails are kept in memory, marked Logged)
   resetMailer();
   script.reply = null;
   script.calls = [];
@@ -205,7 +205,7 @@ describe('sending the offer by email', () => {
     expect((await offerById(offer._id)).task.emailStatus).toBe('QUEUED');
   });
 
-  it('with email not set up (production), Email still opens the mailto: link as before', async () => {
+  it('with email off (production), Email still opens the mailto: link as before', async () => {
     configureMail({ mode: 'off' });
     const { offer } = await customerWithOffer('Old Way', { email: 'old.way@mail.com' });
     expect((await preview('desk', offer, 'EMAIL')).json.appSends).toBe(false);

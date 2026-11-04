@@ -11,16 +11,26 @@ export async function notify(ctx, userIds, { message, link }, session) {
   );
 }
 
-// The salon's business owner(s): owners who see every branch
-export async function businessOwnerIds(ctx) {
-  return User.find(scoped(ctx, { role: 'OWNER', allBranches: true, status: 'active' })).distinct('_id');
-}
+const branchOwnersFilter = (ctx, branchId) => scoped(ctx, { role: 'OWNER', status: 'active', $or: [{ allBranches: true }, { branchIds: branchId }] });
 
 // Everyone who may approve a change at this branch: its branch owners and the business owner(s)
-export async function branchApproverIds(ctx, branchId) {
-  return User.find(
-    scoped(ctx, { role: 'OWNER', status: 'active', $or: [{ allBranches: true }, { branchIds: branchId }] })
-  ).distinct('_id');
+export function branchApproverIds(ctx, branchId) {
+  return User.find(branchOwnersFilter(ctx, branchId)).distinct('_id');
+}
+
+// The same people, keeping only those a check allows, e.g. who may approve an order of this value
+export async function approverIdsWhere(ctx, branchId, mayApprove) {
+  const owners = await User.find(branchOwnersFilter(ctx, branchId)).lean();
+  return owners.filter((o) => mayApprove({ role: 'OWNER', isPrimaryOwner: o.allBranches })).map((o) => o._id);
+}
+
+// The people who look after stock at a branch: its owners and its inventory logins
+export async function stockKeeperIds(ctx, branchId) {
+  const [owners, keepers] = await Promise.all([
+    branchApproverIds(ctx, branchId),
+    User.find(scoped(ctx, { role: 'INVENTORY', status: 'active', branchIds: branchId })).distinct('_id'),
+  ]);
+  return [...owners, ...keepers];
 }
 
 // The latest messages in my bell, and how many I haven't read

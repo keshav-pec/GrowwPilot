@@ -12,7 +12,7 @@ import { PROMO_GAP_DAYS } from '../../../config/occasions.js';
 const GAP_MS = PROMO_GAP_DAYS * 24 * 60 * 60 * 1000;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function hasDestination(customer, channel) {
+function hasDestination(customer, channel) {
   return channel === 'EMAIL' ? EMAIL.test(customer.email ?? '') : PHONE_REGEX.test(customer.phone ?? '');
 }
 

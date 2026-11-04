@@ -36,5 +36,3 @@ export const GST_STATES = [
   ['36', 'Telangana'], ['37', 'Andhra Pradesh'], ['38', 'Ladakh'], ['97', 'Other Territory'],
 ].map(([value, label]) => ({ value, label: `${label} (${value})` }));
 
-// A fresh Idempotency-Key for one money change (a double click or retry with the same key happens only once)
-export const newRequestKey = () => crypto.randomUUID();

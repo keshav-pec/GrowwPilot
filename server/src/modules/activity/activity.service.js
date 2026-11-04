@@ -10,6 +10,9 @@ export function actorRole(ctx) {
   return ctx.isPrimaryOwner ? 'Business owner' : 'Branch owner';
 }
 
+// Who did something, as saved on stock records
+export const personOf = (ctx) => ({ id: ctx.userId, name: ctx.userName, role: actorRole(ctx) });
+
 // Adds one row to the activity log. Pass the transaction's session so the row is saved
 // together with the change it describes (or not at all).
 export async function logActivity(ctx, { action, branchId, staffId, invoiceId, summary, before, after }, session) {

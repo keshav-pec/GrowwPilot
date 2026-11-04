@@ -9,7 +9,7 @@ import { useSaveCustomer } from '../../api/customers';
 import { useServiceStaff } from '../../api/staff';
 import { isValidPhone } from '../../lib/phone';
 import { fromDateForm, toDateForm } from '../../lib/occasions';
-import { Button, ConfirmDialog, Input, Modal, Select, Textarea } from '../../components/ui';
+import { ConfirmDialog, Input, Modal, ModalFooter, Select, Textarea } from '../../components/ui';
 import OccasionDateFields from './OccasionDateFields';
 
 const schema = z.object({
@@ -87,14 +87,9 @@ export default function CustomerFormModal({ customer, onClose, onSaved }) {
       onClose={onClose}
       title={customer ? `Edit ${customer.name}` : 'Add customer'}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" form="customer-form" loading={saveCustomer.isPending}>
+        <ModalFooter onClose={onClose} type="submit" form="customer-form" loading={saveCustomer.isPending}>
             Save
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <form id="customer-form" onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2" noValidate>

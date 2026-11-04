@@ -6,7 +6,7 @@ import { AlertTriangle } from 'lucide-react';
 import { useRequestPayChange, useSavePayPlan } from '../../api/payroll';
 import { formatAmount, isValidRupees, toPaise } from '../../lib/money';
 import { PARTS_BY_MODEL, PAY_MODELS, PAY_PARTS, describePay, firstOfMonth, formatPayDay, formatPercent, payModelsFor } from '../../lib/payroll';
-import { Button, Input, Modal, Select, Textarea } from '../../components/ui';
+import { Input, Modal, ModalFooter, Select, Textarea } from '../../components/ui';
 
 const amount = z.string().trim().refine((v) => v === '' || isValidRupees(v), 'Enter an amount like 20000 or 499.50');
 const percent = z
@@ -140,14 +140,9 @@ export default function PayPlanFormModal({ mode, staff, current, latest, plan, t
       onClose={onClose}
       title={title}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" form="pay-form" loading={mutation.isPending}>
+        <ModalFooter onClose={onClose} type="submit" form="pay-form" loading={mutation.isPending}>
             {isRequest ? 'Send for approval' : 'Save'}
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <form id="pay-form" onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2" noValidate>

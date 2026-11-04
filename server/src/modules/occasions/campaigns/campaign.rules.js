@@ -3,8 +3,7 @@ import { formatAmount } from '../../../utils/money.js';
 // Campaign terms: checks and plain wording. Pure functions, no database.
 // PERCENT: value in basis points (1500 = 15%), maxDiscount needed. FLAT: value in paise. Money in paise.
 
-export const MAX_DISCOUNT_CAP = 1_00_000_00; // ₹1,00,000: the most a % offer may take off
-export const MAX_NAME = 80;
+const MAX_DISCOUNT_CAP = 1_00_000_00; // ₹1,00,000: the most a % offer may take off
 
 // The starting suggestions, saved as drafts in the quick setup
 export const STARTER_CAMPAIGNS = {

@@ -1,4 +1,4 @@
-// Moves bills made before Billing Phase 1 onto the new bill shape. Safe to run any number of times:
+// Moves old bills onto the current bill shape. Safe to run any number of times:
 // a bill is only converted once, and nothing else is touched.
 //   - Old bills become ISSUED + PAID and keep their old numbers (GP-AND-000123), dates and amounts. No GST.
 //   - Their embedded payments move into Payment + PaymentAllocation records.
@@ -15,7 +15,7 @@ import { splitByPrice } from '../modules/payroll/commission.rules.js';
 const { ObjectId } = mongoose.Types;
 
 // The new fields for one old bill, or null if its numbers don't add up (left alone, and reported)
-export function convertOldBill(doc, { appointment, customer, branch, org }) {
+function convertOldBill(doc, { appointment, customer, branch, org }) {
   const prices = doc.lines.map((l) => l.price);
   const itemsTotal = prices.reduce((a, b) => a + b, 0);
   // Old bills kept the combo price as `subtotal`; share it over the services like new bills do
@@ -91,7 +91,7 @@ export function convertOldBill(doc, { appointment, customer, branch, org }) {
 
 export async function migrateBilling({ log = console.log } = {}) {
   // Indexes first: drops the old ones that didn't allow drafts (bills) or a second commission event per
-  // service (Phase 2: refunds and reversed payments), and makes the new ones
+  // service (refunds and reversed payments), and makes the new ones
   await Invoice.syncIndexes();
   await CommissionEntry.syncIndexes();
 

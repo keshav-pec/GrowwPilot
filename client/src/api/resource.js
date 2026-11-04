@@ -19,8 +19,7 @@ export function useResourceList(queryKey, url, field, options = {}) {
 export function useSaveResource(url, refresh) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ _id, ...values }) =>
-      (_id ? api.patch(`${url}/${_id}`, values) : api.post(url, values)).then((res) => res.data),
+    mutationFn: ({ _id, ...values }) => (_id ? api.patch(`${url}/${_id}`, values) : api.post(url, values)).then((res) => res.data),
     onSuccess: () => refresh.forEach((queryKey) => queryClient.invalidateQueries({ queryKey })),
   });
 }

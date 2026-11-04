@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { DateTime } from 'luxon';
 import { ChartColumn, Settings } from 'lucide-react';
 import { useAuth } from '../../../auth/AuthContext';
 import { useOfferSummary, useOffers } from '../../../api/occasions';
 import { useDebounce } from '../../../lib/useDebounce';
-import { MONTHS } from '../../../lib/occasions';
-import { Button, EmptyState, Input, PageHeader, Select, Spinner, Tabs } from '../../../components/ui';
+import { MONTHS, monthOptions } from '../../../lib/occasions';
+import { Button, EmptyState, Input, PageHeader, PageSpinner, Select, Tabs } from '../../../components/ui';
 import OfferTable from './OfferTable';
 import OfferCards from './OfferCards';
 import OfferDrawer from './OfferDrawer';
@@ -27,15 +26,6 @@ const EMPTY = {
   used: 'No offer used yet.',
   excluded: 'No expired or withdrawn offers.',
 };
-
-// This month and the 12 before it, e.g. "2026-11" -> "November 2026"
-function monthOptions(zone) {
-  const now = DateTime.now().setZone(zone);
-  return Array.from({ length: 13 }, (_, i) => {
-    const d = now.minus({ months: i });
-    return { value: `${d.year}-${d.month}`, label: `${MONTHS[d.month - 1]} ${d.year}` };
-  });
-}
 
 // Customer occasions: who to contact this month, what their offer is, and the next step
 export default function OccasionsPage() {
@@ -105,7 +95,7 @@ export default function OccasionsPage() {
           <Input aria-label="Search" placeholder="Search name or mobile" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select aria-label="Occasion" placeholder="Both occasions" value={get('type')} onChange={set('type')} options={[{ value: 'BIRTHDAY', label: 'Birthday' }, { value: 'ANNIVERSARY', label: 'Anniversary' }]} />
-        <Select aria-label="Month" placeholder="This month" value={get('month')} onChange={set('month')} options={monthOptions(zone).slice(1)} />
+        <Select aria-label="Month" placeholder="This month" value={get('month')} onChange={set('month')} options={monthOptions(zone, (d) => `${d.year}-${d.month}`).slice(1)} />
         <Select aria-label="Can be messaged" placeholder="Messaging: any" value={get('canMessage')} onChange={set('canMessage')} options={[{ value: 'yes', label: 'Can be messaged' }, { value: 'no', label: 'In-salon only' }]} />
         <Select aria-label="Assigned to" placeholder="Assigned: anyone" value={get('assignee')} onChange={set('assignee')} options={[{ value: 'me', label: 'Assigned to me' }, { value: 'none', label: 'Not assigned' }]} />
         {isOwner && manyBranches && (
@@ -116,9 +106,7 @@ export default function OccasionsPage() {
       <Tabs tabs={TABS} value={filters.tab} onChange={set('tab')} />
 
       {offersQuery.isPending ? (
-        <div className="flex justify-center py-12">
-          <Spinner size={28} />
-        </div>
+        <PageSpinner />
       ) : offersQuery.isError ? (
         <EmptyState title="Couldn’t load the list" message={offersQuery.error.message} />
       ) : (

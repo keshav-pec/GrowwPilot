@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Info } from 'lucide-react';
 import { useBillingSettings, useSaveBillingSettings } from '../../api/billing';
-import { GST_RATE_OPTIONS, GST_STATES, newRequestKey, percentLabel } from '../../lib/billing';
-import { Button, Card, EmptyState, Input, PageHeader, Select, Spinner } from '../../components/ui';
+import { GST_RATE_OPTIONS, GST_STATES, percentLabel } from '../../lib/billing';
+import { newRequestKey } from '../../lib/requestKey';
+import { Button, Card, EmptyState, Input, PageHeader, PageSpinner, Select } from '../../components/ui';
 
 // The current financial year, for the bill number example: "26-27"
 function currentFy() {
@@ -19,11 +20,7 @@ const GSTIN_SHAPE = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 export default function BillingSettingsPage() {
   const settingsQuery = useBillingSettings();
   if (settingsQuery.isPending) {
-    return (
-      <div className="flex justify-center py-12">
-        <Spinner size={28} />
-      </div>
-    );
+    return <PageSpinner />;
   }
   if (settingsQuery.isError) return <EmptyState title="Couldn’t load billing settings" message={settingsQuery.error.message} />;
   return <SettingsForm key={settingsQuery.data.updatedAt ?? 'new'} saved={settingsQuery.data} />;
@@ -124,7 +121,7 @@ function SettingsForm({ saved }) {
                 <input type="radio" name="gst" className="mt-1 accent-gold" checked={values.gstRegistered} onChange={() => setValues((v) => ({ ...v, gstRegistered: true }))} />
                 <span>
                   <span className="font-medium">GST registered</span>
-                  <span className="block text-muted">Tax invoices with your GSTIN, CGST and SGST. (The composition scheme isn’t supported yet.)</span>
+                  <span className="block text-muted">Tax invoices with your GSTIN, CGST and SGST.</span>
                 </span>
               </label>
             </div>

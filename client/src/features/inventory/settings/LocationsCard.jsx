@@ -2,8 +2,8 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Plus } from 'lucide-react';
 import { useLocations, useSaveLocation } from '../../../api/inventory/locations';
-import { newRequestKey } from '../../../lib/inventory';
-import { Badge, Button, Card, Input, Modal, Spinner } from '../../../components/ui';
+import { newRequestKey } from '../../../lib/requestKey';
+import { Badge, Button, Card, Input, Modal, ModalFooter, Spinner } from '../../../components/ui';
 
 const KIND_LABEL = { STORE: 'Store', IN_USE: 'In use', STATION: 'Station' };
 
@@ -105,14 +105,9 @@ function LocationNameModal({ location, onClose }) {
       onClose={onClose}
       title={isNew ? `Add a ${what}` : `Rename ${location.name}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" form="location-form" loading={saveLocation.isPending} disabled={name.trim().length < 2}>
+        <ModalFooter onClose={onClose} type="submit" form="location-form" loading={saveLocation.isPending} disabled={name.trim().length < 2}>
             Save
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <form id="location-form" onSubmit={save} className="flex flex-col gap-3">

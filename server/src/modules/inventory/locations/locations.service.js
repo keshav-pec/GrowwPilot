@@ -3,11 +3,9 @@ import { AppError } from '../../../utils/AppError.js';
 import { scoped } from '../../../utils/scoped.js';
 import { escapeRegex } from '../../../utils/regex.js';
 import { runOnce } from '../../../middleware/idempotency.js';
-import { assertCan } from '../permissions.js';
-import { getBranchSettings } from '../settings/settings.service.js';
-import { recordInventoryAction } from '../activity.js';
+import { assertCanHere } from '../settings/settings.service.js';
+import { logActivity } from '../../activity/activity.service.js';
 
-const SETTINGS_LINK = '/app/inventory?tab=settings';
 
 // Every branch has a "Main store" and an "In use" place. Made the first time a branch uses Inventory
 // (so branches that existed before the add-on get them too). Safe to call any number of times.
@@ -41,7 +39,7 @@ export async function listLocations(ctx) {
 }
 
 async function assertCanManage(ctx) {
-  assertCan(ctx, 'inventory.manageSettings', { settings: await getBranchSettings(ctx, ctx.activeBranchId) });
+  await assertCanHere(ctx, 'inventory.manageSettings');
 }
 
 async function assertNameFree(ctx, branchId, name, exceptId) {
@@ -61,7 +59,7 @@ export async function createLocation(ctx, { kind, name }, key) {
 
   return runOnce(ctx, { key, operation: 'inventory.location.create' }, async (session) => {
     const [location] = await InventoryLocation.create([{ orgId: ctx.orgId, branchId, kind, name }], { session });
-    await recordInventoryAction(ctx, { action: 'inventory.location_added', branchId, summary: `Added the ${KIND_LABEL[kind]} “${name}”`, link: SETTINGS_LINK }, session);
+    await logActivity(ctx, { action: 'inventory.location_added', branchId, summary: `Added the ${KIND_LABEL[kind]} “${name}”` }, session);
     return { location };
   });
 }
@@ -101,7 +99,7 @@ export async function updateLocation(ctx, id, { name, active }, key) {
     ]
       .filter(Boolean)
       .join('. ');
-    await recordInventoryAction(ctx, { action: 'inventory.location_changed', branchId: location.branchId, summary, before: { name: location.name, active: location.active }, after: changes, link: SETTINGS_LINK }, session);
+    await logActivity(ctx, { action: 'inventory.location_changed', branchId: location.branchId, summary, before: { name: location.name, active: location.active }, after: changes }, session);
     return { location: updated };
   });
 }

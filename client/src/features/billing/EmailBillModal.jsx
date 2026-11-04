@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useEmailBill } from '../../api/invoices';
-import { newRequestKey } from '../../lib/billing';
-import { Button, Input, Modal } from '../../components/ui';
+import { newRequestKey } from '../../lib/requestKey';
+import { Input, Modal, ModalFooter } from '../../components/ui';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -34,14 +34,9 @@ export default function EmailBillModal({ invoice, customerEmail, onClose }) {
       onClose={onClose}
       title={`Email bill ${invoice.invoiceNumber}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={submit} loading={send.isPending} disabled={other && (!to.trim() || Boolean(error))}>
+        <ModalFooter onClose={onClose} onClick={submit} loading={send.isPending} disabled={other && (!to.trim() || Boolean(error))}>
             Email bill
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="flex flex-col gap-3 text-sm">

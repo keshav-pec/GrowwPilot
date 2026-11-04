@@ -3,7 +3,7 @@ import { DateTime } from 'luxon';
 import { useAuth } from '../../../auth/AuthContext';
 import toast from 'react-hot-toast';
 import { useSaveCampaignMessages } from '../../../api/occasions';
-import { newRequestKey } from '../../../lib/billing';
+import { newRequestKey } from '../../../lib/requestKey';
 import { Button, Card, Input, Tabs, Textarea } from '../../../components/ui';
 
 const NEEDED = ['{first_name}', '{salon_name}', '{offer_summary}', '{expiry_date}'];

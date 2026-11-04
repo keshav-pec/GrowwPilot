@@ -11,12 +11,12 @@ import { addOfferEvents } from '../engine/events.js';
 import { campaignMessages, fillMessage, messageValues } from './templates.js';
 import { checkSend, maskedDestination, sendLink } from './gate.js';
 import { applyOutcome } from './contact.rules.js';
-import { buildOfferEmail } from './emailOffer.js';
+import { buildOfferEmail, offerEmailFields } from './emailOffer.js';
 import { mailMode } from '../../mail/config.js';
 import { kickMailer, queueEmail } from '../../mail/outbox.js';
 
 // Staff follow-up on one offer: send the ready-made message, record a call, assign.
-// WhatsApp and SMS are sent from the staff member's own phone; email is sent by the app (when email is set up).
+// WhatsApp and SMS are sent from the staff member's own phone; email is sent by the app (when email is on).
 // Everyone acts only on offers of customers whose home branch is one of their branches.
 
 const GAP_MS = PROMO_GAP_DAYS * 24 * 60 * 60 * 1000;
@@ -65,12 +65,12 @@ export async function sendPreview(ctx, id, { channel } = {}) {
   const sc = await sendContext(ctx, offer);
   if (!sc.gate.allowed) return { allowed: false, code: sc.gate.code, reason: sc.gate.reason, nextAllowedAt: sc.gate.nextAllowedAt ?? null };
   const chosen = channel && sc.gate.channels.includes(channel) ? channel : sc.gate.channel;
-  // appSends: the app sends it itself (email, when set up); otherwise the staff member's own app opens
+  // appSends: the app sends it itself (email, when on); otherwise the staff member's own app opens
   const appSends = appSendsEmail(chosen);
   return { allowed: true, channels: sc.gate.channels, channel: chosen, appSends, to: maskedDestination(chosen, sc.customer), ...buildMessage({ offer, ...sc }, chosen) };
 }
 
-// Email is sent by the app unless email isn't set up at all (production without settings: the old mailto: link)
+// Email is sent by the app unless email is off (production without settings: a mailto: link)
 const appSendsEmail = (channel) => channel === 'EMAIL' && mailMode() !== 'off';
 
 // POST /api/occasions/offers/:id/send — { channel }. Everything is checked again here. The 7-day slot is taken with
@@ -132,19 +132,7 @@ export async function sendOffer(ctx, id, { channel }, key) {
         const email = buildOfferEmail({ offer, customer, org, campaign, zone });
         const queued = await queueEmail(
           ctx,
-          {
-            kind: 'OCCASION_OFFER',
-            dedupeKey: `offer:${offer._id}:send:${now.getTime()}`,
-            branchId: offer.homeBranchId,
-            to: customer.email,
-            subject: email.subject,
-            text: email.text,
-            html: email.html,
-            headers: email.headers,
-            fromName: org.name,
-            replyTo: org.contactEmail,
-            ref: { offerId: offer._id },
-          },
+          { ...offerEmailFields({ offer, customer, org, email }), dedupeKey: `offer:${offer._id}:send:${now.getTime()}` },
           session
         );
         await OfferIssue.updateOne({ _id: offer._id }, { $set: { 'task.emailOutboxId': queued.id, 'task.emailStatus': 'QUEUED', 'task.emailError': null } }, { session });

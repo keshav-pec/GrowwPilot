@@ -131,12 +131,12 @@ describe('Monthly payroll for a branch', () => {
     expect(items.find((i) => i.staffName === 'Rahul').lines.at(-1)).toMatchObject({ kind: 'bonus', amount: 100000, detail: expect.stringContaining('correction for') });
   });
 
-  it('a branch owner locks their branch and the business owner is notified', async () => {
+  it('a branch owner locks their branch and it goes in the activity log', async () => {
     await payroll.createPlan(bandraOwner, f.arjun._id, fixed(18000));
-    await Notification.deleteMany({});
     await monthly.lockRun(bandraOwner, lastMonth);
-    const [message] = await Notification.find({ userId: owner.userId }).lean();
-    expect(message.message).toMatch(/^Vikram \(Branch owner\): Locked .* payroll for Bandra: 1 person, ₹18,000 to pay\.$/);
+    const log = await ActivityLog.findOne({ action: 'payroll.locked' }).lean();
+    expect(log.actorRole).toBe('Branch owner');
+    expect(log.summary).toMatch(/^Locked .* payroll for Bandra: 1 person, ₹18,000 to pay\.$/);
   });
 
   it('bonuses and deductions are logged and only for staff at the selected branch', async () => {

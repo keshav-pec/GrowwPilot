@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
-import { Customer, Notification, OccasionCampaign, OfferEvent, OfferIssue, Organization, User } from '../src/models/index.js';
+import { Customer, OccasionCampaign, OfferEvent, OfferIssue, Organization, User } from '../src/models/index.js';
 import { hashPassword } from '../src/utils/password.js';
 import { monthWindow, taskDueAt } from '../src/modules/occasions/engine/window.js';
 import { runForOrg, runScheduledTick } from '../src/modules/occasions/engine/scheduler.js';
@@ -324,7 +324,7 @@ describe('turning off and withdrawing', () => {
     expect(await OfferIssue.countDocuments({ customerId: bandraNew.json.customer._id, campaignId: bandraBirthday._id })).toBe(1);
   });
 
-  it('AT-30: emergency withdraw takes back unused offers only, with a task for contacted customers and a bell', async () => {
+  it('AT-30: emergency withdraw takes back unused offers only, with a task for contacted customers', async () => {
     const offers = await OfferIssue.find({ campaignId: salonBirthday._id, year: now.year, status: 'ISSUED' }).lean();
     const [contacted, ...rest] = offers;
     await OfferIssue.updateOne({ _id: contacted._id }, { $set: { 'task.contactedAt': new Date(), 'task.state': 'CONTACTED' } });
@@ -340,8 +340,6 @@ describe('turning off and withdrawing', () => {
     expect(told.task).toMatchObject({ state: 'OPEN', kind: 'WITHDRAWN_NOTICE' });
     if (rest.length) expect((await OfferIssue.findById(rest[0]._id).lean()).task).toMatchObject({ state: 'CLOSED', closedReason: 'WITHDRAWN' });
     expect(await OfferIssue.countDocuments({ campaignId: salonBirthday._id, status: 'REDEEMED' })).toBe(usedBefore);
-    const bilal = await User.findOne({ email: 'bilal@g.com' });
-    expect(await Notification.exists({ userId: bilal._id, message: /withdrew/ })).toBeTruthy();
 
     const action = await call('business', 'GET', '/occasions/offers?tab=action&branch=all');
     expect(action.json.offers.find((o) => o._id === String(contacted._id)).nextAction).toBe('Tell the customer the offer was withdrawn');

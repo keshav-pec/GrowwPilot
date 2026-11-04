@@ -305,12 +305,12 @@ export const KNOWLEDGE = [
     audiences: ALL,
     keywords: ['*password', 'forgot password', 'reset password', 'change password', 'cant login', 'cannot login', 'locked out'],
     answer:
-      'Forgot your own password? On the login page click **Forgot password?** and we’ll email you a link (it works once, for 1 hour). For your team: **Team → Front desk logins**, click the person, then **Email a password link** (they choose their own password, link valid 48 hours) or **Reset password** (a temporary password shown once to share). If there’s no **Forgot password?** link, email isn’t set up yet.',
+      'Forgot your own password? On the login page click **Forgot password?** and we’ll email you a link (it works once, for 1 hour). For your team: **Team → Front desk logins**, click the person, then **Email a password link** (they choose their own password, link valid 48 hours) or **Reset password** (a temporary password shown once to share). If there’s no **Forgot password?** link, email is off.',
     for: {
       FRONT_DESK: 'On the login page click **Forgot password?** and we’ll email you a link to choose a new one (it works once, for 1 hour; check spam too). No link there, or no email? Please ask your salon owner: they can reset your password in **Team → Front desk logins**.',
       INVENTORY: 'On the login page click **Forgot password?** and we’ll email you a link to choose a new one (it works once, for 1 hour). No link there, or no email? Please ask your salon owner: they can reset your password in **Team → Inventory logins**.',
       PRIMARY_OWNER:
-        'Your own password: on the login page click **Forgot password?** and we’ll email you a link (it works once, for 1 hour). Your team: in **Team**, click the person, then **Email a password link** (they choose their own, valid 48 hours) or **Reset password** (a temporary password shown once). Either way they’re logged out on their other devices. No **Forgot password?** link means email isn’t set up yet (see **Email** in the menu).',
+        'Your own password: on the login page click **Forgot password?** and we’ll email you a link (it works once, for 1 hour). Your team: in **Team**, click the person, then **Email a password link** (they choose their own, valid 48 hours) or **Reset password** (a temporary password shown once). Either way they’re logged out on their other devices. No **Forgot password?** link means email is off (see **Email** in the menu).',
     },
   },
   {
@@ -319,7 +319,7 @@ export const KNOWLEDGE = [
     audiences: EVERYONE,
     keywords: ['email bill', 'email invoice', 'bill by email', 'mail bill', 'email receipt', 'email pdf', 'send bill email'],
     answer:
-      'Open the issued bill and click **Email bill**. It goes to the customer’s email (you can type another one) with the bill attached as a PDF, from your salon’s name; replies go to your salon’s contact email. The bill then shows *Email queued*, *Email sent* or *Email not sent* with the reason. No **Email bill** button means email isn’t set up yet: use **Send to customer** for a link instead.',
+      'Open the issued bill and click **Email bill**. It goes to the customer’s email (you can type another one) with the bill attached as a PDF, from your salon’s name; replies go to your salon’s contact email. The bill then shows *Email queued*, *Email sent* or *Email not sent* with the reason. No **Email bill** button means email is off: use **Send to customer** for a link instead.',
   },
   {
     id: 'email-not-received',
@@ -342,8 +342,8 @@ export const KNOWLEDGE = [
     audiences: ['PRIMARY_OWNER'],
     keywords: ['email not set up', 'set up email', 'email setup', 'email setting', 'test email', 'email limit', 'daily email limit', '*gmail', 'apps script'],
     answer:
-      'Open **Email** in the menu. It says whether email is set up, how much of today’s limit is used (about 90 emails a day for the whole app on a free Gmail account), and has **Send test email**. *Not set up* means whoever runs the server still has to connect the Gmail account (the README’s “Setting up email”); until then offer emails open on your own device, and bills and passwords can’t be emailed.',
-    denied: 'Only the main owner of {salon} can check how email is set up. If emails aren’t arriving, ask them to open **Email** in the menu.',
+      'Open **Email** in the menu. It says whether email is on, how much of today’s limit is used (about 90 emails a day for the whole app on a free Gmail account), and has **Send test email**. While email is *Off*, offer emails open on your own device, and bills and passwords can’t be emailed.',
+    denied: 'Only the main owner of {salon} can check how email is working. If emails aren’t arriving, ask them to open **Email** in the menu.',
     link: { to: '/app/settings/email', label: 'Email' },
   },
   {
@@ -360,9 +360,9 @@ export const KNOWLEDGE = [
     id: 'dashboard',
     title: 'The dashboard and Salon Pulse',
     audiences: OWNERS,
-    keywords: ['*dashboard', 'salon pulse', '*pulse', '*kpi', 'doing well', 'needs action', 'keep eye', 'chairs filled'],
+    keywords: ['*dashboard', 'salon pulse', '*pulse', '*kpi', 'chairs filled'],
     answer:
-      'The **Dashboard** answers *“is my salon doing fine?”* for the selected branch.\n- **Salon Pulse** gives one verdict (Doing well / Keep an eye / Needs action) from 3 signals: revenue vs a usual same weekday by this time, chairs filled today, and how many urgent items are waiting.\n- The tiles show today’s revenue, appointments, customers served, open leads and lead conversion.\n- Everything is live and refreshes every minute.',
+      'The **Dashboard** answers *“is my salon doing fine?”* for the selected branch.\n- **Salon Pulse** shows 2 signals: net sales vs a usual same weekday by this time, and chairs filled today.\n- The tiles show today’s net sales, appointments and open leads.\n- Everything is live and refreshes every minute.',
     denied: 'The dashboard is only for owners, because it shows revenue. For today’s work at {branch}, the **Day board** shows everything that’s happening.',
     link: { label: 'Dashboard', to: '/app/dashboard' },
   },
@@ -372,7 +372,7 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['requires attention', 'needs attention', '*todo', '*urgent'],
     answer:
-      'The **Requires attention** list on the dashboard shows what needs someone now, most urgent first: customers waiting or not showing up, bills not collected, bookings whose stylist is absent or inactive, overdue lead follow-ups and new leads nobody contacted in 24 hours. Each row has a one-click button (Open, Checkout, Reassign or Open lead).',
+      'The **Requires attention** list on the dashboard shows what needs someone now, most urgent first: customers waiting or not showing up, visits not billed, bookings whose stylist is absent or inactive, and overdue lead follow-ups. Each row has a one-click button (Open, Checkout, Reassign or Open lead).',
     denied: 'That list is on the owner’s dashboard. On the **Day board** you’ll see the same warnings (orange rings) for today’s bookings.',
     link: { label: 'Dashboard', to: '/app/dashboard' },
   },
@@ -380,9 +380,9 @@ export const KNOWLEDGE = [
     id: 'analytics',
     title: 'Analytics and the sales PDF',
     audiences: OWNERS,
-    keywords: ['*analytics', '*report', 'sales pdf', 'export pdf', 'download pdf', 'busiest time', 'best stylist', 'popular service', 'payment mix', '*heatmap'],
+    keywords: ['*analytics', '*report', 'sales pdf', 'export pdf', 'download pdf', 'busiest time', 'best stylist', 'popular service', '*heatmap'],
     answer:
-      'Open **Analytics**, choose a date range (or Last 7 days / Last 30 days / This month) and a branch. You’ll see branch demand, the busiest times (a weekday × hour heatmap), stylist and service demand, lead sources and the payment mix. **Export PDF** downloads the same numbers with a “Generated on …” time stamp, ready to email to your sales team.',
+      'Open **Analytics**, choose a date range (or Last 7 days / Last 30 days / This month) and a branch. You’ll see branch demand, the busiest times (a weekday × hour heatmap), and stylist and service demand. **Export PDF** downloads the same numbers with a “Generated on …” time stamp, ready to email to your sales team.',
     denied: 'Analytics and the sales PDF are only for owners, because they show revenue. Please ask your owner if you need a report.',
     link: { label: 'Analytics', to: '/app/analytics' },
   },
@@ -423,7 +423,7 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['front desk login', 'receptionist account', 'add receptionist', 'new front desk', 'desk account', 'add user'],
     answer:
-      'Go to **Team → Front desk logins → Add front desk**, enter their name and email and pick their branch. With email set up, leave **Email them a link to set their password** ticked and they get an email to choose their own; otherwise a temporary password is shown once, with a **Copy login details** button. Click a person later to **Reset password** or **Deactivate** them (they’re logged out on their next click).',
+      'Go to **Team → Front desk logins → Add front desk**, enter their name and email and pick their branch. With email on, leave **Email them a link to set their password** ticked and they get an email to choose their own; otherwise a temporary password is shown once, with a **Copy login details** button. Click a person later to **Reset password** or **Deactivate** them (they’re logged out on their next click).',
     denied: 'Only owners create front desk logins. Please ask your salon owner.',
     link: { label: 'Team', to: '/app/team?tab=front-desk' },
   },
@@ -528,10 +528,10 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['activity log', '*activity', 'who changed', '*notifications', '*bell', 'audit'],
     answer:
-      'Every pay change and request is written to **Payroll → Activity log**: who did it, when, and what changed. Nothing in the log can be edited. The **bell** at the top shows changes made by others and requests waiting for you.',
+      'Every pay change and request is written to **Payroll → Activity log**: who did it, when, and what changed. Nothing in the log can be edited. The **bell** at the top shows requests waiting for you and the answers to your own requests.',
     for: {
       BRANCH_OWNER:
-        'Every pay change and request at your branches is written to **Payroll → Activity log**: who did it, when, and what changed. The business owner is notified of your changes. The **bell** at the top shows requests waiting for you.',
+        'Every pay change and request at your branches is written to **Payroll → Activity log**: who did it, when, and what changed. The **bell** at the top shows requests waiting for you and the answers to your own requests.',
     },
     denied: 'The activity log is for owners. Your **bell** at the top shows the answers to your pay change requests.',
     link: { label: 'Activity log', to: '/app/payroll?tab=activity' },

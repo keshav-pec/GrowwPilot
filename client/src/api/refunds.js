@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
+import { keyed } from './request';
 
 // After a refund changes: the bill, lists, customer spend, stock, the bell
 function useRefundMutation(mutationFn) {
@@ -25,11 +26,11 @@ export function useRefundQuote(invoiceId, lines, enabled) {
 }
 
 // { key, invoiceId, lines: [{ lineId, qty, restock }], reason, method, reference } -> { refund, invoice }
-export const useCreateRefund = () => useRefundMutation(({ key, ...body }) => api.post('/refunds', body, { headers: { 'Idempotency-Key': key } }).then((res) => res.data));
+export const useCreateRefund = () => useRefundMutation(({ key, ...body }) => api.post('/refunds', body, keyed(key)).then((res) => res.data));
 // { _id, key, method?, reference? }
-export const useApproveRefund = () => useRefundMutation(({ _id, key, ...body }) => api.post(`/refunds/${_id}/approve`, body, { headers: { 'Idempotency-Key': key } }).then((res) => res.data));
+export const useApproveRefund = () => useRefundMutation(({ _id, key, ...body }) => api.post(`/refunds/${_id}/approve`, body, keyed(key)).then((res) => res.data));
 // { _id, key, note }
-export const useRejectRefund = () => useRefundMutation(({ _id, key, note }) => api.post(`/refunds/${_id}/reject`, { note }, { headers: { 'Idempotency-Key': key } }).then((res) => res.data));
+export const useRejectRefund = () => useRefundMutation(({ _id, key, note }) => api.post(`/refunds/${_id}/reject`, { note }, keyed(key)).then((res) => res.data));
 
 // One refund with its credit note: { refund, creditNote, branch }
 export function useRefund(id) {

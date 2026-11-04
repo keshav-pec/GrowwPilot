@@ -4,8 +4,10 @@ import { ClipboardCheck } from 'lucide-react';
 import { useCountStep, useSaveCounts, useStartCount, useStockCounts } from '../../../api/inventory/stockCounts';
 import { useAuth } from '../../../auth/AuthContext';
 import { formatDateTime } from '../../../lib/time';
-import { formatQty, isMeasured, newRequestKey } from '../../../lib/inventory';
-import { Badge, Button, Card, EmptyState, Input, Modal, Spinner } from '../../../components/ui';
+import { formatQty, isMeasured } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
+import { Badge, Button, Card, EmptyState, Spinner } from '../../../components/ui';
+import ReasonModal from '../../../components/ReasonModal';
 
 const unitOf = (sku) => (isMeasured(sku) ? sku.baseUnit : `${sku.stockUnit}s`);
 const differs = (line, counted) => counted !== '' && counted != null && Number(counted) !== line.expected;
@@ -229,39 +231,27 @@ function Review({ count, canApprove }) {
 function SendBackModal({ countId, onClose }) {
   const step = useCountStep();
   const [key] = useState(newRequestKey);
-  const [note, setNote] = useState('');
   return (
-    <Modal
-      open
-      onClose={onClose}
+    <ReasonModal
+      singleLine
+      danger={false}
       title="Send back to recount"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            loading={step.isPending}
-            disabled={note.trim().length < 3}
-            onClick={() =>
-              step.mutate(
-                { key, id: countId, step: 'send-back', note },
-                {
-                  onSuccess: () => {
-                    toast.success('Sent back');
-                    onClose();
-                  },
-                }
-              )
-            }
-          >
-            Send back
-          </Button>
-        </>
+      label="What should be checked again?"
+      confirmLabel="Send back"
+      loading={step.isPending}
+      error={step.error?.message}
+      onClose={onClose}
+      onConfirm={(note) =>
+        step.mutate(
+          { key, id: countId, step: 'send-back', note },
+          {
+            onSuccess: () => {
+              toast.success('Sent back');
+              onClose();
+            },
+          }
+        )
       }
-    >
-      <Input id="count-sendback" label="What should be checked again?" autoFocus value={note} onChange={(e) => setNote(e.target.value)} />
-      {step.isError && <p className="mt-2 text-sm text-danger">{step.error.message}</p>}
-    </Modal>
+    />
   );
 }

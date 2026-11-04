@@ -2,20 +2,16 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useMoveHandout, useReturnUnused } from '../../../api/inventory/allocations';
 import { useLocations } from '../../../api/inventory/locations';
-import { formatQty, newRequestKey, recipientFromValue } from '../../../lib/inventory';
-import { Button, Input, Modal } from '../../../components/ui';
+import { formatQty, recipientFromValue } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
+import { Input, Modal, ModalFooter } from '../../../components/ui';
 import { QtyField, RecipientSelect, StoreSelect } from './fields';
 
 function Footer({ onClose, onSave, saving, disabled, label }) {
   return (
-    <>
-      <Button variant="secondary" onClick={onClose}>
-        Cancel
-      </Button>
-      <Button onClick={onSave} loading={saving} disabled={disabled}>
+    <ModalFooter onClose={onClose} onClick={onSave} loading={saving} disabled={disabled}>
         {label}
-      </Button>
-    </>
+      </ModalFooter>
   );
 }
 
@@ -46,7 +42,7 @@ export function ReturnModal({ handout, onClose }) {
       open
       onClose={onClose}
       title={`Return ${handout.sku.name} unused`}
-      footer={<Footer onClose={onClose} onSave={save} saving={returnUnused.isPending} disabled={qty < 1 || qty > handout.remainingQty} label="Return to store" />}
+      footer={<ModalFooter onClose={onClose} onClick={save} loading={returnUnused.isPending} disabled={qty < 1 || qty > handout.remainingQty}>Return to store</ModalFooter>}
     >
       <div className="flex flex-col gap-4">
         <p className="text-sm text-muted">
@@ -86,7 +82,7 @@ export function MoveModal({ handout, onClose }) {
       open
       onClose={onClose}
       title={`Move ${handout.sku.name}`}
-      footer={<Footer onClose={onClose} onSave={save} saving={move.isPending} disabled={!recipient || qty < 1 || qty > handout.remainingQty} label="Move" />}
+      footer={<ModalFooter onClose={onClose} onClick={save} loading={move.isPending} disabled={!recipient || qty < 1 || qty > handout.remainingQty}>Move</ModalFooter>}
     >
       <div className="flex flex-col gap-4">
         <p className="text-sm text-muted">

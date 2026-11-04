@@ -1,10 +1,8 @@
 import { Plus, Trash2 } from 'lucide-react';
-import { formatMoney, isValidRupees, toPaise } from '../../lib/money';
+import { formatMoney, isValidRupees, paiseOf } from '../../lib/money';
 import { PAYMENT_METHODS } from '../../lib/billing';
 import { Button, Input, Select } from '../../components/ui';
 
-// Rupees typed in a box -> paise (empty or invalid counts as 0)
-export const paiseOf = (text) => (isValidRupees(text) ? toPaise(text) : 0);
 export const emptyPayment = (method = 'CASH') => ({ method, amount: '', reference: '' });
 
 // What was typed -> what the server needs (rows left empty are skipped)

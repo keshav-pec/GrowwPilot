@@ -5,7 +5,7 @@ import { requireRole } from '../../middleware/requireRole.js';
 import { validate } from '../../middleware/validate.js';
 import { requireIdempotencyKey } from '../../middleware/idempotency.js';
 import { objectId } from '../../utils/schemas.js';
-import { toCsv } from '../../utils/csv.js';
+import { sendCsv } from '../../utils/csv.js';
 import { z } from 'zod';
 import {
   assignSchema,
@@ -75,10 +75,7 @@ router.post('/customers/:id/remove-data', idParams, requireIdempotencyKey, valid
 // Spreadsheet import of dates. The template is a CSV; the upload is the file's rows as JSON (a bigger body,
 // read only after the login check: see app.js). Saving needs an Idempotency-Key; checking doesn't.
 router.get('/import/template', async (req, res) => {
-  const report = await importTemplate(req.ctx);
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="customer-occasions.csv"');
-  res.send(`﻿${toCsv(report)}`);
+  sendCsv(res, 'customer-occasions.csv', await importTemplate(req.ctx));
 });
 router.post('/import', express.json({ limit: '2mb' }), validate({ body: importSchema }), async (req, res) => {
   res.json(await importDates(req.ctx, req.valid.body, req.get('Idempotency-Key')));
@@ -173,9 +170,7 @@ router.get('/customers/:id/offers', idParams, async (req, res) => {
 router.get('/reports', validate({ query: reportQuerySchema }), async (req, res) => {
   if (req.valid.query.format === 'csv') {
     const report = await occasionReportCsv(req.ctx, req.valid.query);
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${report.fileName}"`);
-    return res.send(`\uFEFF${toCsv(report)}`);
+    return sendCsv(res, report.fileName, report);
   }
   res.json(await occasionReport(req.ctx, req.valid.query));
 });

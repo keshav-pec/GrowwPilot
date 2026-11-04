@@ -4,11 +4,12 @@ import { scoped } from '../../../utils/scoped.js';
 import { runOnce } from '../../../middleware/idempotency.js';
 import { assertCan, can } from '../permissions.js';
 import { getBranchSettings } from '../settings/settings.service.js';
-import { recordInventoryAction } from '../activity.js';
+import { logActivity } from '../../activity/activity.service.js';
 import { postOpeningStock } from '../stock/stock.engine.js';
 import { ensureBranchLocations } from '../locations/locations.service.js';
 import { reserveSkuCodes } from '../skus/skuCodes.js';
 import { checkImportRow, rowStatus } from './imports.rules.js';
+import { plural } from '../../../utils/text.js';
 
 // Who may import (anyone who may add products: owners and inventory logins), and whether costs are accepted
 async function importAccess(ctx) {
@@ -131,9 +132,9 @@ export async function commitImport(ctx, id, { skipRows }, key) {
     const result = { created: skus.length, withStock: openings.length, skipped: batch.rows.length - skus.length };
     await InventoryImport.updateOne(scoped(ctx, { _id: batch._id }), { $set: { result } }, { session });
     const from = batch.fileName ? ` from ${batch.fileName}` : ' from a spreadsheet';
-    await recordInventoryAction(
+    await logActivity(
       ctx,
-      { action: 'inventory.products_imported', branchId, summary: `Imported ${skus.length} product${skus.length === 1 ? '' : 's'}${from}`, after: result, link: '/app/inventory?tab=products' },
+      { action: 'inventory.products_imported', branchId, summary: `Imported ${plural(skus.length, 'product')}${from}`, after: result },
       session
     );
     return result;

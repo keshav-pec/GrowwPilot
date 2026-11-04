@@ -32,7 +32,7 @@ export function occasionDateChanges(customer, input, { source, userId, now = new
 }
 
 // A home branch must be an active branch this user works at (the business owner: any active branch)
-export async function resolveHomeBranch(ctx, branchId, session = null) {
+async function resolveHomeBranch(ctx, branchId, session = null) {
   if (!ctx.allowedBranchIds.includes(String(branchId))) throw new AppError(400, 'INVALID_BRANCH', 'Choose one of your branches');
   const branch = await Branch.findOne(scoped(ctx, { _id: branchId, status: 'active' })).select('name').session(session).lean();
   if (!branch) throw new AppError(400, 'INVALID_BRANCH', 'Choose one of your branches');
@@ -227,7 +227,7 @@ export async function consentHistory(ctx, id) {
 
 // ---------------------------------------------------------------------------
 // Remove occasion data (business owner): clears the dates (and the old date of birth) and opts the customer
-// out of every channel, with a reason. The stand-in for an erasure request until the app has a privacy workflow.
+// out of every channel, with a reason.
 // ---------------------------------------------------------------------------
 export async function removeOccasionData(ctx, id, { reason }, key) {
   assertCan(ctx, 'occasions.removeData');

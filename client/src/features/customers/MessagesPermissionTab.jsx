@@ -2,11 +2,11 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Info } from 'lucide-react';
 import { useConsentHistory, useConsents, useRemoveOccasionData } from '../../api/occasions';
-import { newRequestKey } from '../../lib/billing';
+import { newRequestKey } from '../../lib/requestKey';
 import { CHANNEL_LABEL, CONSENT_SOURCE_LABEL, CONSENT_STATUS } from '../../lib/occasions';
 import { formatDateTime } from '../../lib/time';
 import { Badge, Button, Card, EmptyState, Spinner, Table } from '../../components/ui';
-import ReasonModal from '../billing/ReasonModal';
+import ReasonModal from '../../components/ReasonModal';
 import ConsentModal from './ConsentModal';
 
 // Customer profile → Messages & permission: one row per channel, recording and withdrawing permission,

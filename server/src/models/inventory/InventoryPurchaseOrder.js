@@ -2,8 +2,8 @@ import mongoose from 'mongoose';
 import { money, ref } from '../fields.js';
 import { wholeNumber } from './wholeNumber.js';
 
-export const PO_STATUSES = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CLOSED', 'CANCELED'];
-// Orders whose not-yet-received quantities count as "on order" (for reorder suggestions, AC30)
+const PO_STATUSES = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CLOSED', 'CANCELED'];
+// Orders whose not-yet-received quantities count as "on order" (for reorder suggestions)
 export const OPEN_PO_STATUSES = ['APPROVED', 'ORDERED', 'PARTIALLY_RECEIVED'];
 
 const poLineSchema = new mongoose.Schema({

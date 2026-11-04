@@ -4,7 +4,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useRecordPayment } from '../../api/payroll';
 import { formatAmount, isValidRupees, toPaise } from '../../lib/money';
 import { SALARY_METHODS, formatMonth } from '../../lib/payroll';
-import { Button, Input, Modal, Select, Textarea } from '../../components/ui';
+import { Input, Modal, ModalFooter, Select, Textarea } from '../../components/ui';
 
 // Record money handed over for one person's locked month: all of it, or part
 export default function RecordPaymentModal({ item, owed, today, onClose }) {
@@ -52,14 +52,9 @@ export default function RecordPaymentModal({ item, owed, today, onClose }) {
       onClose={onClose}
       title={`Pay ${item.staffName} for ${formatMonth(item.month)}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={save} loading={record.isPending}>
+        <ModalFooter onClose={onClose} onClick={save} loading={record.isPending}>
             Record payment
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">

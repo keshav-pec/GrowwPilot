@@ -1,15 +1,14 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
 import { Plus, Search, Target } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useAssignees, useLeads } from '../../api/leads';
 import { LEAD_SOURCES, LEAD_STATUS_LABEL, isOverdue } from '../../lib/leads';
-import { useDebounce } from '../../lib/useDebounce';
 import { formatDate, formatDateTime } from '../../lib/time';
 import { Button, EmptyState, Input, PageHeader, Select, Table } from '../../components/ui';
-import LeadStatusBadge from '../../components/LeadStatusBadge';
+import { LeadStatusBadge } from '../../components/StatusBadge';
 import LeadFormModal from './LeadFormModal';
 import LeadDrawer from './LeadDrawer';
+import { useUrlFilters } from '../../lib/useUrlFilters';
 
 // Filter chips across the top: every status, plus "Overdue follow-ups"
 const CHIPS = [{ value: '', label: 'All' }, ...Object.entries(LEAD_STATUS_LABEL).map(([value, label]) => ({ value, label })), { value: 'overdue', label: 'Overdue follow-ups' }];
@@ -17,27 +16,10 @@ const CHIPS = [{ value: '', label: 'All' }, ...Object.entries(LEAD_STATUS_LABEL)
 export default function LeadsPage() {
   const { activeBranch } = useAuth();
   const zone = activeBranch.timezone;
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { searchParams, setFilter, search, setSearch, debouncedSearch } = useUrlFilters();
   const chip = searchParams.get('chip') || '';
   const source = searchParams.get('source') || '';
   const assignedTo = searchParams.get('assignedTo') || '';
-
-  const [search, setSearch] = useState(searchParams.get('search') || '');
-  const debouncedSearch = useDebounce(search);
-  useEffect(() => {
-    setFilter('search', debouncedSearch);
-  }, [debouncedSearch]);
-
-  function setFilter(key, value) {
-    setSearchParams(
-      (params) => {
-        if (value) params.set(key, value);
-        else params.delete(key);
-        return params;
-      },
-      { replace: true }
-    );
-  }
 
   const leadsQuery = useLeads({
     status: chip && chip !== 'overdue' ? chip : undefined,

@@ -4,7 +4,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import { useOfferSummary } from '../../../api/occasions';
 import { Card } from '../../../components/ui';
 
-// "Customer occasions — this month" on the owner Dashboard and the front desk Today page.
+// "Customer occasions — this month" on the Today page.
 // Shown only while the feature is switched on. "Open list" opens Action required for this branch and month.
 export default function OccasionWidget() {
   const { user } = useAuth();

@@ -6,13 +6,11 @@ import { reverseCommissions } from '../payroll/commission.service.js';
 import { postMovement } from '../inventory/stock/stock.engine.js';
 
 // ---------------------------------------------------------------------------
-// The kinds of line a bill can have (BILLING_PLAN.md, Phase 4). Billing only talks to a line through its kind,
-// so a new kind (PACKAGE, MEMBERSHIP, GIFT_CARD...) is added here, plus its name in config/billing.js,
-// without changing how bills are priced, issued, refunded or voided.
+// The kinds of line a bill can have. Billing only talks to a line through its kind.
 //
 // Each kind says:
 //   label            how it is called on screens
-//   discountable     false: no line discount, and no share of a bill discount (e.g. a gift card)
+//   discountable     false: no line discount, and no share of a bill discount
 //   needsCustomer    true: a bill with this line can't go to "Guest"
 //   removable        false: it can't be taken off a draft (services come from the appointment)
 //   hasQuantity      true: the desk can change how many
@@ -30,7 +28,7 @@ const find = (list, id) => list.find((x) => String(x._id) === String(id));
 // The branch's main store, where products are sold from and returned to
 async function mainStoreOf(ctx, branchId, session) {
   const store = await InventoryLocation.findOne(scoped(ctx, { branchId, isMain: true })).session(session).lean();
-  if (!store) throw new AppError(409, 'NO_STORE', 'This branch has no stock set up yet');
+  if (!store) throw new AppError(409, 'NO_STORE', 'This branch has no main store');
   return store;
 }
 

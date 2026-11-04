@@ -1,6 +1,6 @@
 import { env } from '../../config/env.js';
 
-// Email settings, read once from the environment (see config/env.js and EMAIL_PLAN.md section C).
+// Email settings, read once from the environment (see config/env.js).
 // Kept in one object so tests can switch routes on and off with configureMail().
 const settings = fromEnv();
 
@@ -44,7 +44,7 @@ export function scriptUrlFor(kind) {
 }
 
 // live = really sends; log = development/tests: printed (development) and kept in memory, marked "Logged";
-// off = production with nothing set up: nothing can be sent
+// off = production with no email settings: nothing can be sent
 export function mailMode() {
   if (settings.mode) return settings.mode; // tests only: configureMail({ mode: 'off' })
   if (mailConfigured()) return 'live';

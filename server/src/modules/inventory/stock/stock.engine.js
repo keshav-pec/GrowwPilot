@@ -1,9 +1,7 @@
-import mongoose from 'mongoose';
 import { InventoryBalance, InventoryLedgerEntry, InventoryLocation, InventorySkuBranch, InventoryTransaction } from '../../../models/index.js';
 import { AppError } from '../../../utils/AppError.js';
-import { scoped } from '../../../utils/scoped.js';
-import { actorRole } from '../../activity/activity.service.js';
-import { refreshLowStock } from './lowStock.js';
+import { oid, scoped } from '../../../utils/scoped.js';
+import { actorRole, personOf } from '../../activity/activity.service.js';
 
 // ---------------------------------------------------------------------------
 // The stock engine: the ONLY code that writes stock movements and balances.
@@ -31,7 +29,7 @@ const unique = (values) => [...new Set(values.map(String))];
 export async function postMovement(ctx, movement, session) {
   if (!session) throw new Error('postMovement must run inside a transaction');
   const { branchId, type, reason, note, heldBy, reference, correctsId, requestKey, approvedBy, lines } = movement;
-  const actor = movement.actor ?? { id: ctx.userId, name: ctx.userName, role: actorRole(ctx) };
+  const actor = movement.actor ?? personOf(ctx);
 
   if (!lines?.length) throw new AppError(400, 'VALIDATION_ERROR', 'A stock movement needs at least one line');
   for (const line of lines) {
@@ -134,10 +132,6 @@ export async function postMovement(ctx, movement, session) {
     { session, ordered: true }
   );
 
-  // Stock in the stores changed: raise (or clear) low-stock alerts
-  const storeChanged = unique(costedLines.filter((l) => locations.find((loc) => String(loc._id) === String(l.locationId)).kind === 'STORE').map((l) => l.skuId));
-  await refreshLowStock(ctx, branchId, storeChanged, session);
-
   return { transaction, entries };
 }
 
@@ -200,10 +194,10 @@ async function branchOnHand(ctx, branchId, skuId, session) {
 }
 
 // Rebuilds every balance from the movement history and lists any that don't match (should always be empty).
-// Phase 7 turns this into an owner-only check; tests use it after mixed actions (PRD AC24).
+// Owners can run this check from Settings; tests use it after mixed actions.
 export async function reconcile(ctx, { branchId } = {}) {
-  const match = { orgId: new mongoose.Types.ObjectId(ctx.orgId) };
-  if (branchId) match.branchId = new mongoose.Types.ObjectId(String(branchId));
+  const match = { orgId: oid(ctx.orgId) };
+  if (branchId) match.branchId = oid(branchId);
 
   const [fromHistory, balances] = await Promise.all([
     InventoryLedgerEntry.aggregate([{ $match: match }, { $group: { _id: { locationId: '$locationId', skuId: '$skuId' }, qty: { $sum: '$qty' } } }]),

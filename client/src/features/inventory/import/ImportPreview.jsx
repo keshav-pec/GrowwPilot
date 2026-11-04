@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { useCommitImport, usePreviewImport } from '../../../api/inventory/imports';
-import { WAY_OF_USE_LABEL, newRequestKey } from '../../../lib/inventory';
+import { WAY_OF_USE_LABEL } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { IMPORT_COLUMNS } from '../../../lib/inventoryCsv';
-import { Button, Input, Modal, Pagination } from '../../../components/ui';
+import { Button, Input, Modal, ModalFooter, Pagination } from '../../../components/ui';
 
 const PAGE_SIZE = 100;
 
@@ -171,14 +172,9 @@ function FixRowModal({ line, saving, onSave, onClose }) {
       onClose={onClose}
       title={`Fix row ${line.row}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={() => onSave(raw)} loading={saving}>
+        <ModalFooter onClose={onClose} onClick={() => onSave(raw)} loading={saving}>
             Check again
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="grid gap-3 sm:grid-cols-2">

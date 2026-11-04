@@ -2,22 +2,17 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useDirectReceipt, useReturnToSupplier } from '../../../api/inventory/purchasing';
 import { useSuppliers } from '../../../api/inventory/suppliers';
-import { newRequestKey } from '../../../lib/inventory';
+import { newRequestKey } from '../../../lib/requestKey';
 import { toPaise } from '../../../lib/money';
-import { Button, Input, Modal, Select } from '../../../components/ui';
+import { Input, Modal, ModalFooter, Select } from '../../../components/ui';
 import { StoreSelect } from '../actions/fields';
 import LinesEditor, { linesValid } from './LinesEditor';
 
 function Footer({ onClose, onSave, saving, disabled, label }) {
   return (
-    <>
-      <Button variant="secondary" onClick={onClose}>
-        Cancel
-      </Button>
-      <Button onClick={onSave} loading={saving} disabled={disabled}>
+    <ModalFooter onClose={onClose} onClick={onSave} loading={saving} disabled={disabled}>
         {label}
-      </Button>
-    </>
+      </ModalFooter>
   );
 }
 
@@ -50,7 +45,7 @@ export function DirectReceiptModal({ canSeeCosts, onClose }) {
   }
 
   return (
-    <Modal open onClose={onClose} size="wide" title="Receive without an order" footer={<Footer onClose={onClose} onSave={save} saving={receive.isPending} disabled={!linesValid(lines)} label="Add to store" />}>
+    <Modal open onClose={onClose} size="wide" title="Receive without an order" footer={<ModalFooter onClose={onClose} onClick={save} loading={receive.isPending} disabled={!linesValid(lines)}>Add to store</ModalFooter>}>
       <div className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-3">
           <Select label="Supplier (optional)" placeholder="—" options={suppliers.map((s) => ({ value: s._id, label: s.name }))} value={supplierId} onChange={(e) => setSupplierId(e.target.value)} />
@@ -92,7 +87,7 @@ export function ReturnToSupplierModal({ onClose }) {
       onClose={onClose}
       size="wide"
       title="Return to supplier"
-      footer={<Footer onClose={onClose} onSave={save} saving={sendBack.isPending} disabled={!supplierId || reason.trim().length < 3 || !linesValid(lines)} label="Return" />}
+      footer={<ModalFooter onClose={onClose} onClick={save} loading={sendBack.isPending} disabled={!supplierId || reason.trim().length < 3 || !linesValid(lines)}>Return</ModalFooter>}
     >
       <div className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-3">

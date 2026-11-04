@@ -3,7 +3,7 @@ import { DateTime } from 'luxon';
 // What a recorded call does to the task. Pure. A call never counts as a promotional message and never needs
 // messaging permission.
 //   Reached        -> contacted (a "tell them it was withdrawn" task is done). Only Reached counts as "contacted" in the
-//                     reports (PRD section 16: contacted = an offer message sent, or a Reached call)
+//                     reports (contacted = an offer message sent, or a Reached call)
 //   No answer      -> one follow-up the next day at 11:00; a second no answer closes the task as Unreachable
 //   Not interested -> closed
 //   Call later     -> due at the chosen time (before the offer's month ends)

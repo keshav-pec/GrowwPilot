@@ -32,7 +32,7 @@ export const EXCEPTION_REASON = {
 };
 
 // The parts of a use that are copied onto exceptions and corrections
-export const USE_FIELDS = [
+const USE_FIELDS = [
   'branchId',
   'appointmentId',
   'serviceLineId',

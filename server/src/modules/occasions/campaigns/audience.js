@@ -2,13 +2,14 @@ import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
 import { Branch, Customer, OccasionCampaign } from '../../../models/index.js';
 import { scoped } from '../../../utils/scoped.js';
-import { CONSENT_CHANNELS, maskPhone } from '../../../config/occasions.js';
+import { CONSENT_CHANNELS } from '../../../config/occasions.js';
+import { maskPhone } from '../../../utils/mask.js';
 
 const { ObjectId } = mongoose.Types;
 
 // Which month it is now at every active branch, in the branch's own time zone (late on 31 October in
 // Kolkata it can still be October in Dubai). Map branchId -> { branch, month, year }
-export async function branchMonths(ctx, now = new Date(), session = null) {
+async function branchMonths(ctx, now = new Date(), session = null) {
   const branches = await Branch.find(scoped(ctx, { status: 'active' })).select('name timezone').session(session).lean();
   return new Map(
     branches.map((b) => {

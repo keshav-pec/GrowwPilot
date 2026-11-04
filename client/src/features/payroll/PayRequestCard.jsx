@@ -5,7 +5,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useAnswerPayRequest } from '../../api/payroll';
 import { describePay, formatPayDay } from '../../lib/payroll';
 import { formatDateTime } from '../../lib/time';
-import { Badge, Button, Modal, Textarea } from '../../components/ui';
+import { Badge, Button, Modal, ModalFooter, Textarea } from '../../components/ui';
 
 const STATUS = {
   pending: { label: 'Waiting for approval', tone: 'yellow' },
@@ -38,14 +38,9 @@ function AnswerModal({ request, action, onClose }) {
       onClose={onClose}
       title={approving ? 'Approve this pay change?' : 'Don’t approve this pay change?'}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant={approving ? 'primary' : 'danger'} onClick={submit} loading={answer.isPending}>
+        <ModalFooter onClose={onClose} variant={approving ? 'primary' : 'danger'} onClick={submit} loading={answer.isPending}>
             {approving ? 'Approve' : 'Don’t approve'}
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="space-y-3 text-sm">
@@ -83,7 +78,7 @@ export default function PayRequestCard({ request, showBranch = false }) {
       </div>
 
       <p className="mt-2 flex flex-wrap items-center gap-2">
-        <span className="text-muted">{request.currentSummary === 'No pay setup' ? 'Not set up yet' : request.currentSummary}</span>
+        <span className="text-muted">{request.currentSummary}</span>
         <ArrowRight size={14} className="text-muted" />
         <span className="font-medium">{describePay(request.proposed)}</span>
         <span className="text-muted">from {formatPayDay(request.proposed.effectiveFrom)}</span>

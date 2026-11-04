@@ -23,7 +23,7 @@ export function customerScope(ctx, extra = {}) {
 
 // The three counts next to the switch: how many customers have a birthday month, an anniversary month,
 // and at least one channel they may be messaged on
-export async function dataCounts(ctx) {
+async function dataCounts(ctx) {
   const optedIn = { $or: CONSENT_CHANNELS.map((channel) => ({ [`marketing.${channel}.status`]: 'OPTED_IN' })) };
   const [customers, birthdayKnown, anniversaryKnown, canMessage] = await Promise.all([
     Customer.countDocuments(customerScope(ctx)),

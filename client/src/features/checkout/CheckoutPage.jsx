@@ -4,7 +4,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useAppointment } from '../../api/appointments';
 import { useOpenDraft } from '../../api/invoices';
 import { formatDateTime } from '../../lib/time';
-import { Badge, EmptyState, PageHeader, Spinner } from '../../components/ui';
+import { Badge, EmptyState, PageHeader, PageSpinner } from '../../components/ui';
 import DraftEditor from './DraftEditor';
 
 // Checkout for a finished appointment: opens its draft bill (made the first time), then the draft editor.
@@ -63,9 +63,5 @@ export default function CheckoutPage() {
 }
 
 function Loading() {
-  return (
-    <div className="flex justify-center py-12">
-      <Spinner size={28} />
-    </div>
-  );
+  return <PageSpinner />;
 }

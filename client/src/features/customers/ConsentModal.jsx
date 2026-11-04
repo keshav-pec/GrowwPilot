@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { useChangeConsent } from '../../api/occasions';
-import { newRequestKey } from '../../lib/billing';
+import { newRequestKey } from '../../lib/requestKey';
 import { CHANNEL_LABEL, CONSENT_SOURCES } from '../../lib/occasions';
-import { Button, Modal, Select, Textarea } from '../../components/ui';
+import { Modal, ModalFooter, Select, Textarea } from '../../components/ui';
 
 // Record permission (mode 'record') or an opt-out (mode 'withdraw') for one channel.
 // Recording: the tick box starts unticked and shows the exact wording; the front desk also ticks
@@ -38,14 +38,9 @@ export default function ConsentModal({ customerId, customerName, channel, mode, 
       onClose={onClose}
       title={recording ? `Record ${label} permission` : `Opt out of ${label}`}
       footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant={recording ? 'primary' : 'danger'} disabled={!ready} loading={change.isPending} onClick={save}>
+        <ModalFooter onClose={onClose} variant={recording ? 'primary' : 'danger'} disabled={!ready} loading={change.isPending} onClick={save}>
             {recording ? 'Record permission' : 'Opt out'}
-          </Button>
-        </>
+          </ModalFooter>
       }
     >
       <div className="flex flex-col gap-4 text-sm">

@@ -23,7 +23,7 @@ export const PLAIN_REASON = {
   TIMEOUT: 'The mail service took too long to answer. It will be tried again.',
   NETWORK: 'Couldn’t reach the mail service. It will be tried again.',
   BUSY: 'The mail service is busy. It will be tried again.',
-  NOT_SET_UP: 'Email is not set up on the server.',
+  MAIL_OFF: 'Email is off on the server.',
   OTHER: 'The email couldn’t be sent.',
 };
 

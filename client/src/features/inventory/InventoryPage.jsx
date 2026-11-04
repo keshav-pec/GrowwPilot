@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { useInventoryAccess } from '../../api/inventory/access';
 import { useSetup } from '../../api/inventory/setup';
-import { PageHeader, Spinner, Tabs } from '../../components/ui';
+import { PageHeader, PageSpinner, Tabs } from '../../components/ui';
 import ProductsTab from './products/ProductsTab';
 import ProductDrawer from './products/ProductDrawer';
 import SettingsTab from './settings/SettingsTab';
@@ -16,7 +16,7 @@ import PurchasingTab from './purchasing/PurchasingTab';
 import OrderDrawer from './purchasing/OrderDrawer';
 import StockCountTab from './stockCount/StockCountTab';
 
-// The tabs (INVENTORY_PLAN.md). `action`: only shown to people who may do it.
+// The tabs. `action`: only shown to people who may do it.
 const TABS = [
   { value: 'overview', label: 'Overview' },
   { value: 'products', label: 'Products' },
@@ -86,9 +86,7 @@ export default function InventoryPage() {
       <PageHeader title="Inventory" subtitle={`Stock at ${activeBranch?.name}`} />
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <Spinner size={28} />
-        </div>
+        <PageSpinner />
       ) : accessQuery.isError ? (
         <p className="text-sm text-danger">{accessQuery.error.message}</p>
       ) : tab === 'setup' ? (
