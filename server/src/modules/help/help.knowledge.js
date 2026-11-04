@@ -6,7 +6,7 @@
 //             Each word is worth 1 point; a leading "*" makes a single strong word worth 2 points.
 // answer:     the reply. "for" gives a different reply to a specific audience.
 // denied:     the reply for someone OUTSIDE the audiences (they learn who can do it, not how).
-// link:       a button that opens the right screen.
+// link:       a button that opens the right screen (link.audiences: only for some of the topic's audiences).
 // general:    a broad topic (e.g. "booking"). On a tie it loses to a specific one (e.g. "cancel a booking").
 // Placeholders: {name} (first name), {branch} (selected branch), {salon} (salon name)
 
@@ -304,12 +304,47 @@ export const KNOWLEDGE = [
     title: 'Passwords',
     audiences: ALL,
     keywords: ['*password', 'forgot password', 'reset password', 'change password', 'cant login', 'cannot login', 'locked out'],
-    answer: 'Owners reset front desk passwords in **Team → Front desk logins**: click the person, then **Reset password**. A new temporary password is shown once to share with them.',
+    answer:
+      'Forgot your own password? On the login page click **Forgot password?** and we’ll email you a link (it works once, for 1 hour). For your team: **Team → Front desk logins**, click the person, then **Email a password link** (they choose their own password, link valid 48 hours) or **Reset password** (a temporary password shown once to share). If there’s no **Forgot password?** link, email isn’t set up yet.',
     for: {
-      FRONT_DESK: 'Please ask your salon owner. They can reset your password in **Team → Front desk logins** and give you a new temporary password.',
-      INVENTORY: 'Please ask your salon owner. They can reset your password in **Team → Inventory logins** and give you a new temporary password.',
-      PRIMARY_OWNER: 'You can reset front desk and branch owner passwords in **Team** (click the person, then **Reset password**; the new temporary password is shown once). To change your own password, contact GrowwPilot support with the **Need help?** link.',
+      FRONT_DESK: 'On the login page click **Forgot password?** and we’ll email you a link to choose a new one (it works once, for 1 hour; check spam too). No link there, or no email? Please ask your salon owner: they can reset your password in **Team → Front desk logins**.',
+      INVENTORY: 'On the login page click **Forgot password?** and we’ll email you a link to choose a new one (it works once, for 1 hour). No link there, or no email? Please ask your salon owner: they can reset your password in **Team → Inventory logins**.',
+      PRIMARY_OWNER:
+        'Your own password: on the login page click **Forgot password?** and we’ll email you a link (it works once, for 1 hour). Your team: in **Team**, click the person, then **Email a password link** (they choose their own, valid 48 hours) or **Reset password** (a temporary password shown once). Either way they’re logged out on their other devices. No **Forgot password?** link means email isn’t set up yet (see **Email** in the menu).',
     },
+  },
+  {
+    id: 'email-bill',
+    title: 'Emailing a bill',
+    audiences: EVERYONE,
+    keywords: ['email bill', 'email invoice', 'bill by email', 'mail bill', 'email receipt', 'email pdf', 'send bill email'],
+    answer:
+      'Open the issued bill and click **Email bill**. It goes to the customer’s email (you can type another one) with the bill attached as a PDF, from your salon’s name; replies go to your salon’s contact email. The bill then shows *Email queued*, *Email sent* or *Email not sent* with the reason. No **Email bill** button means email isn’t set up yet: use **Send to customer** for a link instead.',
+  },
+  {
+    id: 'email-not-received',
+    title: 'Why didn’t my customer get the email?',
+    audiences: EVERYONE,
+    keywords: ['didnt email', 'email not received', 'no email', 'email failed', 'email not sent', 'email spam', 'email bounced', 'not receiving email', 'email not arrived', 'email not come'],
+    answer:
+      'Open the offer or the bill: it says *Email queued* (waiting to go out), *Email sent* (Gmail accepted it) or *Email not sent* with the reason. Usual reasons: the address is wrong (fix it on the customer’s profile, then send again), the customer withdrew permission or unsubscribed (offers only), or the daily email limit was reached (it goes out later by itself). *Email sent* but not there? Ask them to look in their spam or promotions folder.',
+    for: {
+      PRIMARY_OWNER:
+        'Open the offer or the bill to see *Email queued*, *Email sent* or *Email not sent* with the reason; **Email → Recent emails** lists them all, with filters. Usual reasons: a wrong address (fix it, then send again), permission withdrawn or unsubscribed (offers only), the daily limit (it goes out later by itself), or a setup problem shown on the **Email** page. *Email sent* but not there? Ask them to check spam or promotions.',
+      BRANCH_OWNER:
+        'Open the offer or the bill to see *Email queued*, *Email sent* or *Email not sent* with the reason; **Email → Recent emails** lists your branches’ emails. Usual reasons: a wrong address (fix it, then send again), permission withdrawn or unsubscribed (offers only), or the daily limit (it goes out later by itself). *Email sent* but not there? Ask them to check spam or promotions.',
+    },
+    link: { to: '/app/settings/email', label: 'Recent emails', audiences: OWNERS },
+  },
+  {
+    id: 'email-setup',
+    title: 'Setting up email',
+    audiences: ['PRIMARY_OWNER'],
+    keywords: ['email not set up', 'set up email', 'email setup', 'email setting', 'test email', 'email limit', 'daily email limit', '*gmail', 'apps script'],
+    answer:
+      'Open **Email** in the menu. It says whether email is set up, how much of today’s limit is used (about 90 emails a day for the whole app on a free Gmail account), and has **Send test email**. *Not set up* means whoever runs the server still has to connect the Gmail account (the README’s “Setting up email”); until then offer emails open on your own device, and bills and passwords can’t be emailed.',
+    denied: 'Only the main owner of {salon} can check how email is set up. If emails aren’t arriving, ask them to open **Email** in the menu.',
+    link: { to: '/app/settings/email', label: 'Email' },
   },
   {
     id: 'logged-out',
@@ -388,7 +423,7 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['front desk login', 'receptionist account', 'add receptionist', 'new front desk', 'desk account', 'add user'],
     answer:
-      'Go to **Team → Front desk logins → Add front desk**, enter their name and email and pick their branch. A temporary password is shown once, with a **Copy login details** button. Click a person later to **Reset password** or **Deactivate** them (they’re logged out on their next click).',
+      'Go to **Team → Front desk logins → Add front desk**, enter their name and email and pick their branch. With email set up, leave **Email them a link to set their password** ticked and they get an email to choose their own; otherwise a temporary password is shown once, with a **Copy login details** button. Click a person later to **Reset password** or **Deactivate** them (they’re logged out on their next click).',
     denied: 'Only owners create front desk logins. Please ask your salon owner.',
     link: { label: 'Team', to: '/app/team?tab=front-desk' },
   },

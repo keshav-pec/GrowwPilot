@@ -593,6 +593,33 @@ const withOffer = await setInvoiceOffer(deskOccasions, spaDraft._id, { offerIssu
 await issueInvoice(deskOccasions, spaDraft._id, { version: withOffer.version, payments: [{ method: 'UPI', amount: withOffer.grandTotal, reference: 'UPI 5512' }] }, bkey());
 
 // ===========================================================================
+// 10. Email (EMAIL_PLAN.md): a few emails already sent or failed, for Email → Recent emails and the bill page.
+//     Saved as finished rows, so nothing is really sent even when the server has email set up.
+// ===========================================================================
+const minutesAgo = (m) => new Date(Date.now() - m * 60_000);
+const meeraBill = await models.Invoice.findById(spaDraft._id).select('invoiceNumber').lean();
+const emailRow = (org, fields) => ({
+  orgId: org._id,
+  html: '<p>Demo email</p>',
+  text: 'Demo email',
+  fromName: org.name,
+  replyTo: org.contactEmail,
+  attempts: 1,
+  nextAttemptAt: fields.createdAt,
+  ...fields,
+});
+const demoEmails = [
+  emailRow(glamour, { kind: 'TEST', priority: 2, to: 'owner@glamour.com', subject: 'Test email from Glamour Studio', dedupeKey: 'seed:test', status: 'SENT', via: 'APPS_SCRIPT', createdAt: minutesAgo(300), sentAt: minutesAgo(299), createdBy: { id: anita._id, name: anita.name } }),
+  emailRow(glamour, { kind: 'BILL', priority: 3, to: 'meera.nair@example.com', subject: `Your bill ${meeraBill.invoiceNumber} from Glamour Studio`, branchId: branch.Andheri._id, attachment: { type: 'INVOICE', id: spaDraft._id }, ref: { invoiceId: spaDraft._id }, dedupeKey: 'seed:bill', status: 'SENT', via: 'SMTP', createdAt: minutesAgo(90), sentAt: minutesAgo(89), createdBy: { id: kavya._id, name: kavya.name } }),
+  emailRow(glamour, { kind: 'OCCASION_OFFER', priority: 4, to: 'rohit.jain@exmaple.com', subject: 'A birthday treat from Glamour Studio', branchId: branch.Bandra._id, dedupeKey: 'seed:offer-failed', status: 'FAILED', attempts: 1, errorKind: 'BAD_ADDRESS', lastError: 'The email address isn’t valid.', errorDetail: 'Invalid email: rohit.jain@exmaple.com', createdAt: minutesAgo(60), createdBy: { id: vikram._id, name: vikram.name } }),
+  emailRow(glamour, { kind: 'PASSWORD', priority: 1, to: 'desk.bandra@glamour.com', subject: 'Set your GrowwPilot password for Glamour Studio', html: 'Removed: this email contained a one-time password link.', text: 'Removed: this email contained a one-time password link.', fromName: 'GrowwPilot', dedupeKey: 'seed:password', status: 'SENT', via: 'APPS_SCRIPT', createdAt: minutesAgo(30), sentAt: minutesAgo(30), createdBy: { id: anita._id, name: anita.name } }),
+  emailRow(desertRose, { kind: 'TEST', priority: 2, to: 'owner@desertrose.com', subject: 'Test email from Desert Rose Salon', dedupeKey: 'seed:test', status: 'SENT', via: 'APPS_SCRIPT', createdAt: minutesAgo(200), sentAt: minutesAgo(200) }),
+];
+// Checked like any email, then saved as they are (so the demo times are kept)
+for (const row of demoEmails) await new models.EmailOutbox(row).validate();
+await models.EmailOutbox.collection.insertMany(demoEmails.map((row) => ({ ...row, updatedAt: row.sentAt ?? row.createdAt })));
+
+// ===========================================================================
 // Done
 // ===========================================================================
 console.log(`\nSeeded: 2 salons, 3 branches, ${Object.keys(staff).length} staff, ${GLAMOUR_SERVICES.length + DESERT_ROSE_SERVICES.length} services, 2 combos,`);
@@ -601,6 +628,7 @@ console.log(`        8 pay setups (2 front desk), 1 pay change request waiting f
 console.log(`        Inventory (Glamour Andheri): ${Object.keys(sku).length} products (2 for sale on bills), 3 recipes, 4 hand-outs, 2 purchase orders, 1 write-off waiting for approval, 1 problem report, 4 product photos`);
 console.log('        Billing: Glamour GST registered (Desert Rose not); 2 bills with money due, 1 advance, 2 product sales (1 refund done with a credit note, 1 waiting for approval), yesterday\'s cash days closed');
 console.log(`        Occasion offers (Glamour on, Desert Rose off): 3 campaigns (1 Bandra-only), ${await models.OfferIssue.countDocuments()} offers this month (1 already used on a bill), Priya and Neha can be messaged`);
+console.log('        Email: 5 demo emails (4 for Glamour: a test email, a bill, a failed offer email, a password link; 1 for Desert Rose), nothing really sent');
 console.log(`Today is centred on ${A.toFormat('h:mm a')} at Andheri (${A.zoneName}).`);
 console.log('\nEvery account uses the password:', DEMO_PASSWORD);
 console.table([

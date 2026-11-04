@@ -1,4 +1,6 @@
-import { EmailOutbox, Organization } from '../../models/index.js';
+import { DateTime } from 'luxon';
+import { Branch, EmailOutbox, Organization } from '../../models/index.js';
+import { maskEmail } from './mask.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { runOnce } from '../../middleware/idempotency.js';
@@ -82,4 +84,53 @@ export async function testEmailState(ctx, id) {
   const row = await EmailOutbox.findOne(scoped(ctx, { _id: id, kind: 'TEST' })).select('status via sentAt lastError to').lean();
   if (!row) throw new AppError(404, 'NOT_FOUND', 'Test email not found');
   return { id: row._id, to: row.to, status: row.status, via: row.via ?? null, sentAt: row.sentAt ?? null, error: row.lastError ?? null };
+}
+
+// GET /api/mail/log — the salon's recent emails, newest first. No email body, the address partly hidden.
+// Business owner: every email; branch owner: emails of their branches (test and password emails have no branch).
+const LOG_PAGE = 25;
+const KIND_LABEL = { TEST: 'Test email', OCCASION_OFFER: 'Occasion offer', PASSWORD: 'Password link', BILL: 'Bill' };
+export async function mailLog(ctx, { kind, status, from, to, page }) {
+  const filter = ctx.isPrimaryOwner ? scoped(ctx) : scoped(ctx, { branchId: { $in: ctx.allowedBranchIds } });
+  if (kind) filter.kind = kind;
+  if (status) filter.status = status === 'WAITING' ? { $in: ['PENDING', 'SENDING'] } : status;
+  if (from || to) {
+    const branch = await Branch.findOne(scoped(ctx, { _id: ctx.activeBranchId })).select('timezone').lean();
+    const zone = branch?.timezone ?? 'Asia/Kolkata';
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = DateTime.fromISO(from, { zone }).startOf('day').toJSDate();
+    if (to) filter.createdAt.$lte = DateTime.fromISO(to, { zone }).endOf('day').toJSDate();
+  }
+  const [rows, total, branches] = await Promise.all([
+    EmailOutbox.find(filter)
+      .select('kind to subject status via attempts lastError branchId createdAt sentAt createdBy priority')
+      .sort({ createdAt: -1, _id: -1 })
+      .skip((page - 1) * LOG_PAGE)
+      .limit(LOG_PAGE)
+      .lean(),
+    EmailOutbox.countDocuments(filter),
+    Branch.find(scoped(ctx)).select('name').lean(),
+  ]);
+  const branchName = new Map(branches.map((b) => [String(b._id), b.name]));
+  return {
+    emails: rows.map((r) => ({
+      _id: r._id,
+      kind: r.kind,
+      kindLabel: KIND_LABEL[r.kind],
+      automatic: r.kind === 'OCCASION_OFFER' && r.priority === 5,
+      to: maskEmail(r.to),
+      subject: r.kind === 'PASSWORD' ? 'Password link' : r.subject,
+      status: r.status,
+      via: r.via ?? null,
+      attempts: r.attempts,
+      error: r.lastError ?? null,
+      branchName: r.branchId ? (branchName.get(String(r.branchId)) ?? null) : null,
+      by: r.createdBy?.name ?? null,
+      createdAt: r.createdAt,
+      sentAt: r.sentAt ?? null,
+    })),
+    total,
+    page,
+    pageSize: LOG_PAGE,
+  };
 }

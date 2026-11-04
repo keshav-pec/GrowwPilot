@@ -111,3 +111,23 @@ export function useInvoiceOffers(invoiceId, version, enabled = true) {
 
 // { _id, version, offerIssueId | null } -> the draft with the offer on (or off). Nothing is used until the bill is issued.
 export const useSetInvoiceOffer = () => useBillMutation(({ _id, version, offerIssueId }) => api.post(`/invoices/${_id}/occasion-offer`, { offerIssueId, version }).then((res) => res.data));
+
+// A bill's emails (newest first), the customer's email (partly hidden) and whether it can be emailed.
+// Asks again every 3 seconds while one is waiting to go out.
+export function useBillEmails(id, enabled = true) {
+  return useQuery({
+    queryKey: ['invoice', id, 'emails'],
+    queryFn: () => api.get(`/invoices/${id}/emails`).then((res) => res.data),
+    enabled: Boolean(id) && enabled,
+    refetchInterval: (query) => (query.state.data?.emails.some((e) => ['PENDING', 'SENDING'].includes(e.status) && !e.error) ? 3000 : false),
+  });
+}
+
+// { id, key, to? } -> { id, to, status }
+export function useEmailBill() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, key, to }) => api.post(`/invoices/${id}/email`, { to: to || undefined }, { headers: { 'Idempotency-Key': key } }).then((res) => res.data),
+    onSuccess: (_, { id }) => queryClient.invalidateQueries({ queryKey: ['invoice', id, 'emails'] }),
+  });
+}

@@ -219,7 +219,13 @@ describe('Apps Script replies', () => {
 
 describe('attachments', () => {
   const pdf = Buffer.from('%PDF-1.4 fake');
-  beforeAll(() => onAttachment('INVOICE', async () => ({ fileName: 'bill.pdf', mimeType: 'application/pdf', content: pdf })));
+  let realBuilder;
+  beforeAll(() => {
+    realBuilder = onAttachment('INVOICE', async () => ({ fileName: 'bill.pdf', mimeType: 'application/pdf', content: pdf }));
+  });
+  afterAll(() => {
+    onAttachment('INVOICE', realBuilder);
+  });
 
   it('an email with a PDF goes by SMTP first', async () => {
     const { id } = await queue({ kind: 'BILL', attachment: { type: 'INVOICE', id: new mongoose.Types.ObjectId() } });

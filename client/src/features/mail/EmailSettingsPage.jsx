@@ -4,12 +4,22 @@ import { useMailStatus, useSendTestEmail, useTestEmail } from '../../api/mail';
 import { newRequestKey } from '../../lib/billing';
 import { formatDateTime } from '../../lib/time';
 import { Badge, Button, Card, EmptyState, PageHeader, Spinner } from '../../components/ui';
+import RecentEmailsCard from './RecentEmailsCard';
 
 const ROUTE_LABELS = { APPS_SCRIPT: 'Google Apps Script', SMTP: 'Gmail SMTP (backup)', LOG: 'not sent: email isn’t set up, so it was printed in the server log' };
 
-// Settings → Email (business owner): is email set up, how much of today's limit is used, and a test email
+// Email (owners): is email set up, how much of today's limit is used, a test email (business owner), and the
+// recent emails (branch owners: only this, for their branches)
 export default function EmailSettingsPage() {
   const statusQuery = useMailStatus();
+  if (statusQuery.isError && statusQuery.error.status === 403) {
+    return (
+      <div className="max-w-5xl">
+        <PageHeader title="Email" subtitle="Emails the app sent for your branches." />
+        <RecentEmailsCard />
+      </div>
+    );
+  }
   if (statusQuery.isPending) {
     return (
       <div className="flex justify-center py-12">
@@ -21,11 +31,12 @@ export default function EmailSettingsPage() {
 
   const status = statusQuery.data;
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl">
       <PageHeader title="Email" subtitle="Emails the app sends for your salon. Replies go to your salon’s contact email." />
       <div className="space-y-4">
         <StatusCard status={status} />
         {status.mode !== 'off' && <TestEmailCard to={status.testTo} />}
+        <RecentEmailsCard />
       </div>
     </div>
   );

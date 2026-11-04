@@ -61,6 +61,11 @@ describe('Understanding the question', () => {
     ['why can’t I apply the offer', 'occasions-cant-apply'],
     ['offer redeemed elsewhere message', 'occasions-cant-apply'],
     ['birthday report with associated sales', 'occasions-reports'],
+    ['how do I email the bill to a customer', 'email-bill'],
+    ['why didn’t my customer get the email?', 'email-not-received'],
+    ['email is not set up', 'email-setup'],
+    ['send a test email', 'email-setup'],
+    ['I forgot my password and need a reset link', 'password'],
     ['hello', 'greeting'],
     ['thanks!', 'thanks'],
   ];
@@ -97,6 +102,8 @@ describe('Answers are limited to the person asking', () => {
   it('gives the same topic different words for different roles, filled in with their details', () => {
     expect(answerQuestion('forgot password', desk).answer).toContain('ask your salon owner');
     expect(answerQuestion('forgot password', owner).answer).toContain('Reset password');
+    expect(answerQuestion('forgot password', desk).answer).toContain('Forgot password?');
+    expect(answerQuestion('email is not set up', desk).kind).toBe('not-allowed');
     expect(answerQuestion('switch branch', desk).answer).toContain('**Andheri** only');
     expect(answerQuestion('hi', desk).answer).toContain('Hi Kavya!');
   });

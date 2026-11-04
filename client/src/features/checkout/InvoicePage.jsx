@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Ban, Download, History, Printer, Share2, Undo2, Wallet } from 'lucide-react';
+import { Ban, Download, History, Mail, Printer, Share2, Undo2, Wallet } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
-import { downloadInvoicePdf, useInvoice, useInvoiceHistory, useReversePayment, useVoidInvoice } from '../../api/invoices';
+import { downloadInvoicePdf, useBillEmails, useInvoice, useInvoiceHistory, useReversePayment, useVoidInvoice } from '../../api/invoices';
 import { useApproveRefund, useRejectRefund } from '../../api/refunds';
 import { formatMoney } from '../../lib/money';
 import { formatDateTime } from '../../lib/time';
@@ -13,6 +13,7 @@ import RecordPaymentModal from '../billing/RecordPaymentModal';
 import RefundModal from '../billing/RefundModal';
 import ReasonModal from '../billing/ReasonModal';
 import ShareBillModal from '../billing/ShareBillModal';
+import EmailBillModal from '../billing/EmailBillModal';
 
 const REFUND_STATUS = { REQUESTED: { label: 'Waiting for an owner', tone: 'yellow' }, DONE: { label: 'Refunded', tone: 'brown' }, REJECTED: { label: 'Turned down', tone: 'neutral' } };
 
@@ -26,6 +27,8 @@ export default function InvoicePage() {
   const [refunding, setRefunding] = useState(false);
   const [asking, setAsking] = useState(null); // { kind: 'void' | 'reverse' | 'rejectRefund', id }
   const [sharing, setSharing] = useState(false);
+  const [emailing, setEmailing] = useState(false);
+  const emailsQuery = useBillEmails(id, invoiceQuery.data?.status === 'ISSUED');
   const [showHistory, setShowHistory] = useState(false);
   const history = useInvoiceHistory(id, showHistory);
   const voidBill = useVoidInvoice();
@@ -97,6 +100,11 @@ export default function InvoicePage() {
               <Share2 size={16} /> Send to customer
             </Button>
           )}
+          {emailsQuery.data?.canEmail && (
+            <Button variant="secondary" onClick={() => setEmailing(true)}>
+              <Mail size={16} /> Email bill
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => downloadInvoicePdf(invoice).catch((err) => toast.error(err.message))}>
             <Download size={16} /> PDF
           </Button>
@@ -105,6 +113,8 @@ export default function InvoicePage() {
           </Button>
         </div>
       </div>
+
+      <BillEmailLine emails={emailsQuery.data?.emails ?? []} zone={invoice.branchId.timezone} />
 
       <div className="mx-auto max-w-2xl rounded-xl border border-border bg-bg p-6 print:border-0 print:p-0">
         <div className="mb-6 flex items-start justify-between gap-4">
@@ -306,6 +316,7 @@ export default function InvoicePage() {
 
       {paying && <RecordPaymentModal invoice={invoice} onClose={() => setPaying(false)} />}
       {sharing && <ShareBillModal invoice={invoice} salonName={salonName} onClose={() => setSharing(false)} />}
+      {emailing && <EmailBillModal invoice={invoice} customerEmail={emailsQuery.data?.customerEmail} onClose={() => setEmailing(false)} />}
       {refunding && <RefundModal invoice={invoice} mayApprove={permissions.refund === 'approve'} onClose={() => setRefunding(false)} />}
       {asking && (
         <ReasonModal
@@ -333,5 +344,29 @@ function Row({ label, value, muted = false }) {
       <dt>{label}</dt>
       <dd>{value}</dd>
     </div>
+  );
+}
+
+// The bill's latest email: Queued / Sent / Not sent (with the reason)
+const EMAIL_STATE = {
+  PENDING: { label: 'Email queued', tone: 'yellow' },
+  SENDING: { label: 'Email queued', tone: 'yellow' },
+  SENT: { label: 'Email sent', tone: 'gold' },
+  FAILED: { label: 'Email not sent', tone: 'danger' },
+  SKIPPED: { label: 'Email not sent', tone: 'danger' },
+};
+function BillEmailLine({ emails, zone }) {
+  const latest = emails[0];
+  if (!latest) return null;
+  const state = EMAIL_STATE[latest.status];
+  return (
+    <p className="mx-auto mb-3 flex max-w-2xl flex-wrap items-center gap-2 text-sm print:hidden">
+      <Badge tone={state.tone}>{state.label}</Badge>
+      <span className="text-muted">
+        to {latest.to} · {formatDateTime(latest.sentAt ?? latest.createdAt, zone)}
+        {latest.by && ` · by ${latest.by}`}
+      </span>
+      {latest.error && <span className={latest.status === 'FAILED' || latest.status === 'SKIPPED' ? 'text-danger' : 'text-orange'}>{latest.error}</span>}
+    </p>
   );
 }

@@ -97,7 +97,7 @@ export function answerQuestion(question, who) {
     topicId: entry.id,
     topic: entry.title,
     answer: fill(text, who),
-    link: allowed ? (entry.link ?? null) : null,
+    link: allowed && entry.link && (!entry.link.audiences || entry.link.audiences.includes(who.audience)) ? { to: entry.link.to, label: entry.link.label } : null,
     suggestions: ['greeting', 'capabilities'].includes(entry.id) ? STARTER_QUESTIONS[who.audience] : [],
   };
 }

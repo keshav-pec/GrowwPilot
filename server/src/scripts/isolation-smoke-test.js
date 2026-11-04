@@ -125,6 +125,21 @@ attempts.push(
   ['Header', "X-Branch-Id = B's branch (occasion reports)", () => call(a, 'GET', '/occasions/reports', { branch: bBranch._id }), 403]
 );
 
+// Email: Glamour aims at Desert Rose's bill emails, test email and team members; a forged unsubscribe link
+const bTestEmail = (await call(b, 'GET', '/mail/log?kind=TEST')).json.emails?.[0];
+const aLogIds = new Set(((await call(a, 'GET', '/mail/log')).json.emails ?? []).map((e) => e._id));
+attempts.push(
+  ['Email (URL)', "email B's bill", () => call(a, 'POST', `/invoices/${bBill._id}/email`, { body: { to: 'spy@example.com' }, idempotency: true }), 404],
+  ['Email (URL)', "read B's bill emails", () => call(a, 'GET', `/invoices/${bBill._id}/emails`), 404],
+  ['Email (URL)', "read B's test email", () => call(a, 'GET', `/mail/test/${bTestEmail?._id}`), 404],
+  ['Email (list)', "B's emails in A's recent emails", async () => ({ status: bTestEmail && !aLogIds.has(bTestEmail._id) ? 404 : 200, json: {} }), 404],
+  ['Email (URL)', "email B's front desk a password link", () => call(a, 'POST', `/users/${bDesk._id}/email-password-link`), 404],
+  ['Email (URL)', 'unsubscribe with a forged link', async () => {
+    const res = await fetch(`${API}/api/public/unsubscribe/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA`, { method: 'POST' });
+    return { status: res.status, json: {} };
+  }, 404]
+);
+
 console.log(`Tenant isolation smoke test against ${API}\nLogged in as Glamour Studio, using Desert Rose's ids (and the other way round for inventory):\n`);
 const rows = [];
 for (const [where, what, request, expected] of attempts) {

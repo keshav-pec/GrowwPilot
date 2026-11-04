@@ -8,6 +8,7 @@ import * as schemas from './invoices.schemas.js';
 import * as controller from './invoices.controller.js';
 import { offersForInvoice, setInvoiceOffer } from '../occasions/checkout/checkout.service.js';
 import { objectId } from '../../utils/schemas.js';
+import { billEmails, emailBill } from './billEmail.js';
 import { z } from 'zod';
 
 // /api/invoices — bills (owners and front desk; branch access is checked in the service)
@@ -22,6 +23,13 @@ router.get('/:id', controller.getOne);
 router.get('/:id/pdf', controller.pdf);
 router.get('/:id/history', controller.history);
 router.post('/:id/share', controller.share); // a link for the customer (see share.js)
+// Email the bill with its PDF ({ to? }: the customer's email by default), and how its emails are doing
+router.post('/:id/email', requireIdempotencyKey, validate({ body: z.object({ to: z.string().trim().max(200).optional() }) }), async (req, res) => {
+  res.status(202).json(await emailBill(req.ctx, req.params.id, { to: req.valid.body.to || undefined }, req.idempotencyKey));
+});
+router.get('/:id/emails', async (req, res) => {
+  res.json(await billEmails(req.ctx, req.params.id));
+});
 
 // Drafts (stale edits are refused by version)
 router.patch('/:id', validate({ body: schemas.saveDraftSchema }), controller.save);

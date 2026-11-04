@@ -45,7 +45,7 @@ const APP_NAV = [
   // Same screen: owners get all of payroll, the front desk only pay setup and requests
   { to: '/app/payroll', label: 'Payroll', icon: Wallet, roles: ['OWNER'] },
   { to: '/app/payroll', label: 'Staff pay', icon: Wallet, roles: ['FRONT_DESK'] },
-  { to: '/app/settings/email', label: 'Email', icon: Mail, roles: ['OWNER'], businessOwner: true },
+  { to: '/app/settings/email', label: 'Email', icon: Mail, roles: ['OWNER'] }, // branch owners: their recent emails only
 ];
 
 export default function AppLayout() {

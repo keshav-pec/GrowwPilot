@@ -277,10 +277,22 @@ Email Part 5: email bills with PDF attached, recent emails log for owners, help 
 
 ## Choices awaiting your OK
 
-1. **Part 3 (automatic offer emails):** include it, or stop at staff-pressed emails? It reverses part of the earlier "staff reminders only" decision.
-2. **Sender:** salon name as the sender name, salon's contact email as Reply-To; one shared Gmail account for all salons.
-3. **Hosting:** stay on Render free and use Apps Script only (about 100 emails a day for the whole platform), or move to a paid Render plan so the SMTP backup works.
-4. **Password emails use a link**, not the 6-digit code from the reference (one way for both "forgot password" and "new team member").
-5. **Limits:** 90 a day for the platform, 30 automatic a day per salon, send hours 10:00–19:00.
+All 5 parts are built (3–4 Nov 2026), using the defaults below. Nothing was answered yet, so each is still open: say if you want one changed.
+
+1. **Part 3 (automatic offer emails): built.** It stays off unless an owner picks *Send automatically by email* on a campaign (or in the quick setup). Easy to remove before committing if you'd rather stop at staff-pressed emails.
+2. **Sender:** salon name as the sender name, salon's contact email as Reply-To; one shared Gmail account for all salons. Password emails are sent as "GrowwPilot".
+3. **Hosting:** built for Render free with Apps Script only (about 100 emails a day for the whole platform). SMTP is ready if you move to a paid plan.
+4. **Password emails use a link**, not a 6-digit code (one way for both "forgot password" and "new team member").
+5. **Limits:** 90 a day for the platform, 30 automatic a day per salon, send hours 10:00–19:00 (changeable in Settings → Occasion offers).
 6. **Every offer email has an unsubscribe link**, and pressing it records *Opted out* on Email only (WhatsApp/SMS untouched).
-7. **Payslip emails** are left for later (staff records have an email field, but no one asked yet).
+7. **Payslip emails** are left for later.
+
+## Decisions made while building
+
+- **How offers are sent** (staff or automatic email) changes straight away, without publishing a new campaign version, so automatic emails can be stopped at once.
+- **Password rule** (none existed): at least 8 characters, with a letter and a number. An owner's **Reset password** now also logs the person out on their other devices.
+- **The Super Admin** can't use "Forgot password" (the account belongs to no salon).
+- **Stored password emails lose their link** once sent (only a hash of the link is kept).
+- **Credit notes and refunds** have no PDF yet, so only bills can be emailed.
+- **Branch owners** see the Email page with **Recent emails** for their branches only; the setup and test email stay with the business owner.
+- **Tests never use the real email settings** in `server/.env` (`vitest.config.js` blanks them), and the demo seed saves its sample emails as already finished, so nothing is sent.
