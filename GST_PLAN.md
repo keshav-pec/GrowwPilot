@@ -1,6 +1,6 @@
 # GST Engine: Build Plan
 
-Based on `GrowwPilot_GST_Engine_Technical_PRD_v1.pdf` (1 Nov 2026) and a check of the current code on 4 Nov 2026. **Phases 1 and 2 are built and committed. Phase 3 is built (6 Nov 2026), not yet committed.** Phases 4 and 5 are not built.
+Based on `GrowwPilot_GST_Engine_Technical_PRD_v1.pdf` (1 Nov 2026) and a check of the current code on 4 Nov 2026. **Phases 1 to 3 are built and committed. Phase 4 is built (6 Nov 2026), not yet committed.** Phase 5 is not built. **Still open from Phase 4: the file has not been uploaded to the GST portal or the offline tool, and no official sample file was available.**
 
 **The goal:** a salon's bills become a correct, traceable GST record. From that record the owner can prepare GSTR-1, check purchases and input credit, and prepare a GSTR-3B working sheet. The owner still files on the GST portal.
 
@@ -185,7 +185,7 @@ GST Phase 3: advances for named services taxed when received with a receipt vouc
 - **Units for Table 12:** products use free text like "bottle" today, so each one maps to an official unit code. A missing one is a blocking error.
 - **Trail for every figure:** each return figure links back to its tax entries. Every entry must appear exactly once or be listed as excluded.
 - **Error list:** each issue says what is wrong and opens the exact bill, service or product. After the fix, Rebuild makes a new revision and keeps the old one.
-- **Approve and export:** an approved revision can't change. It exports official-format JSON, checked against the official file format, plus a review CSV and PDF.
+- **Approve and export:** an approved revision can't change. It exports JSON, checked against a file layout kept in one place (`gstr1.format.js`), plus a review CSV and PDF. GSTN doesn't publish the layout openly, so it comes from public notes on the offline tool and still has to be proven by a real upload.
 - **Status:** Exported never means Filed. A rejected upload is marked Rejected, its errors link to the source, and a new revision follows.
 - **Record filing:** the owner enters the ARN, date and proof, shown as "Manually confirmed". No proof, no Filed. The month then locks.
 - **After filing:** direct edits, and voids of bills in that month, are refused with "Create adjustment case". If GSTR-3B isn't filed yet, an omitted bill goes through GSTR-1A as a correction. If it is filed, the app points to a later-period amendment for review.

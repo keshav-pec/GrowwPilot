@@ -4,12 +4,14 @@ import { Badge, EmptyState, PageHeader, PageSpinner, Tabs } from '../../componen
 import GstOverviewTab from './GstOverviewTab';
 import GstSalesTab from './GstSalesTab';
 import GstAdvancesTab from './GstAdvancesTab';
+import GstReturnsTab from './GstReturnsTab';
 import GstSettingsTab from './GstSettingsTab';
 
 const RECORD_TABS = [
   { value: 'overview', label: 'Overview' },
   { value: 'sales', label: 'Sales & Returns' },
   { value: 'advances', label: 'Advances' },
+  { value: 'returns', label: 'Returns' },
 ];
 const SETTINGS_TAB = { value: 'settings', label: 'Settings' };
 
@@ -33,6 +35,7 @@ export default function GstPage() {
       {tab === 'overview' && <GstOverviewTab today={setup.today} onOpenSettings={() => setSearchParams({ tab: 'settings' })} />}
       {tab === 'sales' && <GstSalesTab today={setup.today} />}
       {tab === 'advances' && <GstAdvancesTab />}
+      {tab === 'returns' && <GstReturnsTab />}
       {tab === 'settings' && <GstSettingsTab setup={setup} />}
     </>
   );

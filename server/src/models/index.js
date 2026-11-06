@@ -16,6 +16,8 @@ export { default as GstRegistration } from './GstRegistration.js';
 export { default as GstTaxRule } from './GstTaxRule.js';
 export { default as GstTaxEntry } from './GstTaxEntry.js';
 export { default as GstCheck } from './GstCheck.js';
+export { default as GstReturn } from './GstReturn.js';
+export { default as GstAdjustment } from './GstAdjustment.js';
 export { default as Payment } from './Payment.js';
 export { default as PaymentAllocation } from './PaymentAllocation.js';
 export { default as CustomerAdvance } from './CustomerAdvance.js';

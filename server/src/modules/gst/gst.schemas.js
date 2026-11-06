@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { DateTime } from 'luxon';
 import { objectId, paise } from '../../utils/schemas.js';
 import { GST_RATES_BPS, LINE_KINDS } from '../../config/billing.js';
-import { GST_SCHEMES, ITC_TYPES, TAX_CODE_REGEX, TAX_ENTRY_TYPES } from '../../config/gst.js';
+import { GST_SCHEMES, ITC_TYPES, TAX_CODE_REGEX, TAX_ENTRY_TYPES, UNIT_CODES } from '../../config/gst.js';
 
 const date = z.string().refine((v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && DateTime.fromISO(v).isValid, 'Choose a date');
 const state = z.string().regex(/^\d{2}$/, 'Choose a state');
@@ -67,3 +67,13 @@ export const advancesViewSchema = z.object({
   open: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
   format: z.enum(['json', 'csv']).default('json'),
 });
+
+const gstinField = z.string().trim().toUpperCase().length(15, 'A GSTIN has 15 characters');
+export const prepareReturnSchema = z.object({ gstin: gstinField, period: month });
+export const listReturnsSchema = z.object({ gstin: gstinField.optional() });
+export const rejectSchema = z.object({ text: z.string().trim().min(3, 'Paste what the portal said').max(10000) });
+const arn = z.string().trim().toUpperCase().regex(/^[A-Z0-9]{15}$/, 'An ARN has 15 letters and digits');
+export const filingSchema = z.object({ arn, filedOn: date });
+export const adjustmentSchema = z.object({ reason: z.string().trim().min(3, 'Say what needs correcting').max(500), invoiceId: objectId.optional() });
+export const unitsSchema = z.object({ units: z.record(z.string().trim().toLowerCase().regex(/^[a-z0-9 ]{1,20}$/), z.enum(UNIT_CODES)) });
+export const trailSchema = z.object({ row: z.string().min(1).max(200) });

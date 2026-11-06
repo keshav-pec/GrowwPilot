@@ -26,3 +26,14 @@ export const PRODUCTS_LINK = '/app/inventory?tab=products';
 // Entries in the permanent tax record. A bill or a taxed advance adds a plus entry. A credit note, a void, an advance
 // used on a bill (its tax was already paid), or an advance given back or reversed adds a minus entry.
 export const TAX_ENTRY_TYPES = ['BILL_ISSUED', 'CREDIT_NOTE', 'BILL_VOIDED', 'ADVANCE_RECEIVED', 'ADVANCE_USED', 'ADVANCE_REFUNDED', 'ADVANCE_REVERSED'];
+
+// Where a GSTR-1 revision stands. Exported never means Filed: filing is recorded by hand, with proof.
+export const RETURN_STATUSES = ['NEEDS_FIXING', 'READY', 'APPROVED', 'EXPORTED', 'REJECTED', 'FILED'];
+// A correction after filing: GSTR-1A before GSTR-3B is filed, otherwise a later-period amendment for review
+export const ADJUSTMENT_ROUTES = ['GSTR_1A', 'LATER_AMENDMENT'];
+export const ADJUSTMENT_STATUSES = ['DRAFT', 'EXPORTED', 'FILED', 'NEEDS_REVIEW'];
+
+// The official unit codes for Table 12. NA is for services.
+export const UNIT_CODES = ['BAG', 'BAL', 'BDL', 'BKL', 'BOU', 'BOX', 'BTL', 'BUN', 'CAN', 'CBM', 'CCM', 'CMS', 'CTN', 'DOZ', 'DRM', 'GGK', 'GMS', 'GRS', 'GYD', 'KGS', 'KLR', 'KME', 'LTR', 'MLT', 'MTR', 'MTS', 'NOS', 'OTH', 'PAC', 'PCS', 'PRS', 'QTL', 'ROL', 'SET', 'SQF', 'SQM', 'SQY', 'TBS', 'TGM', 'THD', 'TON', 'TUB', 'UGS', 'UNT', 'YDS'];
+// What a salon's own word for a unit usually means. Only a suggestion on screen: the owner confirms it.
+export const UNIT_SUGGESTIONS = { bottle: 'BTL', tube: 'TUB', tub: 'TUB', box: 'BOX', piece: 'PCS', pcs: 'PCS', pack: 'PAC', packet: 'PAC', kit: 'SET', set: 'SET', can: 'CAN', roll: 'ROL', pair: 'PRS', bag: 'BAG', litre: 'LTR', ml: 'MLT', kg: 'KGS', g: 'GMS', gram: 'GMS' };

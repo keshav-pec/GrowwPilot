@@ -10,6 +10,7 @@ import ReasonModal from '../../components/ReasonModal';
 import RegistrationsCard from './RegistrationsCard';
 import TaxRulesCard from './TaxRulesCard';
 import TestBillCard from './TestBillCard';
+import UnitCodesCard from './UnitCodesCard';
 
 const SCHEMES = [
   { value: 'UNREGISTERED', label: 'Not registered', hint: 'Plain bills with no tax on them.' },
@@ -30,6 +31,7 @@ export default function GstSettingsTab({ setup }) {
         <>
           <RegistrationsCard setup={setup} />
           <TaxRulesCard setup={setup} />
+          {setup.units?.rows.length > 0 && <UnitCodesCard key={setup.units.rows.map((r) => `${r.unit}:${r.code}`).join()} setup={setup} />}
           {setup.canEdit && <TestBillCard setup={setup} />}
         </>
       )}

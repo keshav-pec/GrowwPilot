@@ -25,7 +25,7 @@ const settingsSchema = z.object({
   frontDeskDiscountLimitBps: z.number().int().min(0).max(10000).optional(),
   guestProductSales: z.boolean().optional(),
   defaultProductTaxBps: z.number().int().refine((v) => GST_RATES_BPS.includes(v), 'Choose a GST rate from the list').optional(),
-  branchOwners: z.object({ approveRefunds: z.boolean(), voidBills: z.boolean(), editSettings: z.boolean(), viewGst: z.boolean() }).partial().optional(),
+  branchOwners: z.object({ approveRefunds: z.boolean(), voidBills: z.boolean(), editSettings: z.boolean(), viewGst: z.boolean(), approveReturns: z.boolean() }).partial().optional(),
   frontDesk: z.object({ closeCash: z.boolean() }).partial().optional(),
   branches: z
     .array(

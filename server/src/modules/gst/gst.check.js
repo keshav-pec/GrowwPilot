@@ -1,7 +1,7 @@
 // The nightly check: every bill, credit note and void in the salon's tax record period is compared with its entry.
 // A difference is listed with a link to the bill. The business owner gets a bell only when a new one appears.
 import { DateTime } from 'luxon';
-import { BillingSettings, GstCheck, GstRegistration, GstTaxEntry, Refund, User } from '../../models/index.js';
+import { BillingSettings, GstAdjustment, GstCheck, GstRegistration, GstReturn, GstTaxEntry, Refund, User } from '../../models/index.js';
 import { notify } from '../notifications/notifications.service.js';
 import { formatMoney } from '../../utils/money.js';
 import { addOlderDocuments, documentsInScope } from './gst.ledger.js';
@@ -74,13 +74,24 @@ export async function runTaxCheck(orgId, { now = new Date() } = {}) {
   await addOlderDocuments(orgId, settings);
   const { bills, voids, notes, advances, uses } = await documentsInScope(orgId, settings);
   const [entries, registrations, refunds, previous] = await Promise.all([
-    GstTaxEntry.find({ orgId }).select('sourceKey documentNumber invoiceId branchId taxable cgst sgst igst total').lean(),
+    GstTaxEntry.find({ orgId }).select('sourceKey documentNumber invoiceId branchId taxable cgst sgst igst total gstin period').lean(),
     GstRegistration.find({ orgId }).lean(),
     Refund.find({ _id: { $in: notes.map((n) => n.note.refundId) } }).select('_id').lean(),
     GstCheck.findOne({ orgId }).lean(),
   ]);
   const differences = compareDocuments({ bills, voids, notes, advances, uses, refundsById: new Map(refunds.map((r) => [String(r._id), r])), registrations, entries });
   const checked = bills.length + voids.length + notes.length + advances.length;
+
+  // Anything in a filed month that its return (or a correction since) doesn't cover needs a person
+  const filed = await GstReturn.find({ orgId, status: 'FILED' }).select('gstin period lineage excluded').lean();
+  for (const ret of filed) {
+    const covered = new Set([...ret.lineage.flatMap((l) => l.entryIds.map(String)), ...ret.excluded.map((e) => String(e.entryId))]);
+    const cases = await GstAdjustment.find({ orgId, returnId: ret._id }).select('entryIds').lean();
+    for (const c of cases) for (const id of c.entryIds) covered.add(String(id));
+    for (const entry of entries.filter((e) => e.gstin === ret.gstin && e.period === ret.period && !covered.has(String(e._id)))) {
+      differences.push({ key: `notfiled:${entry.sourceKey}`, code: 'NOT_IN_FILED_RETURN', message: `${entry.documentNumber} isn’t in the GSTR-1 filed for ${ret.period}. Open the return to create an adjustment case.`, invoiceId: entry.invoiceId, branchId: entry.branchId, link: `/app/gst/returns/${ret._id}` });
+    }
+  }
 
   const before = new Set((previous?.differences ?? []).map((d) => d.key));
   const fresh = differences.filter((d) => !before.has(d.key));

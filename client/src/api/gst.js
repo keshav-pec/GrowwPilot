@@ -74,3 +74,56 @@ export function useRunGstCheck() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['gst-overview'] }),
   });
 }
+
+// ---- GSTR-1 ----
+const RETURN_KEYS = ['gst-returns', 'gst-return', 'gst-overview'];
+function useReturnChange(request) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: request,
+    onSuccess: () => RETURN_KEYS.forEach((name) => queryClient.invalidateQueries({ queryKey: [name] })),
+  });
+}
+
+// Months of a GSTIN: { active, gstins, gstin, canWork, months: [{ period, returnId, revision, status, taxable, tax, arn, toFix }] }
+export function useGstReturns(params) {
+  return useQuery({ queryKey: ['gst-returns', params], queryFn: () => api.get('/gst/returns', { params }).then((res) => res.data), placeholderData: keepPreviousData });
+}
+export function useGstReturn(id) {
+  return useQuery({ queryKey: ['gst-return', id], queryFn: () => api.get(`/gst/returns/${id}`).then((res) => res.data), enabled: Boolean(id) });
+}
+// The entries behind one figure
+export function useReturnTrail(id, row) {
+  return useQuery({ queryKey: ['gst-return-trail', id, row], queryFn: () => api.get(`/gst/returns/${id}/trail`, { params: { row } }).then((res) => res.data), enabled: Boolean(row) });
+}
+export const usePrepareReturn = () => useReturnChange(({ key, ...body }) => send('post', '/gst/returns', key, body));
+export const useApproveReturn = () => useReturnChange(({ key, _id }) => send('post', `/gst/returns/${_id}/approve`, key));
+export const useRejectReturn = () => useReturnChange(({ key, _id, text }) => send('post', `/gst/returns/${_id}/reject`, key, { text }));
+export const useRecordGstr3b = () => useReturnChange(({ key, _id, ...body }) => send('post', `/gst/returns/${_id}/gstr3b`, key, body));
+export const useCreateAdjustment = () => useReturnChange(({ key, _id, ...body }) => send('post', `/gst/returns/${_id}/adjustments`, key, body));
+
+// Filing needs its proof, so it goes as a form. path: `returns/<id>` or `adjustments/<id>`
+export const useRecordFiling = () =>
+  useReturnChange(({ key, path, arn, filedOn, proof }) => {
+    const form = new FormData();
+    form.append('arn', arn);
+    form.append('filedOn', filedOn);
+    if (proof) form.append('proof', proof);
+    return send('post', `/gst/${path}/file`, key, form);
+  });
+
+// The file for the GST portal. Downloading it marks the revision Exported, never Filed.
+export const useExportFile = () =>
+  useReturnChange(async ({ path }) => {
+    const res = await api.post(`/gst/${path}/export`, null, { responseType: 'blob' });
+    const fileName = res.headers['content-disposition']?.match(/filename="(.+)"/)?.[1] ?? 'GSTR1.json';
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(res.data);
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+export const downloadReview = (id, kind) => downloadFile(`/gst/returns/${id}/review.${kind}`, {}, `GSTR1-review.${kind}`);
+export const downloadProof = (proofId, name) => downloadFile(`/gst/proofs/${proofId}`, {}, name ?? 'proof');
+
+export const useSaveUnits = () => useGstChange((body) => ['patch', '/gst/units', body]);

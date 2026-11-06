@@ -24,7 +24,8 @@ import { branchStock } from '../inventory/stock/stock.queries.js';
 import { makeShareToken, readShareToken, SHARE_DAYS } from './share.js';
 import { redeemOffer, restoreOffer } from '../occasions/checkout/redeem.js';
 import { billContext, gstSetupActive, missingRuleBlocker } from '../gst/gst.billing.js';
-import { postBill, postVoid } from '../gst/gst.ledger.js';
+import { billTaxDate, postBill, postVoid } from '../gst/gst.ledger.js';
+import { assertMonthOpen } from '../gst/gstr1.lock.js';
 import { advanceFitsBill, sellerOfBill } from '../gst/gst.advances.js';
 
 export { branchCode } from '../billing/settings.service.js';
@@ -606,6 +607,13 @@ export async function voidInvoice(ctx, id, { reason }, key) {
   const result = await runOnce(ctx, { key, operation: 'billing.invoice.void' }, async (session) => {
     const invoice = await loadInvoice(ctx, id, session);
     if (invoice.status !== 'ISSUED') throw new AppError(409, 'NOT_ISSUED', invoice.status === 'VOID' ? 'This bill is already void' : 'Only issued bills can be voided');
+    // A bill in a month already filed can't be voided, and neither can one from before the tax record began: it needs a credit note
+    if (gstSetupActive(settings) && invoice.gstRegistered && invoice.seller?.gstin) {
+      const billBranch = await Branch.findById(invoice.branchId).select('timezone').session(session).lean();
+      const billMonth = billTaxDate(invoice, billBranch.timezone).slice(0, 7);
+      await assertMonthOpen(invoice.orgId, invoice.seller.gstin, billMonth, session);
+      if (billMonth < settings.gst.startMonth) throw new AppError(409, 'BEFORE_START_MONTH', 'This bill is from before your tax record begins. Use a refund, so a credit note is made, instead of voiding it.');
+    }
     if (invoice.amountPaid > 0) throw new AppError(409, 'HAS_PAYMENTS', `${formatMoney(invoice.amountPaid)} has been paid on this bill. Reverse the payments (or refund) first.`);
     if ((invoice.refundStatus ?? 'NONE') !== 'NONE' || (await Refund.exists({ invoiceId: invoice._id, status: 'REQUESTED' }).session(session))) {
       throw new AppError(409, 'HAS_REFUNDS', 'This bill has refunds, so it can’t be voided');

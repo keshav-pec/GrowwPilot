@@ -290,8 +290,28 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['*nightly', 'tax record', 'sales register', 'output tax', 'gst overview', 'gst menu', 'nightly check', 'gst difference', 'tax entry', 'credit note in gst', 'gst csv'],
     answer:
-      'Open **GST** in the menu. **Overview** shows a month’s output tax for one GSTIN or all of them, and anything that needs attention. **Sales & Returns** lists every bill, credit note, voided bill and advance entry of the month with its tax: click a row to open it, or download a CSV for your accountant. **Advances** shows what was taken, used and left, with tax, for each GSTIN. Each issued bill gets a permanent entry saved together with the bill. It is never changed: a refund or a void adds a new minus entry. Every night the app compares bills with the record and lists any difference, with a link to the bill. Branch owners see this for their own branches only if the business owner switches it on in Billing settings.',
+      'Open **GST** in the menu. **Overview** shows a month’s output tax for one GSTIN or all of them, and anything that needs attention. **Sales & Returns** lists every bill, credit note, voided bill and advance entry of the month with its tax: click a row to open it, or download a CSV for your accountant. **Advances** shows what was taken, used and left, with tax, for each GSTIN. **Returns** is where you prepare GSTR-1. Each issued bill gets a permanent entry saved together with the bill. It is never changed: a refund or a void adds a new minus entry. Every night the app compares bills with the record and lists any difference, with a link to the bill. Branch owners see this for their own branches only if the business owner switches it on in Billing settings.',
     link: { label: 'GST', to: '/app/gst' },
+  },
+
+  {
+    id: 'gstr-1',
+    title: 'Preparing and filing GSTR-1',
+    audiences: OWNERS,
+    keywords: ['*gstr-1', '*gstr1', 'prepare return', 'gst return', 'rebuild return', 'approve return', 'export json', '*arn', 'record filing', 'month locked', 'portal rejected', 'unit code', 'uqc', 'table 12', 'table 13'],
+    answer:
+      'Open **GST → Returns**, choose a GSTIN and click **Prepare** for a month. The app reads your tax record up to that moment and lists anything to fix, each with a link to the bill, service or product. Fix it there (nobody types over the totals), then **Rebuild**: this makes a new revision and keeps the old one. **Approve** locks that revision, and **Download file** gives you the file to upload on the GST portal. Downloaded doesn’t mean filed: check the portal’s preview and file there. If the portal turns it down, click **Portal rejected it** and paste what it said. Once it’s filed, click **Record filing** and enter the ARN, the date and the proof. The month then locks, and shows as manually confirmed. Each figure shows the bills behind it.',
+    link: { label: 'Returns', to: '/app/gst?tab=returns' },
+  },
+
+  {
+    id: 'gst-correction',
+    title: 'Correcting a month already filed',
+    audiences: OWNERS,
+    keywords: ['*gstr-1a', '*gstr1a', 'adjustment case', 'filed month', 'correct filed', 'amendment', 'bill left out', 'void filed bill', 'gstr-3b filed'],
+    answer:
+      'A filed month can’t be changed, so a bill in it can’t be voided. Open the return and click **Create adjustment case**. If a bill was left out and GSTR-3B for that month isn’t filed yet, the case makes a **GSTR-1A** file with only that bill: upload and file it on the portal, then record its ARN and proof. Once you’ve recorded GSTR-3B as filed, GSTR-1A closes, and the case goes to your tax person as an amendment in a later month. To give money back on a filed bill, use **Refund / return**: its credit note counts in the current month and nothing filed changes.',
+    link: { label: 'Returns', to: '/app/gst?tab=returns' },
   },
 
   {

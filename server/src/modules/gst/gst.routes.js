@@ -8,6 +8,11 @@ import * as schemas from './gst.schemas.js';
 import * as gst from './gst.service.js';
 import { advancesView, checkNow, overview, salesRegister } from './gst.record.js';
 import { sendCsv } from '../../utils/csv.js';
+import multer from 'multer';
+import { AppError } from '../../utils/AppError.js';
+import { MAX_PROOF_BYTES, PROOF_TYPES } from './gst.proofs.js';
+import * as gstr1 from './gstr1.service.js';
+import { reviewCsv, writeReviewPdf } from './gstr1.review.js';
 
 // /api/gst — GST setup. Owners only: branch owners can look, the business owner changes things (checked in the service).
 const router = Router();
@@ -59,5 +64,76 @@ router.get('/advances', validate({ query: schemas.advancesViewSchema }), async (
 router.post('/check', once, async (req, res) => {
   res.json(await checkNow(req.ctx, req.idempotencyKey));
 });
+
+// ---- GSTR-1 ----
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_PROOF_BYTES, files: 1 },
+  fileFilter: (req, file, done) => (PROOF_TYPES.includes(file.mimetype) ? done(null, true) : done(new AppError(400, 'UNSUPPORTED_PROOF', 'The proof must be a PDF, JPEG or PNG'))),
+});
+const receiveProof = (req, res, next) =>
+  upload.single('proof')(req, res, (err) => {
+    if (err?.code === 'LIMIT_FILE_SIZE') return next(new AppError(400, 'PROOF_TOO_LARGE', 'The proof can be at most 5 MB'));
+    next(err);
+  });
+const sendFile = (res, { fileName, file }) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.send(JSON.stringify(file));
+};
+
+router.get('/returns', validate({ query: schemas.listReturnsSchema }), async (req, res) => {
+  res.json(await gstr1.listReturns(req.ctx, req.valid.query));
+});
+router.post('/returns', once, validate({ body: schemas.prepareReturnSchema }), async (req, res) => {
+  res.status(201).json(await gstr1.prepareReturn(req.ctx, req.valid.body, req.idempotencyKey));
+});
+router.get('/returns/:id', async (req, res) => {
+  res.json(await gstr1.getReturn(req.ctx, req.params.id));
+});
+router.get('/returns/:id/trail', validate({ query: schemas.trailSchema }), async (req, res) => {
+  res.json(await gstr1.returnTrail(req.ctx, req.params.id, req.valid.query.row));
+});
+router.post('/returns/:id/approve', once, async (req, res) => {
+  res.json(await gstr1.approveReturn(req.ctx, req.params.id, req.idempotencyKey));
+});
+router.post('/returns/:id/export', async (req, res) => {
+  sendFile(res, await gstr1.exportReturn(req.ctx, req.params.id));
+});
+router.get('/returns/:id/review.csv', async (req, res) => {
+  const found = await gstr1.reviewOf(req.ctx, req.params.id);
+  sendCsv(res, `GSTR1-review-${found.gstin}-${found.period}-rev${found.revision}.csv`, reviewCsv(found));
+});
+router.get('/returns/:id/review.pdf', async (req, res) => {
+  const found = await gstr1.reviewOf(req.ctx, req.params.id);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="GSTR1-review-${found.gstin}-${found.period}-rev${found.revision}.pdf"`);
+  writeReviewPdf(res, found);
+});
+router.post('/returns/:id/reject', once, validate({ body: schemas.rejectSchema }), async (req, res) => {
+  res.json(await gstr1.markRejected(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
+});
+router.post('/returns/:id/file', once, receiveProof, validate({ body: schemas.filingSchema }), async (req, res) => {
+  res.json(await gstr1.recordFiling(req.ctx, req.params.id, req.valid.body, req.file, req.idempotencyKey));
+});
+router.post('/returns/:id/gstr3b', once, validate({ body: schemas.filingSchema }), async (req, res) => {
+  res.json(await gstr1.recordGstr3b(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
+});
+router.post('/returns/:id/adjustments', once, validate({ body: schemas.adjustmentSchema }), async (req, res) => {
+  res.status(201).json(await gstr1.createAdjustment(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
+});
+router.post('/adjustments/:id/export', async (req, res) => {
+  sendFile(res, await gstr1.exportAdjustment(req.ctx, req.params.id));
+});
+router.post('/adjustments/:id/file', once, receiveProof, validate({ body: schemas.filingSchema }), async (req, res) => {
+  res.json(await gstr1.recordAdjustmentFiled(req.ctx, req.params.id, req.valid.body, req.file, req.idempotencyKey));
+});
+router.get('/proofs/:id', async (req, res) => {
+  const proof = await gstr1.filingProof(req.ctx, req.params.id);
+  res.setHeader('Content-Type', proof.file.metadata.contentType);
+  res.setHeader('Content-Disposition', `attachment; filename="${proof.file.filename.replace(/[^\w.-]/g, '_')}"`);
+  proof.stream.pipe(res);
+});
+router.patch('/units', once, validate({ body: schemas.unitsSchema }), change((req) => gstr1.saveUnitCodes(req.ctx, req.valid.body, req.idempotencyKey)));
 
 export default router;

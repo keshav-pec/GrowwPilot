@@ -33,6 +33,7 @@ const billingSettingsSchema = new mongoose.Schema(
       voidBills: { type: Boolean, default: true },
       editSettings: { type: Boolean, default: false }, // only their own branches' bill prefix
       viewGst: { type: Boolean, default: false }, // the GST overview and sales register, for their own branches
+      approveReturns: { type: Boolean, default: false }, // prepare, approve and record filing of their GSTINs' returns
     },
     // What the front desk may do besides billing and taking payments
     frontDesk: {
@@ -49,6 +50,7 @@ const billingSettingsSchema = new mongoose.Schema(
       activatedBy: ref('User'),
       activatedByName: String,
       recordFrom: Date, // bills from here on get their tax entry as they are issued; earlier ones are added once
+      unitCodes: { type: mongoose.Schema.Types.Mixed, default: () => ({}) }, // a stock unit -> its official code: { bottle: 'BTL' }
     },
   },
   { timestamps: true, collection: 'billing_settings' }

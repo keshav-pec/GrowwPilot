@@ -6,7 +6,7 @@ import { scoped } from '../../utils/scoped.js';
 import { todayInZone } from '../../utils/time.js';
 import { runOnce } from '../../middleware/idempotency.js';
 import { GST_STATES, isValidGstin } from '../../config/billing.js';
-import { STARTER_RULE, SUPPORTED_GST_SCHEMES } from '../../config/gst.js';
+import { STARTER_RULE, SUPPORTED_GST_SCHEMES, UNIT_CODES, UNIT_SUGGESTIONS } from '../../config/gst.js';
 import { logActivity } from '../activity/activity.service.js';
 import { getBillingSettings } from '../billing/settings.service.js';
 import { computeBill } from '../billing/tax.rules.js';
@@ -41,6 +41,14 @@ async function checksFor(ctx, settings, session = null) {
   const [branches, registrations, rules, items] = [await branchesOf(ctx, session), await GstRegistration.find(scoped(ctx)).session(session).lean(), await GstTaxRule.find(scoped(ctx, { status: 'APPROVED' })).session(session).lean(), await chargeableItems(ctx, session)];
   const today = todayInZone(branches[0]?.timezone ?? INDIA);
   return setupChecks({ settings, today, branches, registrations, rules, ...items });
+}
+
+// The units products for sale are counted in, each with its official code for Table 12 (or a suggestion to confirm)
+async function unitsForSetup(ctx, settings) {
+  if (!hasInventory(ctx)) return { codes: UNIT_CODES, rows: [] };
+  const words = await InventorySku.find(scoped(ctx, { type: 'RETAIL' })).distinct('stockUnit');
+  const saved = settings.gst?.unitCodes ?? {};
+  return { codes: UNIT_CODES, rows: words.sort().map((unit) => ({ unit, code: saved[unit] ?? null, suggestion: UNIT_SUGGESTIONS[unit] ?? null })) };
 }
 
 // What the Overview lists as needing attention
@@ -136,6 +144,7 @@ export async function getSetup(ctx) {
     checks: await checksFor(ctx, settings),
     canEdit: Boolean(ctx.isPrimaryOwner),
     canViewTax: Boolean(ctx.isPrimaryOwner || settings.branchOwners?.viewGst),
+    units: await unitsForSetup(ctx, settings),
   };
 }
 

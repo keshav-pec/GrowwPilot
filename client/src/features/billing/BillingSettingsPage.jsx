@@ -190,6 +190,10 @@ function SettingsForm({ saved }) {
               <input type="checkbox" className="accent-gold" checked={values.branchOwners.viewGst} onChange={setDelegation('viewGst')} />
               See the GST overview and sales register for their branches
             </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" className="accent-gold" checked={values.branchOwners.approveReturns} onChange={setDelegation('approveReturns')} />
+              Prepare, approve and record GST returns for their GSTINs
+            </label>
             <label className="mt-2 flex items-center gap-2">
               <input type="checkbox" className="accent-gold" checked={values.frontDesk.closeCash} onChange={(e) => setValues((v) => ({ ...v, frontDesk: { closeCash: e.target.checked } }))} />
               The front desk counts the drawer and closes the cash day
