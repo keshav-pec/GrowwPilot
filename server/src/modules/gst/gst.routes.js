@@ -6,6 +6,8 @@ import { validate } from '../../middleware/validate.js';
 import { requireIdempotencyKey } from '../../middleware/idempotency.js';
 import * as schemas from './gst.schemas.js';
 import * as gst from './gst.service.js';
+import { checkNow, overview, salesRegister } from './gst.record.js';
+import { sendCsv } from '../../utils/csv.js';
 
 // /api/gst — GST setup. Owners only: branch owners can look, the business owner changes things (checked in the service).
 const router = Router();
@@ -37,5 +39,19 @@ router.post('/test-bill', validate({ body: schemas.testBillSchema }), async (req
   res.json(await gst.testBill(req.ctx, req.valid.body));
 });
 router.post('/activate', once, change((req) => gst.activate(req.ctx, req.idempotencyKey)));
+
+// The tax record: the overview and the sales register (each checks who may see them)
+router.get('/overview', validate({ query: schemas.overviewSchema }), async (req, res) => {
+  res.json(await overview(req.ctx, req.valid.query));
+});
+router.get('/register', validate({ query: schemas.registerSchema }), async (req, res) => {
+  const { format, ...filters } = req.valid.query;
+  const register = await salesRegister(req.ctx, { ...filters, all: format === 'csv' });
+  if (format === 'csv') return sendCsv(res, `sales-register-${register.month}.csv`, register);
+  res.json(register);
+});
+router.post('/check', once, async (req, res) => {
+  res.json(await checkNow(req.ctx, req.idempotencyKey));
+});
 
 export default router;

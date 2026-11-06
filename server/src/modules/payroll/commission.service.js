@@ -31,7 +31,7 @@ export async function recordInvoiceCommissions({ invoice, appointment, timezone 
     .filter((l) => l.kind === 'SERVICE' && l.itemId && !(l.refundedQty >= l.qty))
     .map((l) => {
       const item = appointment?.items.find((i) => String(i._id) === String(l.itemId));
-      return { itemId: l.itemId, staffId: l.staffId ?? item?.staffId, serviceId: l.serviceId ?? item?.serviceId, serviceName: l.name, saleAmount: l.taxableAmount };
+      return { itemId: l.itemId, staffId: l.staffId ?? item?.staffId, serviceId: l.serviceId ?? item?.serviceId, serviceName: l.name, saleAmount: l.taxableAmount - (l.creditedTaxable ?? 0) };
     })
     .filter((l) => l.staffId);
   if (lines.length === 0) return [];
@@ -86,7 +86,8 @@ export async function reverseCommissions({ invoice, itemIds, eventKey, day }, se
     const net = byItem.get(key) ?? { sale: 0, amount: 0, earned: 0, reversed: 0, last: row };
     net.sale += row.saleAmount;
     net.amount += row.amount;
-    net[row.type === 'earned' ? 'earned' : 'reversed'] += 1;
+    if (row.type === 'earned') net.earned += 1;
+    if (row.type === 'reversal') net.reversed += 1; // a part reversal leaves the service earning
     if (row.type === 'earned') net.last = row;
     byItem.set(key, net);
   }
@@ -113,6 +114,42 @@ export async function reverseCommissions({ invoice, itemIds, eventKey, day }, se
     }));
   if (reversals.length > 0) await CommissionEntry.insertMany(reversals, { session });
   return reversals;
+}
+
+// A part refund takes back the same share of the commission: half the value refunded, half the commission back.
+// The service is still earning on what's left. taxable: the part of the sale refunded, without GST.
+export async function reverseCommissionShare({ invoice, itemId, taxable, eventKey, day }, session) {
+  const rows = await CommissionEntry.find({ invoiceId: invoice._id, itemId }).session(session ?? null).lean();
+  const earned = rows.filter((r) => r.type === 'earned');
+  if (earned.length <= rows.filter((r) => r.type === 'reversal').length) return null; // nothing earned yet, or all taken back
+  const sale = rows.reduce((sum, r) => sum + r.saleAmount, 0);
+  const amount = rows.reduce((sum, r) => sum + r.amount, 0);
+  if (sale <= 0) return null;
+  const part = Math.min(taxable, sale);
+  const last = earned.at(-1);
+  const [row] = await CommissionEntry.insertMany(
+    [{
+      orgId: last.orgId,
+      branchId: last.branchId,
+      staffId: last.staffId,
+      invoiceId: last.invoiceId,
+      invoiceNumber: invoice.invoiceNumber ?? last.invoiceNumber,
+      appointmentId: last.appointmentId,
+      itemId: last.itemId,
+      serviceId: last.serviceId,
+      serviceName: last.serviceName,
+      day,
+      saleAmount: -part,
+      rateBps: last.rateBps,
+      rateSource: last.rateSource,
+      ruleId: last.ruleId,
+      amount: -(part === sale ? amount : Math.round((amount * part) / sale)),
+      type: 'part_reversal',
+      eventKey,
+    }],
+    { session }
+  );
+  return row;
 }
 
 // Bills that became fully paid between two branch-local days (inclusive), each with its appointment,

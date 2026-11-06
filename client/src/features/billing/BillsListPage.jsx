@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Clock, Landmark, Receipt, Settings, ShoppingBag } from 'lucide-react';
+import { BarChart3, Clock, Receipt, Settings, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useBills } from '../../api/invoices';
 import { formatMoney } from '../../lib/money';
@@ -88,11 +88,6 @@ export default function BillsListPage() {
             {isOwner && (
               <Button variant="secondary" onClick={() => navigate('/app/settings/billing')}>
                 <Settings size={16} /> Billing settings
-              </Button>
-            )}
-            {isOwner && (
-              <Button variant="secondary" onClick={() => navigate('/app/settings/gst')}>
-                <Landmark size={16} /> GST setup
               </Button>
             )}
             {hasAddon(user, 'inventory') && (

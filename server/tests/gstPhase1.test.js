@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import mongoose from 'mongoose';
 import { DateTime } from 'luxon';
 import {
-  ActivityLog, Appointment, BillingSettings, CreditNote, Counter, Customer, GstRegistration, GstTaxRule, IdempotencyRecord, InventorySku, Invoice, Organization, Payment, PaymentAllocation, Refund, Service, User,
+  ActivityLog, Appointment, BillingSettings, CreditNote, Counter, Customer, GstRegistration, GstTaxEntry, GstTaxRule, IdempotencyRecord, InventorySku, Invoice, Organization, Payment, PaymentAllocation, Refund, Service, User,
 } from '../src/models/index.js';
 import { formatCreditNoteNumber, formatInvoiceNumber, gstinCheckChar } from '../src/config/billing.js';
 import * as gst from '../src/modules/gst/gst.service.js';
@@ -54,7 +54,7 @@ beforeAll(async () => {
 afterAll(stopDb);
 afterEach(() => vi.useRealTimers());
 beforeEach(async () => {
-  await Promise.all([BillingSettings, GstRegistration, GstTaxRule, Appointment, Invoice, Counter, Payment, PaymentAllocation, Refund, IdempotencyRecord, CreditNote].map((m) => m.deleteMany({})));
+  await Promise.all([BillingSettings, GstRegistration, GstTaxRule, GstTaxEntry, Appointment, Invoice, Counter, Payment, PaymentAllocation, Refund, IdempotencyRecord, CreditNote].map((m) => m.deleteMany({})));
   await Service.updateMany({}, { $set: { taxRuleGroupId: null } });
   await InventorySku.updateMany({}, { $set: { taxRuleGroupId: null } });
   await Customer.updateMany({}, { $unset: { gstin: '', gstLegalName: '' } });

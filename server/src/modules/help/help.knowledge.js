@@ -216,7 +216,7 @@ export const KNOWLEDGE = [
     audiences: EVERYONE,
     keywords: ['*refund', '*return product', 'money back', 'credit note', 'customer returned', 'give money back', 'void bill', 'cancel bill', 'reverse payment'],
     answer:
-      'Open the bill and click **Refund / return**. Tick what comes back, say how many and (for products) whether they can be sold again, and give a reason. The front desk’s request goes to an owner, who approves or turns it down. Approving gives the money back, makes a credit note on GST bills, puts sellable products back in the store and takes back the stylist’s commission. Owners can also **Void** a bill with no money on it, or **Reverse** a payment that was recorded by mistake.',
+      'Open the bill and click **Refund / return**. Tick what comes back, say how many and (for products) whether they can be sold again, or choose **Part of the amount** to refund only some of a line’s value (₹525 off a ₹1,050 haircut), and give a reason. The front desk’s request goes to an owner, who approves or turns it down. Approving gives the money back, makes a credit note on GST bills, puts sellable products back in the store and takes back the stylist’s commission (in the same share for part of the amount). Owners can also **Void** a bill with no money on it, or **Reverse** a payment that was recorded by mistake.',
   },
   {
     id: 'advance',
@@ -261,7 +261,7 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['*gst', 'tax invoice', 'billing settings', 'bill prefix', 'bill number', 'cgst', 'sgst', 'tax rate'],
     answer:
-      'Open **Bills → Billing settings** (the business owner changes them) for the front desk discount limit and each branch’s bill prefix (numbers look like AND/26-27/00001 and start again every 1 April). GSTINs are kept in **GST setup**, with the date each one starts. Until GST setup is active, this page also holds whether the salon is **GST registered**, whether menu prices include GST and the default rates, and a service or product can have its own rate. **Please have your tax adviser check the rates and codes.**',
+      'Open **Bills → Billing settings** (the business owner changes them) for the front desk discount limit and each branch’s bill prefix (numbers look like AND/26-27/00001 and start again every 1 April). GSTINs are kept in **GST → Settings**, with the date each one starts. Until GST setup is active, this page also holds whether the salon is **GST registered**, whether menu prices include GST and the default rates, and a service or product can have its own rate. **Please have your tax adviser check the rates and codes.**',
     link: { label: 'Billing settings', to: '/app/settings/billing' },
   },
 
@@ -271,8 +271,18 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['gst setup', 'gstin', 'activate gst', 'tax rule', 'approve rule', 'sac code', 'hsn', 'start month', 'gst registration', 'change gstin', 'test bill', 'composition', 'qrmp'],
     answer:
-      'Open **Bills → GST setup** (the business owner changes it; branch owners can look). 1. Choose **Regular** and a start month. 2. Check your **GSTINs**: each branch has one GSTIN on any date, and replacing one adds a new dated row. 3. **Approve your tax rules**: a salon starts with a draft rule of 5% without ITC from 22 Sep 2025, which your GST practitioner should check. An approved rule can’t change; a new rate is a new dated row. 4. **Link** services and products to a rule. 5. Try a **test bill**, then **Activate**. From then on each bill uses the rule for its date, and old bills never change. Composition and QRMP aren’t supported.',
-    link: { label: 'GST setup', to: '/app/settings/gst' },
+      'Open **GST → Settings** (the business owner changes it; branch owners can look). 1. Choose **Regular** and a start month. 2. Check your **GSTINs**: each branch has one GSTIN on any date, and replacing one adds a new dated row. 3. **Approve your tax rules**: a salon starts with a draft rule of 5% without ITC from 22 Sep 2025, which your GST practitioner should check. An approved rule can’t change; a new rate is a new dated row. 4. **Link** services and products to a rule. 5. Try a **test bill**, then **Activate**. From then on each bill uses the rule for its date, and old bills never change. Composition and QRMP aren’t supported.',
+    link: { label: 'GST setup', to: '/app/gst?tab=settings' },
+  },
+
+  {
+    id: 'gst-record',
+    title: 'The tax record, sales register and nightly check',
+    audiences: OWNERS,
+    keywords: ['*nightly', 'tax record', 'sales register', 'output tax', 'gst overview', 'gst menu', 'nightly check', 'gst difference', 'tax entry', 'credit note in gst', 'gst csv'],
+    answer:
+      'Open **GST** in the menu. **Overview** shows a month’s output tax for one GSTIN or all of them, and anything that needs attention. **Sales & Returns** lists every bill, credit note and voided bill of the month with its tax: click a row to open the bill, or download a CSV for your accountant. Each issued bill gets a permanent entry saved together with the bill. It is never changed: a refund or a void adds a new minus entry. Every night the app compares bills with the record and lists any difference, with a link to the bill. Branch owners see this for their own branches only if the business owner switches it on in Billing settings.',
+    link: { label: 'GST', to: '/app/gst' },
   },
 
   {

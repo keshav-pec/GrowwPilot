@@ -31,7 +31,8 @@ const billingSettingsSchema = new mongoose.Schema(
     branchOwners: {
       approveRefunds: { type: Boolean, default: true },
       voidBills: { type: Boolean, default: true },
-      editSettings: { type: Boolean, default: false }, // only their own branches' GSTIN and prefix
+      editSettings: { type: Boolean, default: false }, // only their own branches' bill prefix
+      viewGst: { type: Boolean, default: false }, // the GST overview and sales register, for their own branches
     },
     // What the front desk may do besides billing and taking payments
     frontDesk: {
@@ -47,6 +48,7 @@ const billingSettingsSchema = new mongoose.Schema(
       activatedAt: Date,
       activatedBy: ref('User'),
       activatedByName: String,
+      recordFrom: Date, // bills from here on get their tax entry as they are issued; earlier ones are added once
     },
   },
   { timestamps: true, collection: 'billing_settings' }

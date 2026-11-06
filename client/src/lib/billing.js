@@ -61,3 +61,12 @@ export function taxRows(taxSummary = []) {
         ]
   );
 }
+
+// One line of a refund in words: "2 × Hair serum (damaged)", or "₹525.00 off Haircut"
+export const refundLineWords = (l, money) => (l.partAmount ? `${money(l.partAmount)} off ${l.name}` : `${l.qty} × ${l.name}${l.restock === 'DAMAGED' ? ' (damaged)' : ''}`);
+
+// A bill line's refund so far, for the small text under its name
+export function lineRefundWords(line, money) {
+  if (line.refundedQty > 0) return line.refundedQty === line.qty ? 'refunded' : `${line.refundedQty} refunded`;
+  return line.creditedAmount > 0 ? `${money(line.creditedAmount)} refunded` : null;
+}

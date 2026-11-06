@@ -14,8 +14,7 @@ import {
   Target,
   UserCog,
   Users,
-  Wallet,
-} from 'lucide-react';
+  Wallet, Landmark } from 'lucide-react';
 import Shell from './Shell';
 import BranchSwitcher from './BranchSwitcher';
 import ChatAssistant from '../components/ChatAssistant';
@@ -31,6 +30,7 @@ const APP_NAV = [
   { to: '/app/appointments', label: 'Appointments', icon: CalendarDays, roles: ['OWNER', 'FRONT_DESK'] },
   { to: '/app/bills', label: 'Bills', icon: Receipt, roles: ['OWNER', 'FRONT_DESK'] },
   { to: '/app/cash', label: 'Cash drawer', icon: Banknote, roles: ['OWNER', 'FRONT_DESK'] },
+  { to: '/app/gst', label: 'GST', icon: Landmark, roles: ['OWNER'] },
   { to: '/app/customers', label: 'Customers', icon: Users, roles: ['OWNER', 'FRONT_DESK'] },
   { to: '/app/leads', label: 'Leads', icon: Target, roles: ['OWNER', 'FRONT_DESK'] },
   { to: '/app/attendance', label: 'Attendance', icon: ClipboardCheck, roles: ['OWNER', 'FRONT_DESK'] },

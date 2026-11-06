@@ -7,19 +7,21 @@ import { migrateOccasions } from './scripts/migrate-occasions-v1.js';
 import { migrateGst } from './scripts/migrate-gst-v1.js';
 import { startOccasionAutomation } from './modules/occasions/engine/scheduler.js';
 import { startMailer } from './modules/mail/outbox.js';
+import { startGstChecks } from './modules/gst/gst.check.js';
 
 // Connect to the database first, then start accepting requests
 try {
   await connectDB();
   await migrateBilling(); // older bills onto the new bill records (does nothing once they're all moved)
   await migrateOccasions(); // dates of birth -> birthday month/day, home branches, permission "not recorded"
-  await migrateGst(); // branch GSTINs -> dated GST registrations
+  await migrateGst(); // branch GSTINs -> dated GST registrations; older bills -> the tax record
   app.listen(env.PORT, () => {
     console.log(`Server running on http://localhost:${env.PORT}`);
   });
   startInventoryAutomation(); // stock used by completed services, and retries
   startOccasionAutomation(); // monthly birthday and anniversary offers, and expiry
   startMailer(); // emails waiting in the outbox, and retries
+  startGstChecks(); // each night, bills compared with the tax record
 } catch (err) {
   console.error('Could not connect to MongoDB:', err.message);
   process.exit(1);

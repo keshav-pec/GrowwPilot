@@ -179,15 +179,47 @@ export function moneyState(invoice) {
   return { netValue, netPaid, balanceDue: Math.max(netValue - netPaid, 0), settlementStatus: settlementStatus(netPaid, netValue) };
 }
 
+// What is left of a line after refunds so far
+function lineLeft(line) {
+  const left = (field, credited) => (line[field] ?? 0) - (line[credited] ?? 0);
+  return { taxableAmount: left('taxableAmount', 'creditedTaxable'), cgst: left('cgst', 'creditedCgst'), sgst: left('sgst', 'creditedSgst'), igst: left('igst', 'creditedIgst') };
+}
+const withTotal = (part, line) => ({ ...part, amount: part.taxableAmount + part.cgst + part.sgst + part.igst, taxRateBps: line.taxRateBps });
+
+// True when refunds have taken back all of a line's value
+export const lineFullyCredited = (line) => line.lineTotal > 0 && (line.creditedAmount ?? 0) >= line.lineTotal;
+
 // The part of one bill line that `qty` units take back (a refund): taxable value, CGST, SGST, IGST and total.
 // The last units take whatever is left, so all the refunds of a line always add up to exactly the line.
+// After a part refund, units can only take what is still left.
 export function creditForLine(line, qty) {
-  const left = line.qty - (line.refundedQty ?? 0);
-  if (qty < 1 || qty > left) throw new AppError(400, 'VALIDATION_ERROR', `Only ${left} of ${line.name} can still be refunded`);
-  const part = (field, credited) => (qty === left ? (line[field] ?? 0) - (line[credited] ?? 0) : roundHalfUp((line[field] ?? 0) * qty, line.qty));
-  const taxableAmount = part('taxableAmount', 'creditedTaxable');
-  const cgst = part('cgst', 'creditedCgst');
-  const sgst = part('sgst', 'creditedSgst');
-  const igst = part('igst', 'creditedIgst');
-  return { taxableAmount, cgst, sgst, igst, amount: taxableAmount + cgst + sgst + igst, taxRateBps: line.taxRateBps };
+  const units = line.qty - (line.refundedQty ?? 0);
+  if (qty < 1 || qty > units) throw new AppError(400, 'VALIDATION_ERROR', `Only ${units} of ${line.name} can still be refunded`);
+  if (lineFullyCredited(line)) throw new AppError(400, 'CREDIT_EXCEEDS_ORIGINAL', `All of ${line.name} has already been refunded`);
+  const left = lineLeft(line);
+  const part = (field) => (qty === units ? left[field] : Math.min(roundHalfUp((line[field] ?? 0) * qty, line.qty), left[field]));
+  return withTotal({ taxableAmount: part('taxableAmount'), cgst: part('cgst'), sgst: part('sgst'), igst: part('igst') }, line);
+}
+
+// A part refund: `amount` (with GST) off a line, shared like the line itself: ₹525 off a ₹1,050 haircut at 5% is
+// ₹500 taxable + ₹12.50 CGST + ₹12.50 SGST. The last of a line takes whatever is left, so refunds add up exactly.
+export function creditForAmount(line, amount) {
+  const left = lineLeft(line);
+  const total = left.taxableAmount + left.cgst + left.sgst + left.igst;
+  if (amount < 1) throw new AppError(400, 'VALIDATION_ERROR', 'Enter the amount to refund');
+  if (amount > total) throw new AppError(400, 'CREDIT_EXCEEDS_ORIGINAL', `Only ${formatMoney(total)} of ${line.name} can still be refunded`);
+  if (amount === total) return withTotal(left, line);
+
+  const taxes = ['cgst', 'sgst', 'igst'];
+  const part = Object.fromEntries(taxes.map((field) => [field, Math.min(roundHalfUp((line[field] ?? 0) * amount, line.lineTotal), left[field])]));
+  part.taxableAmount = amount - part.cgst - part.sgst - part.igst;
+  // Rounding must not take more taxable value than is left: the extra paisa goes to the tax instead
+  let over = part.taxableAmount - left.taxableAmount;
+  for (const field of taxes) {
+    const room = Math.min(Math.max(over, 0), left[field] - part[field]);
+    part[field] += room;
+    over -= room;
+  }
+  part.taxableAmount = Math.min(part.taxableAmount, left.taxableAmount);
+  return withTotal(part, line);
 }

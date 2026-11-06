@@ -105,7 +105,7 @@ function SettingsForm({ saved }) {
 
       <div className="flex flex-col gap-4">
       <fieldset disabled={!canEdit} className="flex flex-col gap-4">
-        <Card title="GST" actions={<Link to="/app/settings/gst" className="text-sm text-brown underline">GST setup</Link>}>
+        <Card title="GST" actions={<Link to="/app/gst?tab=settings" className="text-sm text-brown underline">GST setup</Link>}>
           {saved.gstSetupActive ? (
             <p className="text-sm text-muted">GST setup is active, so tax on new bills comes from your approved tax rules. Registrations, tax rules and how prices work are all in GST setup.</p>
           ) : (
@@ -186,6 +186,10 @@ function SettingsForm({ saved }) {
               <input type="checkbox" className="accent-gold" checked={values.branchOwners.editSettings} onChange={setDelegation('editSettings')} />
               Change their branches’ bill prefix
             </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" className="accent-gold" checked={values.branchOwners.viewGst} onChange={setDelegation('viewGst')} />
+              See the GST overview and sales register for their branches
+            </label>
             <label className="mt-2 flex items-center gap-2">
               <input type="checkbox" className="accent-gold" checked={values.frontDesk.closeCash} onChange={(e) => setValues((v) => ({ ...v, frontDesk: { closeCash: e.target.checked } }))} />
               The front desk counts the drawer and closes the cash day
@@ -225,7 +229,7 @@ function SettingsForm({ saved }) {
             })}
           </div>
           <p className="mt-2 text-xs text-muted">
-            Bill numbers start again from 00001 every financial year (1 April). Bills made before now keep their old numbers. GSTINs are changed in <Link to="/app/settings/gst" className="underline">GST setup</Link>, with the date each one starts.
+            Bill numbers start again from 00001 every financial year (1 April). Bills made before now keep their old numbers. GSTINs are changed in <Link to="/app/gst?tab=settings" className="underline">GST setup</Link>, with the date each one starts.
           </p>
         </Card>
       </fieldset>

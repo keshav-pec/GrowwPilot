@@ -19,6 +19,8 @@ describe('Understanding the question', () => {
     ['how do I activate gst setup', 'gst-setup'],
     ['approve a tax rule', 'gst-setup'],
     ['what is igst and place of supply', 'gst-igst'],
+    ['where is the sales register', 'gst-record'],
+    ['what is the nightly check for gst', 'gst-record'],
     ['new booking', 'book'],
     ['how do i cancel a booking', 'cancel'],
     ['I want to reschedule Priya to 5 pm', 'reschedule'],

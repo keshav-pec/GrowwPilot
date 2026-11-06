@@ -86,7 +86,7 @@ export async function getSettingsForScreen(ctx) {
     defaultProductTaxBps: settings.defaultProductTaxBps ?? 1800,
     frontDeskDiscountLimitBps: settings.frontDeskDiscountLimitBps,
     guestProductSales: settings.guestProductSales,
-    branchOwners: { approveRefunds: settings.branchOwners?.approveRefunds !== false, voidBills: settings.branchOwners?.voidBills !== false, editSettings: Boolean(settings.branchOwners?.editSettings) },
+    branchOwners: { approveRefunds: settings.branchOwners?.approveRefunds !== false, voidBills: settings.branchOwners?.voidBills !== false, editSettings: Boolean(settings.branchOwners?.editSettings), viewGst: Boolean(settings.branchOwners?.viewGst) },
     frontDesk: { closeCash: settings.frontDesk?.closeCash !== false },
     gstSetupActive: settings.gst?.status === 'ACTIVE',
     branches: visible.map((b) => {
@@ -109,7 +109,7 @@ const WORDS = {
   frontDeskDiscountLimitBps: 'front desk discount limit',
   guestProductSales: 'guest product sales',
 };
-const DELEGATION_WORDS = { approveRefunds: 'branch owners approve refunds', voidBills: 'branch owners void bills', editSettings: 'branch owners edit their branches’ bill prefix' };
+const DELEGATION_WORDS = { approveRefunds: 'branch owners approve refunds', voidBills: 'branch owners void bills', editSettings: 'branch owners edit their branches’ bill prefix', viewGst: 'branch owners see GST for their branches' };
 function describe(field, value) {
   if (typeof value === 'boolean') return `${WORDS[field]}: ${value ? 'on' : 'off'}`;
   if (field.endsWith('Bps')) return `${WORDS[field]}: ${value / 100}%`;
@@ -170,7 +170,7 @@ export async function updateSettings(ctx, input, key) {
   const delegationWords = [];
   for (const [field, value] of Object.entries(input.branchOwners ?? {})) {
     set[`branchOwners.${field}`] = value;
-    if (value !== Boolean(before.branchOwners?.[field] ?? field !== 'editSettings')) delegationWords.push(`${DELEGATION_WORDS[field]}: ${value ? 'on' : 'off'}`);
+    if (value !== Boolean(before.branchOwners?.[field] ?? !['editSettings', 'viewGst'].includes(field))) delegationWords.push(`${DELEGATION_WORDS[field]}: ${value ? 'on' : 'off'}`);
   }
   if (input.frontDesk?.closeCash !== undefined) {
     set['frontDesk.closeCash'] = input.frontDesk.closeCash;

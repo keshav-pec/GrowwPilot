@@ -1,6 +1,6 @@
 # GST Engine: Build Plan
 
-Based on `GrowwPilot_GST_Engine_Technical_PRD_v1.pdf` (1 Nov 2026) and a check of the current code on 4 Nov 2026. **Phase 1 is built (6 Nov 2026), not yet committed.** Phases 2 to 5 are not built.
+Based on `GrowwPilot_GST_Engine_Technical_PRD_v1.pdf` (1 Nov 2026) and a check of the current code on 4 Nov 2026. **Phase 1 is built and committed. Phase 2 is built (6 Nov 2026), not yet committed.** Phases 3 to 5 are not built.
 
 **The goal:** a salon's bills become a correct, traceable GST record. From that record the owner can prepare GSTR-1, check purchases and input credit, and prepare a GSTR-3B working sheet. The owner still files on the GST portal.
 
@@ -128,8 +128,8 @@ GST Phase 1: GST setup screen, dated registrations and branch links, owner-appro
 - **Credit notes and voids** add new minus entries. The original stays untouched. A void in a filed month gets blocked once Phase 4 adds filing.
 - **Part refunds by amount:** for example ₹525 off a ₹1,050 haircut gives ₹500 taxable and ₹25 tax. A refund can't go above what is left on the line. Commission is taken back in the same share.
 - **Older bills:** GST bills from the start month onward are added to the record automatically, once only.
-- **GST menu** with four tabs: Overview, Sales & Returns, Purchases & ITC, Settings. Overview stays small: period, output tax and what needs attention. Each row opens the existing bill screen.
-- **Permissions:** the business owner sees everything. Branch owners see their GSTIN's data only if switched on. The front desk sees only the tax on bills. Other salons' data is never reachable.
+- **GST menu** with tabs: Overview, Sales & Returns, Settings. Purchases & ITC is added in Phase 5, when it has something in it. Overview stays small: period, output tax and what needs attention. Each row opens the existing bill screen.
+- **Permissions:** the business owner sees everything. Branch owners see their own branches' data only if switched on, because they can't open other branches' bills. The front desk sees only the tax on bills. Other salons' data is never reachable.
 - **Nightly check:** compares issued bills with the tax record and lists any difference with a link to the bill.
 - **"GST collected" report:** reads the tax record for activated salons, so two screens can't disagree.
 

@@ -462,6 +462,10 @@ await bill(atMarina, await visit(desertRose, 'Dubai Marina', desertCustomers[1],
 // GST setup, started but not activated, to try out: Glamour Studio's GSTINs are now dated registrations and the starter
 // 5% rule waits for approval. One customer is a business from another state. Bills stay as they are until the owner activates.
 await saveSetup(owner, { scheme: 'REGULAR', startMonth: now.setZone('Asia/Kolkata').toFormat('yyyy-MM') }, key());
+// A part refund to look at: half of a haircut, by amount. Activating GST setup adds these bills to the tax record.
+const halfRefunded = await bill(desk, await visit(glamour, 'Andheri', gc['Karan Malhotra'], [gs.Haircut, staff.Rahul]), [{ method: 'CASH', amount: gs.Haircut.price }]);
+await createRefund(owner, { invoiceId: halfRefunded._id, lines: [{ lineId: String(halfRefunded.lines[0]._id), partAmount: Math.round(gs.Haircut.price / 2) }], reason: 'Customer only wanted half the cut redone' }, key());
+await models.BillingSettings.updateOne({ orgId: glamour._id }, { $set: { 'branchOwners.viewGst': true } }); // Vikram can see GST for Bandra
 await Customer.updateOne({ _id: gc['Amit Verma']._id }, { $set: { gstin: demoGstin('29AABCT3518Q1Z'), gstLegalName: 'Verma Traders LLP' } });
 
 // Yesterday's cash days, counted and closed (Andheri was ₹50 short); today's are left for the desk to open

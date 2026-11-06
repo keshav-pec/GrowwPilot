@@ -24,6 +24,7 @@ import { branchStock } from '../inventory/stock/stock.queries.js';
 import { makeShareToken, readShareToken, SHARE_DAYS } from './share.js';
 import { redeemOffer, restoreOffer } from '../occasions/checkout/redeem.js';
 import { billContext, gstSetupActive, missingRuleBlocker } from '../gst/gst.billing.js';
+import { postBill, postVoid } from '../gst/gst.ledger.js';
 
 export { branchCode } from '../billing/settings.service.js';
 
@@ -535,6 +536,9 @@ export async function issueInvoice(ctx, id, { version, payments = [], useAdvance
       settlementStatus: 'UNPAID',
     });
 
+    // The tax record: this bill's permanent entry, in the same transaction, so one never exists without the other
+    if (gst) await postBill(ctx, issued, settings, { taxDate: gst.taxDate }, session);
+
     // What each kind of line does on issue, in the same transaction (products leave the store, exactly once)
     await runHook('onIssue', ctx, issued.lines, { invoice: issued }, session);
     // The occasion offer is used now (two desks can never both use it; any failure below leaves it unused)
@@ -604,6 +608,7 @@ export async function voidInvoice(ctx, id, { reason }, key) {
     await restoreOffer(ctx, invoice, session); // an occasion offer can be used again if its month isn't over
     const branch = await Branch.findById(invoice.branchId).select('timezone').session(session).lean();
     await reverseCommissions({ invoice, eventKey: `void:${invoice._id}`, day: todayInZone(branch.timezone) }, session);
+    await postVoid(ctx, updated, settings, { taxDate: todayInZone(branch.timezone) }, session); // a minus entry; the bill's own entry stays
 
     await logActivity(ctx, { action: 'billing.bill_voided', branchId: invoice.branchId, invoiceId: invoice._id, summary: `Voided bill ${invoice.invoiceNumber} for ${invoice.customerSnapshot?.name} (${formatMoney(invoice.grandTotal)}): ${reason.trim()}`, before: { status: 'ISSUED' }, after: { status: 'VOID', reason: reason.trim() } }, session);
     return present(ctx, updated, { session, settings });

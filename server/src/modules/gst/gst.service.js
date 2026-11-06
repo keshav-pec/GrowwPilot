@@ -11,6 +11,7 @@ import { logActivity } from '../activity/activity.service.js';
 import { getBillingSettings } from '../billing/settings.service.js';
 import { computeBill } from '../billing/tax.rules.js';
 import { billContext, gstSetupActive, ruleTax } from './gst.billing.js';
+import { addOlderDocuments } from './gst.ledger.js';
 import { clashingRules, dayBefore, niceDate, periodsOverlap, registrationFor, ruleFor, setupChecks } from './gst.rules.js';
 
 // ---------------------------------------------------------------------------
@@ -40,6 +41,11 @@ async function checksFor(ctx, settings, session = null) {
   const [branches, registrations, rules, items] = [await branchesOf(ctx, session), await GstRegistration.find(scoped(ctx)).session(session).lean(), await GstTaxRule.find(scoped(ctx, { status: 'APPROVED' })).session(session).lean(), await chargeableItems(ctx, session)];
   const today = todayInZone(branches[0]?.timezone ?? INDIA);
   return setupChecks({ settings, today, branches, registrations, rules, ...items });
+}
+
+// What the Overview lists as needing attention
+export async function setupStateFor(ctx, settings) {
+  return { problems: (await checksFor(ctx, settings)).filter((c) => !c.ok && c.key !== 'testBill') };
 }
 
 // ---- moving existing branch GSTINs -----------------------------------------
@@ -129,6 +135,7 @@ export async function getSetup(ctx) {
     unlinked: { SERVICE: noGroup(items.services), PRODUCT: noGroup(items.products) },
     checks: await checksFor(ctx, settings),
     canEdit: Boolean(ctx.isPrimaryOwner),
+    canViewTax: Boolean(ctx.isPrimaryOwner || settings.branchOwners?.viewGst),
   };
 }
 
@@ -389,9 +396,10 @@ export async function testBill(ctx, { branchId, placeOfSupply, date, billDiscoun
 }
 
 // Every check must pass. Bills issued from now on use the approved rules. The configuration is kept in the activity log.
+// Older GST bills from the start month on are then added to the tax record (the nightly check finishes the job if the server stops).
 export async function activate(ctx, key) {
   assertBusinessOwner(ctx);
-  return runOnce(ctx, { key, operation: 'gst.activate' }, async (session) => {
+  const result = await runOnce(ctx, { key, operation: 'gst.activate' }, async (session) => {
     const settings = await getBillingSettings(ctx, session);
     if (gstSetupActive(settings)) return { activated: true };
     const checks = await checksFor(ctx, settings, session);
@@ -404,12 +412,14 @@ export async function activate(ctx, key) {
     const first = registrations.find((r) => !r.to);
     await BillingSettings.updateOne(
       scoped(ctx),
-      { $set: { gstRegistered: true, legalName: settings.legalName || first.legalName, 'gst.status': 'ACTIVE', 'gst.activatedAt': now, 'gst.activatedBy': ctx.userId, 'gst.activatedByName': ctx.userName } },
+      { $set: { gstRegistered: true, legalName: settings.legalName || first.legalName, 'gst.status': 'ACTIVE', 'gst.activatedAt': now, 'gst.activatedBy': ctx.userId, 'gst.activatedByName': ctx.userName, 'gst.recordFrom': now } },
       { session }
     );
     await copyTodaysGstins(ctx, session);
     await logActivity(ctx, { action: 'billing.gst_activated', summary: `Activated GST setup, with returns from ${settings.gst.startMonth}`, after: { startMonth: settings.gst.startMonth, pricesIncludeTax: settings.pricesIncludeTax, registrations, rules } }, session);
     return { activated: true };
   });
+  await addOlderDocuments(ctx.orgId, await getBillingSettings(ctx));
+  return result;
 }
 

@@ -19,6 +19,9 @@ export const TAX_CODE_REGEX = /^\d{4,8}$/;
 export const STARTER_RULE = { name: 'Salon services', kind: 'SERVICE', code: '999721', rateBps: 500, itcType: 'WITHOUT_ITC', from: '2025-09-22' };
 
 // Where to fix a problem found during setup or on a bill
-export const GST_SETUP_LINK = '/app/settings/gst';
+export const GST_SETUP_LINK = '/app/gst?tab=settings';
 export const CATALOG_LINK = '/app/catalog';
 export const PRODUCTS_LINK = '/app/inventory?tab=products';
+
+// Entries in the permanent tax record. A bill adds a plus entry; a credit note or a void adds a minus entry.
+export const TAX_ENTRY_TYPES = ['BILL_ISSUED', 'CREDIT_NOTE', 'BILL_VOIDED'];

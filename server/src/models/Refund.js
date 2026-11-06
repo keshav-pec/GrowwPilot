@@ -3,14 +3,15 @@ import { ref, money } from './fields.js';
 import { PAYMENT_METHODS } from '../config/constants.js';
 import { LINE_KINDS, REFUND_REQUEST_STATUSES, RESTOCK_OPTIONS } from '../config/billing.js';
 
-// One line of a refund: how many units of a bill line come back, and (products) whether they can be sold again.
+// One line of a refund: how many units of a bill line come back, or an amount off it, and (products) whether they can be sold again.
 // The amounts are filled in when the refund is done (they are worked out from the bill at that moment).
 const refundLineSchema = new mongoose.Schema(
   {
     lineId: { type: mongoose.Schema.Types.ObjectId, required: true },
     kind: { type: String, enum: LINE_KINDS, required: true },
     name: { type: String, required: true },
-    qty: { type: Number, required: true, min: 1 },
+    qty: { type: Number, required: true, min: 0 }, // 0: part of the line's value, nothing comes back
+    partAmount: money({ default: null }), // a part refund: this much off the line, with its GST
     restock: { type: String, enum: [...RESTOCK_OPTIONS, null], default: null }, // products only
     taxableAmount: money({ default: 0 }),
     taxRateBps: { type: Number, default: 0 },

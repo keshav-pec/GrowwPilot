@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon';
-import { Branch, CommissionEntry, Customer, CustomerAdvance, Invoice, Payment, PaymentAllocation, Refund } from '../../models/index.js';
+import { Branch, CommissionEntry, Customer, CustomerAdvance, GstTaxEntry, Invoice, Payment, PaymentAllocation, Refund } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { oid, scoped } from '../../utils/scoped.js';
 import { dayRangeUTC, todayInZone } from '../../utils/time.js';
@@ -87,27 +87,57 @@ async function sales(ctx, { branches, from, to }) {
   };
 }
 
-// GST collected by rate: bills minus credit notes (for the GST return; a tax adviser should check it)
+// GST collected by rate: bills minus credit notes (for the GST return; a tax adviser should check it).
+// Salons with GST setup active read their tax record from their start month on, so this and the register can't disagree.
 async function gst(ctx, { branches, from, to }) {
-  const [bills, refunds] = await Promise.all([billsIn(ctx, branches, from, to), refundsIn(ctx, branches, from, to)]);
+  const settings = await getBillingSettings(ctx);
+  const startDay = settings.gst?.status === 'ACTIVE' && settings.gst.startMonth ? `${settings.gst.startMonth}-01` : null;
   const rows = new Map();
   const rowFor = (rateBps) => add(rows, rateBps, () => ({ rate: `${rateBps / 100}%`, rateBps, taxable: 0, cgst: 0, sgst: 0, igst: 0, creditTaxable: 0, creditCgst: 0, creditSgst: 0, creditIgst: 0 }));
-  for (const b of bills.filter((x) => x.gstRegistered)) {
-    for (const t of b.taxSummary ?? []) {
-      const r = rowFor(t.rateBps);
-      r.taxable += t.taxableAmount;
-      r.cgst += t.cgst;
-      r.sgst += t.sgst;
-      r.igst += t.igst ?? 0;
+
+  // Before the tax record begins (or with no record at all): the bills and refunds themselves
+  const billsTo = startDay && startDay <= to ? DateTime.fromISO(startDay).minus({ days: 1 }).toISODate() : to;
+  if (from <= billsTo) {
+    const [bills, refunds] = await Promise.all([billsIn(ctx, branches, from, billsTo), refundsIn(ctx, branches, from, billsTo)]);
+    for (const b of bills.filter((x) => x.gstRegistered)) {
+      for (const t of b.taxSummary ?? []) {
+        const r = rowFor(t.rateBps);
+        r.taxable += t.taxableAmount;
+        r.cgst += t.cgst;
+        r.sgst += t.sgst;
+        r.igst += t.igst ?? 0;
+      }
+    }
+    for (const refund of refunds) {
+      for (const l of refund.lines.filter((x) => x.taxRateBps > 0)) {
+        const r = rowFor(l.taxRateBps);
+        r.creditTaxable += l.taxableAmount;
+        r.creditCgst += l.cgst;
+        r.creditSgst += l.sgst;
+        r.creditIgst += l.igst ?? 0;
+      }
     }
   }
-  for (const refund of refunds) {
-    for (const l of refund.lines.filter((x) => x.taxRateBps > 0)) {
-      const r = rowFor(l.taxRateBps);
-      r.creditTaxable += l.taxableAmount;
-      r.creditCgst += l.cgst;
-      r.creditSgst += l.sgst;
-      r.creditIgst += l.igst ?? 0;
+
+  // The tax record: a void counts as a minus on the bills side, on the day it was voided
+  if (startDay && startDay <= to) {
+    const recordFrom = from > startDay ? from : startDay;
+    const entries = await GstTaxEntry.find({ orgId: oid(ctx.orgId), branchId: { $in: branches.map((b) => b._id) }, taxDate: { $gte: recordFrom, $lte: to } }).select('type lines').lean();
+    for (const entry of entries) {
+      for (const l of entry.lines.filter((x) => x.rateBps > 0)) {
+        const r = rowFor(l.rateBps);
+        if (entry.type === 'CREDIT_NOTE') {
+          r.creditTaxable -= l.taxable;
+          r.creditCgst -= l.cgst;
+          r.creditSgst -= l.sgst;
+          r.creditIgst -= l.igst;
+        } else {
+          r.taxable += l.taxable;
+          r.cgst += l.cgst;
+          r.sgst += l.sgst;
+          r.igst += l.igst;
+        }
+      }
     }
   }
   const list = [...rows.values()]

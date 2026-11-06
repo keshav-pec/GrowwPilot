@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useCreateRefund, useRefundQuote } from '../../api/refunds';
-import { formatMoney } from '../../lib/money';
+import { formatMoney, isValidRupees, toPaise } from '../../lib/money';
 import { PAYMENT_METHODS } from '../../lib/billing';
 import { newRequestKey } from '../../lib/requestKey';
 import { Input, Modal, ModalFooter, Select, Spinner, Textarea } from '../../components/ui';
@@ -11,27 +11,29 @@ const RESTOCK = [
   { value: 'DAMAGED', label: 'Damaged' },
 ];
 
-// Refund or return: pick lines and how many, say why. The server works out the money (with GST):
+// Refund or return: pick lines and how many, or part of a line's value, and say why. The server works out the money (with GST):
 // what goes back to the customer, and what just comes off what they still owe.
 // An owner who may approve refunds does it straight away; the front desk sends a request.
 export default function RefundModal({ invoice, mayApprove, onClose }) {
-  const refundable = invoice.lines.filter((l) => l.qty - (l.refundedQty ?? 0) > 0);
-  const [picked, setPicked] = useState({}); // lineId -> { qty, restock }
+  const valueLeft = (l) => l.lineTotal - (l.creditedAmount ?? 0);
+  const refundable = invoice.lines.filter((l) => l.qty - (l.refundedQty ?? 0) > 0 && (l.lineTotal === 0 || valueLeft(l) > 0));
+  const [picked, setPicked] = useState({}); // lineId -> { qty, restock, part (true: an amount), amount (the text typed) }
   const [reason, setReason] = useState('');
   const [method, setMethod] = useState(invoice.payments.find((p) => p.kind === 'PAYMENT' && p.status === 'VALID')?.method ?? 'CASH');
   const [reference, setReference] = useState('');
   const [key] = useState(newRequestKey);
   const create = useCreateRefund();
 
-  const lines = useMemo(() => Object.entries(picked).map(([lineId, p]) => ({ lineId, qty: p.qty, ...(p.restock ? { restock: p.restock } : {}) })), [picked]);
-  const quote = useRefundQuote(invoice._id, lines, lines.length > 0);
+  const lines = useMemo(() => Object.entries(picked).map(([lineId, p]) => (p.part ? { lineId, partAmount: isValidRupees(p.amount) ? toPaise(p.amount) : 0 } : { lineId, qty: p.qty, ...(p.restock ? { restock: p.restock } : {}) })), [picked]);
+  const amountsTyped = lines.every((l) => l.qty || l.partAmount > 0);
+  const quote = useRefundQuote(invoice._id, lines, lines.length > 0 && amountsTyped);
   const plan = quote.data;
 
   function toggle(line) {
     setPicked((current) => {
       const next = { ...current };
       if (next[line._id]) delete next[line._id];
-      else next[line._id] = { qty: line.qty - (line.refundedQty ?? 0), restock: line.kind === 'PRODUCT' ? 'SELLABLE' : null };
+      else next[line._id] = { qty: line.qty - (line.refundedQty ?? 0), restock: line.kind === 'PRODUCT' ? 'SELLABLE' : null, part: false, amount: '' };
       return next;
     });
   }
@@ -56,7 +58,7 @@ export default function RefundModal({ invoice, mayApprove, onClose }) {
       onClose={onClose}
       title={`Refund or return · ${invoice.invoiceNumber}`}
       footer={
-        <ModalFooter onClose={onClose} onClick={submit} disabled={!plan || quote.isFetching || reason.trim().length < 3} loading={create.isPending}>
+        <ModalFooter onClose={onClose} onClick={submit} disabled={!plan || !amountsTyped || quote.isError || quote.isFetching || reason.trim().length < 3} loading={create.isPending}>
             {mayApprove ? `Refund ${plan ? formatMoney(plan.creditTotal) : ''}` : 'Ask an owner to approve'}
           </ModalFooter>
       }
@@ -71,10 +73,28 @@ export default function RefundModal({ invoice, mayApprove, onClose }) {
                 <input type="checkbox" className="accent-gold" checked={Boolean(p)} onChange={() => toggle(line)} />
                 <span className="font-medium">{line.name}</span>
                 <span className="text-muted">
-                  · {left} of {line.qty} · {formatMoney(line.lineTotal)}
+                  · {left} of {line.qty} · {formatMoney(valueLeft(line))} left
                 </span>
               </label>
-              {p && line.kind === 'PRODUCT' && (
+              {p && valueLeft(line) > 0 && (
+                <div className="ml-6 flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-1">
+                    <input type="radio" name={`how-${line._id}`} className="accent-gold" checked={!p.part} onChange={() => change(line._id, 'part', false)} />
+                    {line.kind === 'PRODUCT' ? 'It comes back' : 'All of it'}
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <input type="radio" name={`how-${line._id}`} className="accent-gold" checked={p.part} onChange={() => change(line._id, 'part', true)} />
+                    Part of the amount
+                  </label>
+                  {p.part && (
+                    <div className="w-32">
+                      <Input inputMode="decimal" placeholder="₹" aria-label={`Amount off ${line.name}`} value={p.amount} onChange={(e) => change(line._id, 'amount', e.target.value)} />
+                    </div>
+                  )}
+                </div>
+              )}
+              {p?.part && line.kind === 'PRODUCT' && <p className="ml-6 text-xs text-muted">The product stays with the customer, and nothing goes back in stock.</p>}
+              {p && !p.part && line.kind === 'PRODUCT' && (
                 <div className="ml-6 grid grid-cols-2 gap-2">
                   <Select aria-label="How many" options={Array.from({ length: left }, (_, i) => ({ value: String(i + 1), label: `${i + 1} returned` }))} value={String(p.qty)} onChange={(e) => change(line._id, 'qty', Number(e.target.value))} />
                   <Select aria-label="Condition" options={RESTOCK} value={p.restock} onChange={(e) => change(line._id, 'restock', e.target.value)} />
@@ -128,7 +148,7 @@ export default function RefundModal({ invoice, mayApprove, onClose }) {
           <Textarea label="Reason" placeholder="e.g. Wrong shade, customer unhappy with the service" value={reason} onChange={(e) => setReason(e.target.value)} />
         </div>
       </div>
-      <p className="mt-2 text-xs text-muted">Refunded services don’t return the products used. Their commission is taken back.</p>
+      <p className="mt-2 text-xs text-muted">Refunded services don’t return the products used. Their commission is taken back, in the same share for part of the amount.</p>
     </Modal>
   );
 }

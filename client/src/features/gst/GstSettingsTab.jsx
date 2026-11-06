@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { CheckCircle2, CircleAlert, Info } from 'lucide-react';
-import { refusalText, useActivateGst, useGstSetup, useSaveGstSetup } from '../../api/gst';
+import { refusalText, useActivateGst, useSaveGstSetup } from '../../api/gst';
 import { formatDateTime, formatMonth } from '../../lib/time';
 import { newRequestKey } from '../../lib/requestKey';
-import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, PageHeader, PageSpinner, Select } from '../../components/ui';
+import { Badge, Button, Card, ConfirmDialog, Input, Select } from '../../components/ui';
 import ReasonModal from '../../components/ReasonModal';
 import RegistrationsCard from './RegistrationsCard';
 import TaxRulesCard from './TaxRulesCard';
@@ -18,38 +18,26 @@ const SCHEMES = [
   { value: 'QRMP', label: 'QRMP', unsupported: true },
 ];
 
-// GST setup: registration type, registrations, tax rules, a test bill, then Activate.
+// The Settings tab: registration type, registrations, tax rules, a test bill, then Activate.
 // The business owner changes things; branch owners can look.
-export default function GstSetupPage() {
-  const setupQuery = useGstSetup();
-  if (setupQuery.isPending) return <PageSpinner />;
-  if (setupQuery.isError) return <EmptyState title="Couldn’t load GST setup" message={setupQuery.error.message} />;
-  const setup = setupQuery.data;
-
+export default function GstSettingsTab({ setup }) {
   return (
-    <>
-      <PageHeader
-        title="GST setup"
-        subtitle={<Link to="/app/settings/billing" className="hover:underline">← Billing settings</Link>}
-        actions={setup.active ? <Badge tone="brown">Active</Badge> : <Badge tone="neutral">Not active</Badge>}
-      />
-      {!setup.canEdit && <p className="mb-4 rounded-lg bg-surface p-3 text-sm text-muted">Only the business owner can change GST setup.</p>}
-      <div className="flex flex-col gap-4">
-        <Status setup={setup} />
-        <SchemeCard key={`${setup.scheme}:${setup.startMonth}:${setup.pricesIncludeTax}`} setup={setup} />
-        {setup.scheme === 'REGULAR' && (
-          <>
-            <RegistrationsCard setup={setup} />
-            <TaxRulesCard setup={setup} />
-            {setup.canEdit && <TestBillCard setup={setup} />}
-          </>
-        )}
-        <p className="flex items-start gap-2 rounded-lg bg-yellow-soft p-3 text-xs">
-          <Info size={14} className="mt-0.5 shrink-0" />
-          Please have your GST practitioner check your tax rules, SAC and HSN codes and bill wording before you activate.
-        </p>
-      </div>
-    </>
+    <div className="flex flex-col gap-4">
+      {!setup.canEdit && <p className="rounded-lg bg-surface p-3 text-sm text-muted">Only the business owner can change GST setup.</p>}
+      <Status setup={setup} />
+      <SchemeCard key={`${setup.scheme}:${setup.startMonth}:${setup.pricesIncludeTax}`} setup={setup} />
+      {setup.scheme === 'REGULAR' && (
+        <>
+          <RegistrationsCard setup={setup} />
+          <TaxRulesCard setup={setup} />
+          {setup.canEdit && <TestBillCard setup={setup} />}
+        </>
+      )}
+      <p className="flex items-start gap-2 rounded-lg bg-yellow-soft p-3 text-xs">
+        <Info size={14} className="mt-0.5 shrink-0" />
+        Please have your GST practitioner check your tax rules, SAC and HSN codes and bill wording before you activate.
+      </p>
+    </div>
   );
 }
 
@@ -98,7 +86,7 @@ function Status({ setup }) {
               {check.ok ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-brown" /> : <CircleAlert size={16} className="mt-0.5 shrink-0 text-orange" />}
               <span>
                 {check.ok ? check.label : check.message}
-                {!check.ok && check.link && check.link !== '/app/settings/gst' && (
+                {!check.ok && check.link && check.link !== '/app/gst?tab=settings' && (
                   <>
                     {' '}
                     <Link to={check.link} className="font-medium underline">Fix it</Link>
@@ -116,7 +104,7 @@ function Status({ setup }) {
         loading={activate.isPending}
         title="Activate GST setup"
         confirmLabel="Activate"
-        message="Every bill issued from now on takes its tax from your approved rules, and a bill with no approved rule can’t be issued. Bills already issued don’t change."
+        message="Every bill issued from now on takes its tax from your approved rules and goes in the permanent tax record, and a bill with no approved rule can’t be issued. GST bills from your start month on are added to the record too. Bills already issued don’t change."
       />
     </Card>
   );

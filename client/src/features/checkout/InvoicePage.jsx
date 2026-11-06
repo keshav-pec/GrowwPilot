@@ -7,7 +7,7 @@ import { downloadInvoicePdf, useBillEmails, useInvoice, useInvoiceHistory, useRe
 import { useApproveRefund, useRejectRefund } from '../../api/refunds';
 import { formatMoney } from '../../lib/money';
 import { formatDateTime } from '../../lib/time';
-import { METHOD_LABEL, billBadge, percentLabel, taxRows } from '../../lib/billing';
+import { METHOD_LABEL, billBadge, lineRefundWords, percentLabel, refundLineWords, taxRows } from '../../lib/billing';
 import { newRequestKey } from '../../lib/requestKey';
 import { Badge, Button, EmptyState, PageSpinner, Spinner, SummaryRow } from '../../components/ui';
 import RecordPaymentModal from '../billing/RecordPaymentModal';
@@ -180,7 +180,7 @@ export default function InvoicePage() {
                       {line.kind === 'PRODUCT' ? 'Product' : line.staffName}
                       {line.sacCode && ` · SAC ${line.sacCode}`}
                       {line.hsnCode && ` · HSN ${line.hsnCode}`}
-                      {line.refundedQty > 0 && <span className="text-orange"> · {line.refundedQty === line.qty ? 'refunded' : `${line.refundedQty} refunded`}</span>}
+                      {lineRefundWords(line, formatMoney) && <span className="text-orange"> · {lineRefundWords(line, formatMoney)}</span>}
                     </span>
                   </td>
                   <td className="py-2 text-right">{formatMoney(line.unitPrice * line.qty)}</td>
@@ -257,7 +257,7 @@ export default function InvoicePage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="flex items-center gap-2">
                       <Badge tone={REFUND_STATUS[r.status].tone}>{REFUND_STATUS[r.status].label}</Badge>
-                      {r.lines.map((l) => `${l.qty} × ${l.name}${l.restock === 'DAMAGED' ? ' (damaged)' : ''}`).join(', ')}
+                      {r.lines.map((l) => refundLineWords(l, formatMoney)).join(', ')}
                     </span>
                     <span className="font-medium">{formatMoney(r.creditTotal)}</span>
                   </div>

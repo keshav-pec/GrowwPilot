@@ -7,7 +7,7 @@ import { validate } from '../../middleware/validate.js';
 import { requireIdempotencyKey } from '../../middleware/idempotency.js';
 import { PAYMENT_METHODS } from '../../config/constants.js';
 import { RESTOCK_OPTIONS } from '../../config/billing.js';
-import { objectId } from '../../utils/schemas.js';
+import { objectId, paise } from '../../utils/schemas.js';
 import { approveRefund, createRefund, getRefund, quoteRefund, rejectRefund } from './refunds.service.js';
 
 // /api/refunds — refunds and returns on issued bills. Front desk asks; owners approve (see refunds.service.js)
@@ -15,7 +15,11 @@ const router = Router();
 router.use(requireAuth, tenantContext, requireRole('OWNER', 'FRONT_DESK'));
 
 const lines = z
-  .array(z.object({ lineId: objectId, qty: z.number().int().min(1).max(999), restock: z.enum(RESTOCK_OPTIONS).optional() }))
+  .array(
+    z
+      .object({ lineId: objectId, qty: z.number().int().min(1).max(999).optional(), partAmount: paise.min(1, 'Enter the amount to refund').optional(), restock: z.enum(RESTOCK_OPTIONS).optional() })
+      .refine((l) => Boolean(l.qty) !== Boolean(l.partAmount), 'Say how many, or how much')
+  )
   .min(1, 'Choose what is being refunded')
   .max(50);
 const quoteSchema = z.object({ invoiceId: objectId, lines });

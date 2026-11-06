@@ -22,7 +22,7 @@ const commissionEntrySchema = new mongoose.Schema(
     rateSource: { type: String, enum: ['service_rate', 'pay_setup'], required: true },
     ruleId: { type: mongoose.Schema.Types.ObjectId, required: true }, // the CommissionRule or PayPlan used
     amount: { type: Number, required: true, validate: { validator: Number.isInteger, message: 'Commission must be whole paise' } },
-    type: { type: String, enum: ['earned', 'reversal'], default: 'earned' },
+    type: { type: String, enum: ['earned', 'reversal', 'part_reversal'], default: 'earned' }, // part_reversal: a part refund; the service is still earning
     // Why this row exists: "paid:1" (earned the first time), "refund:<id>", "payment_reversed:<id>", "void:<bill id>"
     eventKey: { type: String },
   },

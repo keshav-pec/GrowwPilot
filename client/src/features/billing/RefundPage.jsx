@@ -88,7 +88,7 @@ export default function RefundPage() {
                   {l.name}
                   {l.code && <span className="block text-xs text-muted">{l.code}</span>}
                 </td>
-                <td className="py-2 text-right">{l.qty}</td>
+                <td className="py-2 text-right">{l.qty || 'Part'}</td>
                 {note && <td className="py-2 text-right">{formatMoney(l.taxableAmount)}</td>}
                 {note && <td className="py-2 text-right text-muted">{percentLabel(l.taxRateBps)}</td>}
                 <td className="py-2 text-right">{formatMoney(l.amount)}</td>

@@ -71,7 +71,7 @@ export function writeInvoicePdf(stream, invoice, { maskPhone: mask = false } = {
     const discount = line.comboDiscount + (line.occasionDiscount ?? 0) + line.lineDiscount + line.billDiscountShare;
     const code = line.sacCode ? `SAC ${line.sacCode}` : line.hsnCode ? `HSN ${line.hsnCode}` : '';
     const who = line.kind === 'PRODUCT' ? 'Product' : line.staffName;
-    const refunded = line.refundedQty > 0 ? ` · ${line.refundedQty === line.qty ? 'refunded' : `${line.refundedQty} refunded`}` : '';
+    const refunded = line.refundedQty > 0 ? ` · ${line.refundedQty === line.qty ? 'refunded' : `${line.refundedQty} refunded`}` : line.creditedAmount > 0 ? ` · ${money(line.creditedAmount)} refunded` : '';
     const name = `${line.name}\n${[who, code].filter(Boolean).join(' · ')}${refunded}`;
     const cells = [name, line.qty, money(line.unitPrice * line.qty), discount > 0 ? `-${money(discount)}` : '-'];
     row(doc, columns, gst ? [...cells, money(line.taxableAmount), percent(line.taxRateBps), money(line.lineTotal)] : [...cells, money(line.lineTotal)]);
@@ -120,7 +120,7 @@ export function writeInvoicePdf(stream, invoice, { maskPhone: mask = false } = {
     doc.moveDown(0.6);
     doc.font('Helvetica-Bold').fontSize(9).fillColor(MUTED).text('Refunds');
     for (const r of refunds) {
-      doc.font('Helvetica').fontSize(9).fillColor('black').text(`${r.creditNoteNumber ? `Credit note ${r.creditNoteNumber}: ` : ''}${r.lines.map((l) => `${l.qty} x ${l.name}`).join(', ')} · ${money(r.creditTotal)}`);
+      doc.font('Helvetica').fontSize(9).fillColor('black').text(`${r.creditNoteNumber ? `Credit note ${r.creditNoteNumber}: ` : ''}${r.lines.map((l) => (l.partAmount ? `${money(l.partAmount)} off ${l.name}` : `${l.qty} x ${l.name}`)).join(', ')} · ${money(r.creditTotal)}`);
     }
   }
 

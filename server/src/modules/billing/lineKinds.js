@@ -2,7 +2,7 @@ import { InventoryLocation, InventorySku, Service } from '../../models/index.js'
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { LINE_KINDS as KIND_NAMES } from '../../config/billing.js';
-import { reverseCommissions } from '../payroll/commission.service.js';
+import { reverseCommissionShare, reverseCommissions } from '../payroll/commission.service.js';
 import { postMovement } from '../inventory/stock/stock.engine.js';
 import { ruleTax } from '../gst/gst.billing.js';
 
@@ -66,10 +66,17 @@ export const LINE_KINDS = {
         sacCode: service?.sacCode || settings.defaultSacCode || undefined,
       };
     },
-    // A refunded service's commission is taken back. The products it used are not returned.
+    // A refunded service's commission is taken back; a part refund takes back the same share of it.
+    // The products it used are not returned.
     async onRefund(ctx, { invoice, refund, lines: parts, day }, session) {
-      const itemIds = parts.map((p) => invoice.lines.find((l) => String(l._id) === String(p.lineId))?.itemId).filter(Boolean);
-      if (itemIds.length > 0) await reverseCommissions({ invoice, itemIds, eventKey: `refund:${refund._id}`, day }, session);
+      const eventKey = `refund:${refund._id}`;
+      const lineOf = (part) => invoice.lines.find((l) => String(l._id) === String(part.lineId));
+      const isWhole = (part) => !part.partAmount || part.amount >= lineOf(part).lineTotal - (lineOf(part).creditedAmount ?? 0);
+      const itemIds = parts.filter(isWhole).map((p) => lineOf(p)?.itemId).filter(Boolean);
+      if (itemIds.length > 0) await reverseCommissions({ invoice, itemIds, eventKey, day }, session);
+      for (const part of parts.filter((p) => !isWhole(p) && lineOf(p)?.itemId)) {
+        await reverseCommissionShare({ invoice, itemId: lineOf(part).itemId, taxable: part.taxableAmount, eventKey, day }, session);
+      }
     },
   },
 
@@ -109,8 +116,10 @@ export const LINE_KINDS = {
       }
     },
     // Sellable returns go back into the main store; damaged ones come back and are written off
+    // A part refund (qty 0) is money only: the product stays with the customer.
     async onRefund(ctx, { invoice, refund, lines: parts }, session) {
-      const items = parts.map((p) => ({ part: p, line: invoice.lines.find((l) => String(l._id) === String(p.lineId)), qty: p.qty }));
+      const items = parts.filter((p) => p.qty > 0).map((p) => ({ part: p, line: invoice.lines.find((l) => String(l._id) === String(p.lineId)), qty: p.qty }));
+      if (items.length === 0) return;
       const store = await backToStore(ctx, { invoice, items, note: `Returned on bill ${invoice.invoiceNumber}`, requestKey: (line) => `return:${refund._id}:${line._id}` }, session);
       for (const { part, line } of items.filter((i) => i.part.restock === 'DAMAGED')) {
         await postMovement(

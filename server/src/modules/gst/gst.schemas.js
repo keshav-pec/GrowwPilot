@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { DateTime } from 'luxon';
 import { objectId, paise } from '../../utils/schemas.js';
 import { GST_RATES_BPS, LINE_KINDS } from '../../config/billing.js';
-import { GST_SCHEMES, ITC_TYPES, TAX_CODE_REGEX } from '../../config/gst.js';
+import { GST_SCHEMES, ITC_TYPES, TAX_CODE_REGEX, TAX_ENTRY_TYPES } from '../../config/gst.js';
 
 const date = z.string().refine((v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && DateTime.fromISO(v).isValid, 'Choose a date');
 const state = z.string().regex(/^\d{2}$/, 'Choose a state');
@@ -52,4 +52,13 @@ export const testBillSchema = z.object({
   date: date.optional(),
   billDiscount: z.object({ type: z.enum(['flat', 'percent']), value: z.number().min(0) }).nullable().optional(),
   lines: z.array(z.object({ groupId: objectId, name: z.string().trim().max(80).optional(), unitPrice: paise, qty: z.number().int().min(1).max(999).default(1) })).min(1, 'Add a line').max(20),
+});
+
+const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Choose a month');
+export const overviewSchema = z.object({ month: month.optional(), gstin: z.string().trim().toUpperCase().length(15).optional() });
+export const registerSchema = overviewSchema.extend({
+  type: z.enum(TAX_ENTRY_TYPES).optional(),
+  search: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  format: z.enum(['json', 'csv']).default('json'),
 });

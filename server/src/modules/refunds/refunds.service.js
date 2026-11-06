@@ -8,11 +8,12 @@ import { financialYear, formatCreditNoteNumber } from '../../config/billing.js';
 import { logActivity } from '../activity/activity.service.js';
 import { notify } from '../notifications/notifications.service.js';
 import { markPayrollStale } from '../payroll/payrollStale.js';
-import { creditForLine, moneyState } from '../billing/tax.rules.js';
+import { creditForAmount, creditForLine, lineFullyCredited, moneyState } from '../billing/tax.rules.js';
 import { billingPermissions, branchBilling, getBillingSettings } from '../billing/settings.service.js';
 import { loadInvoice, present } from '../invoices/invoices.service.js';
 import { settle } from '../payments/allocations.js';
 import { runHook } from '../billing/lineKinds.js';
+import { postCreditNote } from '../gst/gst.ledger.js';
 
 // ---------------------------------------------------------------------------
 // Refunds and returns on an issued bill.
@@ -27,10 +28,12 @@ import { runHook } from '../billing/lineKinds.js';
 // ---------------------------------------------------------------------------
 
 const LINK = (invoiceId) => `/app/invoices/${invoiceId}`;
+// "2 × Hair serum (damaged)", or "₹525.00 off Haircut" for a part refund
+const lineWords = (l) => (l.partAmount ? `${formatMoney(l.partAmount)} off ${l.name}` : `${l.qty} × ${l.name}${l.restock === 'DAMAGED' ? ' (damaged)' : ''}`);
 const MONEY = (refund) => (refund.cashRefund > 0 ? `${formatMoney(refund.cashRefund)} back by ${refund.method.toLowerCase()}` : 'nothing to hand back');
 
 // What a refund of these lines would do to the bill right now.
-// requested: [{ lineId, qty, restock }] -> { lines (with amounts), creditTotal, cashRefund, dueReduced }
+// requested: [{ lineId, qty, restock } or { lineId, partAmount }] -> { lines (with amounts), creditTotal, cashRefund, dueReduced }
 function planRefund(invoice, requested) {
   if (requested.length === 0) throw new AppError(400, 'VALIDATION_ERROR', 'Choose what is being refunded');
   const seen = new Set();
@@ -39,8 +42,9 @@ function planRefund(invoice, requested) {
     if (!line) throw new AppError(400, 'VALIDATION_ERROR', 'That line is not on this bill');
     if (seen.has(String(line._id))) throw new AppError(400, 'VALIDATION_ERROR', `${line.name} is listed twice`);
     seen.add(String(line._id));
+    if (r.partAmount) return { lineId: line._id, kind: line.kind, name: line.name, qty: 0, partAmount: r.partAmount, restock: null, ...creditForAmount(line, r.partAmount) };
     if (line.kind === 'PRODUCT' && !r.restock) throw new AppError(400, 'VALIDATION_ERROR', `Say whether ${line.name} can be sold again or is damaged`);
-    return { lineId: line._id, kind: line.kind, name: line.name, qty: r.qty, restock: line.kind === 'PRODUCT' ? r.restock : null, ...creditForLine(line, r.qty) };
+    return { lineId: line._id, kind: line.kind, name: line.name, qty: r.qty, partAmount: null, restock: line.kind === 'PRODUCT' ? r.restock : null, ...creditForLine(line, r.qty) };
   });
   const creditTotal = lines.reduce((sum, l) => sum + l.amount, 0);
   const { netValue, netPaid } = moneyState(invoice);
@@ -111,7 +115,7 @@ export async function createRefund(ctx, { invoiceId, lines, reason, method = 'CA
     if (mayApprove) {
       await carryOut(ctx, refund.toObject(), { session, settings });
     } else {
-      const summary = `Asked to refund ${plan.lines.map((l) => `${l.qty} × ${l.name}`).join(', ')} on bill ${invoice.invoiceNumber} for ${invoice.customerSnapshot?.name} (${formatMoney(plan.creditTotal)}): ${reason.trim()}`;
+      const summary = `Asked to refund ${plan.lines.map(lineWords).join(', ')} on bill ${invoice.invoiceNumber} for ${invoice.customerSnapshot?.name} (${formatMoney(plan.creditTotal)}): ${reason.trim()}`;
       await logActivity(ctx, { action: 'billing.refund_requested', branchId: invoice.branchId, invoiceId: invoice._id, summary, after: { refundId: refund._id, creditTotal: plan.creditTotal } }, session);
       await notify(ctx, await approverIds(ctx, invoice.branchId, settings), { message: `${ctx.userName}: ${summary}`, link: LINK(invoice._id) }, session);
     }
@@ -180,7 +184,7 @@ async function carryOut(ctx, refund, { session, settings }) {
   const lines = invoice.lines.map((line) => {
     const part = plan.lines.find((p) => String(p.lineId) === String(line._id));
     if (!part) return line;
-    return {
+    const next = {
       ...line,
       refundedQty: (line.refundedQty ?? 0) + part.qty,
       creditedTaxable: (line.creditedTaxable ?? 0) + part.taxableAmount,
@@ -189,6 +193,9 @@ async function carryOut(ctx, refund, { session, settings }) {
       creditedIgst: (line.creditedIgst ?? 0) + part.igst,
       creditedAmount: (line.creditedAmount ?? 0) + part.amount,
     };
+    // A service with all its value refunded counts as refunded, however it was done (products only count units that came back)
+    if (next.kind === 'SERVICE' && lineFullyCredited(next)) next.refundedQty = next.qty;
+    return next;
   });
   const after = { ...invoice, lines, creditedTotal: (invoice.creditedTotal ?? 0) + plan.creditTotal, refundedTotal: (invoice.refundedTotal ?? 0) + plan.cashRefund };
   const updated = await Invoice.findOneAndUpdate(
@@ -199,7 +206,7 @@ async function carryOut(ctx, refund, { session, settings }) {
         creditedTotal: after.creditedTotal,
         refundedTotal: after.refundedTotal,
         balanceDue: moneyState(after).balanceDue,
-        refundStatus: lines.every((l) => (l.refundedQty ?? 0) >= l.qty) ? 'FULL' : 'PARTIAL',
+        refundStatus: lines.every((l) => (l.refundedQty ?? 0) >= l.qty || lineFullyCredited(l)) ? 'FULL' : 'PARTIAL',
       },
       $inc: { version: 1 },
     },
@@ -285,7 +292,10 @@ async function carryOut(ctx, refund, { session, settings }) {
   ).lean();
   if (!done) throw new AppError(409, 'NOT_PENDING', 'This refund was just decided by someone else');
 
-  const what = plan.lines.map((l) => `${l.qty} × ${l.name}${l.restock === 'DAMAGED' ? ' (damaged)' : ''}`).join(', ');
+  // 5. The tax record: a minus entry linked to the bill's, saved with everything above
+  if (creditNote) await postCreditNote(ctx, invoice, creditNote.toObject(), done, settings, { taxDate: todayInZone(branch.timezone) }, session);
+
+  const what = plan.lines.map(lineWords).join(', ');
   const owed = plan.dueReduced > 0 ? `, ${formatMoney(plan.dueReduced)} off what was owed` : '';
   await logActivity(
     ctx,

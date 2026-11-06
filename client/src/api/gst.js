@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
+import { downloadFile } from './download';
 import { send } from './request';
 
 // The reason to show for a refused change: the field's own message when the server checked the form, otherwise its message
@@ -25,7 +26,7 @@ function useGstChange(request) {
     },
     onSuccess: ({ setup }) => {
       queryClient.setQueryData(['gst-setup'], setup);
-      for (const name of ['gst-rules', 'billing-settings', 'services', 'inventory']) queryClient.invalidateQueries({ queryKey: [name] });
+      for (const name of ['gst-rules', 'gst-overview', 'gst-register', 'billing-settings', 'services', 'inventory']) queryClient.invalidateQueries({ queryKey: [name] });
     },
   });
 }
@@ -45,5 +46,25 @@ export function useTestBill() {
   return useMutation({
     mutationFn: (body) => send('post', '/gst/test-bill', null, body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['gst-setup'] }),
+  });
+}
+
+// The first screen: { active, month, gstins, net, bills, creditNotes, voided, check, setupProblems }. params: { month, gstin }
+export function useGstOverview(params, enabled = true) {
+  return useQuery({ queryKey: ['gst-overview', params], queryFn: () => api.get('/gst/overview', { params }).then((res) => res.data), placeholderData: keepPreviousData, enabled });
+}
+
+// The sales register: { columns, rows, totals, page, pages, total }. params: { month, gstin, type, search, page }
+export function useGstRegister(params) {
+  return useQuery({ queryKey: ['gst-register', params], queryFn: () => api.get('/gst/register', { params }).then((res) => res.data), placeholderData: keepPreviousData });
+}
+export const downloadGstRegister = (params) => downloadFile('/gst/register', { ...params, format: 'csv' }, 'sales-register.csv');
+
+// Compares bills with the tax record now, as the night timer does
+export function useRunGstCheck() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key }) => send('post', '/gst/check', key),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['gst-overview'] }),
   });
 }
