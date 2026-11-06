@@ -57,6 +57,8 @@ export function writeInvoicePdf(stream, invoice, { maskPhone: mask = false } = {
   doc.font('Helvetica').fontSize(8).fillColor(MUTED).text('Billed to', left);
   doc.font('Helvetica-Bold').fontSize(10).fillColor('black').text(customer.name ?? 'Guest');
   if (customer.phone) doc.font('Helvetica').fontSize(9).fillColor(MUTED).text(mask ? maskPhone(customer.phone, 'X') : customer.phone);
+  if (invoice.buyer?.gstin) doc.font('Helvetica').fontSize(9).fillColor('black').text(`${invoice.buyer.legalName ?? ''} · GSTIN ${invoice.buyer.gstin}`);
+  if (invoice.placeOfSupply?.stateCode) doc.font('Helvetica').fontSize(9).fillColor(MUTED).text(`Place of supply: ${invoice.placeOfSupply.stateName} (${invoice.placeOfSupply.stateCode})`);
   doc.moveDown(1);
 
   // ----- Lines -----
@@ -85,6 +87,10 @@ export function writeInvoicePdf(stream, invoice, { maskPhone: mask = false } = {
   if (gst) {
     total(doc, 'Taxable value', money(invoice.taxableTotal), { color: MUTED });
     for (const t of invoice.taxSummary ?? []) {
+      if (t.igst) {
+        total(doc, `IGST ${percent(t.rateBps)}`, money(t.igst), { color: MUTED });
+        continue;
+      }
       total(doc, `CGST ${percent(t.rateBps / 2)}`, money(t.cgst), { color: MUTED });
       total(doc, `SGST ${percent(t.rateBps / 2)}`, money(t.sgst), { color: MUTED });
     }

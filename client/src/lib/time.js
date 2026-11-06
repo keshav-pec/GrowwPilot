@@ -41,3 +41,6 @@ export function toLocalInput(iso, zone) {
 export function fromLocalInput(value, zone) {
   return value ? DateTime.fromISO(value, { zone }).toUTC().toISO() : null;
 }
+
+// "2026-11" -> "November 2026"
+export const formatMonth = (month) => DateTime.fromISO(`${month}-01`).toFormat('LLLL yyyy');

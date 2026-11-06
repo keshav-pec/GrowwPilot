@@ -28,6 +28,7 @@ const paymentsSchema = z
 // Changes to a draft bill
 const edits = {
   billDiscount: discount.nullable().optional(),
+  placeOfSupply: z.string().regex(/^(\d{2})?$/, 'Choose a state').optional(), // empty = the branch's state
   lines: z
     .array(
       z.object({

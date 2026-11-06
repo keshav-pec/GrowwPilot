@@ -4,6 +4,7 @@ import { connectDB } from './config/db.js';
 import { startInventoryAutomation } from './modules/inventory/automation/outbox.js';
 import { migrateBilling } from './scripts/migrate-billing-v2.js';
 import { migrateOccasions } from './scripts/migrate-occasions-v1.js';
+import { migrateGst } from './scripts/migrate-gst-v1.js';
 import { startOccasionAutomation } from './modules/occasions/engine/scheduler.js';
 import { startMailer } from './modules/mail/outbox.js';
 
@@ -12,6 +13,7 @@ try {
   await connectDB();
   await migrateBilling(); // older bills onto the new bill records (does nothing once they're all moved)
   await migrateOccasions(); // dates of birth -> birthday month/day, home branches, permission "not recorded"
+  await migrateGst(); // branch GSTINs -> dated GST registrations
   app.listen(env.PORT, () => {
     console.log(`Server running on http://localhost:${env.PORT}`);
   });

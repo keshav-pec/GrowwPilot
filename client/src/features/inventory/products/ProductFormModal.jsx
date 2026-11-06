@@ -9,7 +9,10 @@ import { useSuppliers } from '../../../api/inventory/suppliers';
 import { BASE_UNITS, SKU_TYPES, STOCK_UNITS, WAYS_OF_USE, isMeasured } from '../../../lib/inventory';
 import { newRequestKey } from '../../../lib/requestKey';
 import { isValidRupees, toPaise } from '../../../lib/money';
-import { GST_RATE_OPTIONS } from '../../../lib/billing';
+import { GST_RATE_OPTIONS, ruleLabel } from '../../../lib/billing';
+import { useGstRules } from '../../../api/gst';
+import { useInventoryAccess } from '../../../api/inventory/access';
+import { useAuth } from '../../../auth/AuthContext';
 import { Input, Modal, ModalFooter, Select } from '../../../components/ui';
 
 const whole = z.string().trim().refine((v) => v === '' || /^\d+$/.test(v), 'Use a whole number');
@@ -37,6 +40,7 @@ const schema = z
     sellPrice: z.string().refine((v) => v.trim() === '' || isValidRupees(v), 'Enter a price like 450 or 450.50'),
     taxRateBps: z.string(),
     hsnCode: z.string().trim().refine((v) => v === '' || /^\d{4,8}$/.test(v), 'HSN code is 4 to 8 digits'),
+    taxRuleGroupId: z.string(), // '' = no rule linked
   })
   .superRefine((v, ctx) => {
     if (v.wayOfUse !== 'SERVICE_MEASURED') return;
@@ -56,6 +60,10 @@ export default function ProductFormModal({ product, categories = [], canSeeCosts
   const suppliers = useSuppliers().data ?? [];
   const [key] = useState(newRequestKey); // one per form: a double click saves once
   const [moreOpen, setMoreOpen] = useState(reorderOnly);
+  const { user } = useAuth();
+  const isOwner = user.role === 'OWNER';
+  const rulesDecide = Boolean(useInventoryAccess().data?.gstRulesActive); // once GST setup is active, the rule gives the rate and code
+  const ruleChoices = (useGstRules(isOwner).data?.groups ?? []).filter((g) => g.kind === 'PRODUCT');
 
   // Measured products are counted in ml / g; reorder levels are shown in whole stock units (bottles)
   const per = isMeasured(sku) ? sku.unitsPerStockUnit : 1;
@@ -88,6 +96,7 @@ export default function ProductFormModal({ product, categories = [], canSeeCosts
       sellPrice: sku?.sellPrice != null ? String(sku.sellPrice / 100) : '',
       taxRateBps: sku?.taxRateBps != null ? String(sku.taxRateBps) : '',
       hsnCode: sku?.hsnCode ?? '',
+      taxRuleGroupId: sku?.taxRuleGroupId ?? '',
     },
   });
 
@@ -119,6 +128,7 @@ export default function ProductFormModal({ product, categories = [], canSeeCosts
         sellPrice: v.sellPrice.trim() ? toPaise(v.sellPrice) : null,
         taxRateBps: v.taxRateBps === '' ? null : Number(v.taxRateBps),
         hsnCode: v.hsnCode,
+        ...(isOwner && { taxRuleGroupId: v.taxRuleGroupId || null }),
         ...reorder,
       };
       if (sku) {
@@ -244,8 +254,21 @@ export default function ProductFormModal({ product, categories = [], canSeeCosts
                       error={errors.sellPrice?.message}
                       {...register('sellPrice')}
                     />
-                    <Select label="GST rate" options={[{ value: '', label: 'Salon default for products' }, ...GST_RATE_OPTIONS]} {...register('taxRateBps')} />
-                    <Input label="HSN code (optional)" inputMode="numeric" placeholder="e.g. 3305" error={errors.hsnCode?.message} {...register('hsnCode')} />
+                    {!rulesDecide && (
+                      <>
+                        <Select label="GST rate" options={[{ value: '', label: 'Salon default for products' }, ...GST_RATE_OPTIONS]} {...register('taxRateBps')} />
+                        <Input label="HSN code (optional)" inputMode="numeric" placeholder="e.g. 3305" error={errors.hsnCode?.message} {...register('hsnCode')} />
+                      </>
+                    )}
+                    {isOwner && (rulesDecide || ruleChoices.length > 0) && (
+                      <Select
+                        label="Tax rule"
+                        placeholder="Choose a tax rule"
+                        options={ruleChoices.map((g) => ({ value: g.groupId, label: ruleLabel(g) }))}
+                        hint="From GST setup. The rule decides the rate and code on bills."
+                        {...register('taxRuleGroupId')}
+                      />
+                    )}
                   </>
                 )}
               </>

@@ -36,3 +36,28 @@ export const GST_STATES = [
   ['36', 'Telangana'], ['37', 'Andhra Pradesh'], ['38', 'Ladakh'], ['97', 'Other Territory'],
 ].map(([value, label]) => ({ value, label: `${label} (${value})` }));
 
+// A rule's rate and input tax credit, in words: "5% without ITC"
+export const ITC_LABEL = { WITHOUT_ITC: 'without ITC', WITH_ITC: 'with ITC' };
+export const ITC_OPTIONS = [
+  { value: 'WITHOUT_ITC', label: 'Without ITC (no credit on purchases)' },
+  { value: 'WITH_ITC', label: 'With ITC (credit on purchases)' },
+];
+
+// A tax rule in a list of choices: "Salon services · SAC 999721 · 5% without ITC"
+export function ruleLabel(group) {
+  const rule = group.current;
+  const code = group.kind === 'PRODUCT' ? 'HSN' : 'SAC';
+  return rule ? `${group.name} · ${code} ${rule.code} · ${percentLabel(rule.rateBps)} ${ITC_LABEL[rule.itcType]}` : `${group.name} (not approved for today)`;
+}
+
+// The tax rows on a bill: IGST on a sale to another state, otherwise CGST and SGST
+export function taxRows(taxSummary = []) {
+  return taxSummary.flatMap((t) =>
+    t.igst
+      ? [{ key: `i${t.rateBps}`, label: `IGST ${percentLabel(t.rateBps)}`, amount: t.igst }]
+      : [
+          { key: `c${t.rateBps}`, label: `CGST ${percentLabel(t.rateBps / 2)}`, amount: t.cgst },
+          { key: `s${t.rateBps}`, label: `SGST ${percentLabel(t.rateBps / 2)}`, amount: t.sgst },
+        ]
+  );
+}

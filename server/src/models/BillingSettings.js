@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { ref } from './fields.js';
 import { GST_RATES_BPS, PREFIX_REGEX } from '../config/billing.js';
+import { GST_SCHEMES, GST_SETUP_STATUSES } from '../config/gst.js';
 
 // Each branch's GST details and bill prefix. A branch without a row uses the defaults (see billing/settings.service.js).
 const branchBillingSchema = new mongoose.Schema(
@@ -37,6 +38,16 @@ const billingSettingsSchema = new mongoose.Schema(
       closeCash: { type: Boolean, default: true }, // count the drawer and close the cash day
     },
     branches: [branchBillingSchema],
+    // GST setup (modules/gst). Until it is ACTIVE, bills use the fields above exactly as before.
+    gst: {
+      scheme: { type: String, enum: [...GST_SCHEMES, null], default: null }, // empty = not chosen yet
+      status: { type: String, enum: GST_SETUP_STATUSES, default: 'NOT_ACTIVE' },
+      startMonth: { type: String, match: /^\d{4}-(0[1-9]|1[0-2])$/ }, // the first month returns come from the app
+      testBillAt: Date, // when the owner last tried a sample bill that worked
+      activatedAt: Date,
+      activatedBy: ref('User'),
+      activatedByName: String,
+    },
   },
   { timestamps: true, collection: 'billing_settings' }
 );

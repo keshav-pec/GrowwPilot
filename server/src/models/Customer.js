@@ -45,6 +45,8 @@ const customerSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     phone: phone({ required: true }),
     email: { type: String, lowercase: true, trim: true },
+    gstin: { type: String, uppercase: true, trim: true }, // business customers: printed on their bills
+    gstLegalName: { type: String, trim: true }, // the business name on those bills; empty = the customer's name
     dob: Date, // old full date of birth: copied into occasions.birthday, no longer shown or changed
     notes: { type: String, trim: true },
     preferredStaffId: ref('Staff'),

@@ -25,6 +25,7 @@ const productFields = {
   sellPrice: paise.nullable(),
   taxRateBps: z.number().int().refine((v) => GST_RATES_BPS.includes(v), 'Choose a GST rate from the list').nullable(),
   hsnCode: z.string().trim().regex(/^(\d{4,8})?$/, 'HSN code is 4 to 8 digits'),
+  taxRuleGroupId: objectId.nullable(), // owners: once GST setup is active, the rule gives the rate and code
 };
 
 // Reorder levels for the selected branch (counted like the stock: ml for measured products)
@@ -53,6 +54,7 @@ export const createSkuSchema = z
     sellPrice: productFields.sellPrice.optional(),
     taxRateBps: productFields.taxRateBps.optional(),
     hsnCode: productFields.hsnCode.optional(),
+    taxRuleGroupId: productFields.taxRuleGroupId.optional(),
     // Own code instead of the automatic SKU-000123
     code: z
       .string()

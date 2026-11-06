@@ -8,7 +8,7 @@ import { formatMoney } from '../../utils/money.js';
 import { escapeRegex } from '../../utils/regex.js';
 import { dayRangeUTC, todayInZone } from '../../utils/time.js';
 import { runOnce } from '../../middleware/idempotency.js';
-import { financialYear, formatInvoiceNumber } from '../../config/billing.js';
+import { GST_STATES, financialYear, formatInvoiceNumber } from '../../config/billing.js';
 import { isMeasured } from '../../config/inventory.js';
 import { splitByPrice } from '../payroll/commission.rules.js';
 import { reverseCommissions } from '../payroll/commission.service.js';
@@ -23,6 +23,7 @@ import { byKind, kindOf, runHook } from '../billing/lineKinds.js';
 import { branchStock } from '../inventory/stock/stock.queries.js';
 import { makeShareToken, readShareToken, SHARE_DAYS } from './share.js';
 import { redeemOffer, restoreOffer } from '../occasions/checkout/redeem.js';
+import { billContext, gstSetupActive, missingRuleBlocker } from '../gst/gst.billing.js';
 
 export { branchCode } from '../billing/settings.service.js';
 
@@ -65,7 +66,9 @@ function assertVersion(invoice, version) {
 // ---------------------------------------------------------------------------
 // Working out a draft: applies the requested changes, looks up today's GST rates and runs the bill maths.
 // Returns the fields to save, and where the bill stands with the front desk discount limit.
-// edits: { billDiscount?: { type, value }, lines?: [{ lineId, discount?: { type, value } | null, qty? (products), unitPrice?, priceChangeReason? }] }
+// edits: { billDiscount?: { type, value }, placeOfSupply? (a state code; empty = the branch's state), lines?: [{ lineId, discount?: { type, value } | null, qty? (products), unitPrice?, priceChangeReason? }] }
+// Salons with GST setup active: tax comes from approved rules by today's date. Anything missing goes in `blockers`,
+// which stop the bill being issued, so an unknown tax is never issued as zero.
 // ---------------------------------------------------------------------------
 // A service line counts for an occasion offer when its service is one the offer covers and it isn't part of a combo
 export function occasionEligible(line, rules) {
@@ -74,6 +77,7 @@ export function occasionEligible(line, rules) {
 
 export async function priceDraft(ctx, invoice, edits = {}, { session = null, settings } = {}) {
   settings ??= await getBillingSettings(ctx, session);
+  const gst = gstSetupActive(settings) ? await billContext(ctx, { branchId: invoice.branchId, place: choosePlace(ctx, invoice, edits) }, session) : null;
   // What each kind of line needs to work out its GST (one after the other: reads in a transaction must not race)
   const lookups = {};
   for (const [name, kind, lines] of byKind(invoice.lines)) lookups[name] = await kind.lookup(ctx, lines, session);
@@ -103,13 +107,14 @@ export async function priceDraft(ctx, invoice, edits = {}, { session = null, set
     }
     // A combo's lower price only applies at the list price; a price an owner set is the price
     next.comboDiscount = next.unitPrice === next.listUnitPrice ? (next.listComboDiscount ?? 0) : 0;
-    Object.assign(next, kindOf(next).tax(next, settings, lookups[next.kind]));
+    Object.assign(next, { taxRuleId: null, taxRuleName: undefined, itcType: undefined }, kindOf(next).tax(next, settings, lookups[next.kind], gst));
     return next;
   });
+  const blockers = gst ? [...gst.blockers, ...lines.filter((l) => !l.taxRuleId).map((l) => missingRuleBlocker(l, gst.taxDate))] : [];
 
   const billDiscountType = edits.billDiscount !== undefined ? (edits.billDiscount?.type ?? 'flat') : invoice.billDiscountType;
   const billDiscountValue = edits.billDiscount !== undefined ? (edits.billDiscount?.value ?? 0) : invoice.billDiscountValue;
-  const mode = { gstRegistered: settings.gstRegistered, pricesIncludeTax: settings.pricesIncludeTax };
+  const mode = { gstRegistered: settings.gstRegistered, pricesIncludeTax: settings.pricesIncludeTax, useTaxRules: Boolean(gst), interstate: Boolean(gst?.interstate) };
   const offerRules = invoice.offer?.rules ?? null;
   const bill = computeBill(
     lines.map((l) => ({ name: l.name, unitPrice: l.unitPrice, qty: l.qty, comboDiscount: l.comboDiscount, discount: { type: l.discountType, value: l.discountValue }, taxRateBps: l.taxRateBps, discountable: kindOf(l).discountable, occasionEligible: occasionEligible(l, offerRules) })),
@@ -129,7 +134,11 @@ export async function priceDraft(ctx, invoice, edits = {}, { session = null, set
     }),
     billDiscountType,
     billDiscountValue,
-    ...mode,
+    gstRegistered: mode.gstRegistered,
+    pricesIncludeTax: mode.pricesIncludeTax,
+    gstSetupActive: mode.useTaxRules,
+    interstate: mode.interstate,
+    placeOfSupply: gst?.placeOfSupply ?? null,
     subtotal: bill.totals.subtotal,
     comboDiscountTotal: bill.totals.comboDiscountTotal,
     manualDiscount: bill.totals.manualDiscount,
@@ -140,6 +149,7 @@ export async function priceDraft(ctx, invoice, edits = {}, { session = null, set
     taxableTotal: bill.totals.taxableTotal,
     cgstTotal: bill.totals.cgstTotal,
     sgstTotal: bill.totals.sgstTotal,
+    igstTotal: bill.totals.igstTotal,
     taxTotal: bill.totals.taxTotal,
     grandTotal: bill.totals.grandTotal,
     balanceDue: bill.totals.grandTotal,
@@ -153,7 +163,16 @@ export async function priceDraft(ctx, invoice, edits = {}, { session = null, set
   if (approval.status === 'APPROVED' && manual > approval.approvedDiscount) approval.status = 'NONE';
   fields.approval = approval;
 
-  return { fields, priceChanges, settings, limits: limitInfo(ctx, { ...fields, approval }, settings) };
+  return { fields, priceChanges, settings, limits: limitInfo(ctx, { ...fields, approval }, settings), gst, blockers };
+}
+
+// The state an owner chose for this bill, if any. Only owners may change it; everyone else's bill keeps what is saved.
+function choosePlace(ctx, invoice, edits) {
+  const saved = invoice.placeOfSupply?.chosen ? invoice.placeOfSupply.stateCode : null;
+  if (edits.placeOfSupply === undefined) return saved;
+  const wanted = edits.placeOfSupply || null;
+  if (wanted !== saved && !isOwner(ctx)) throw new AppError(403, 'FORBIDDEN', 'Only an owner can change the place of supply');
+  return wanted;
 }
 
 // Where a bill stands with the front desk discount limit
@@ -197,7 +216,7 @@ async function paymentsOf(invoiceId, session = null) {
 export async function present(ctx, invoice, { session = null, settings, limits, preview = false } = {}) {
   const full = await Invoice.findOne({ _id: invoice._id })
     .populate('branchId', 'name address city timezone')
-    .populate('customerId', 'name phone')
+    .populate('customerId', 'name phone gstin gstLegalName')
     .populate('appointmentId', 'startAt comboId')
     .session(session)
     .lean();
@@ -213,7 +232,7 @@ export async function present(ctx, invoice, { session = null, settings, limits, 
 
   if (shown.status === 'DRAFT') {
     result.limits = limits ?? limitInfo(ctx, shown, settings);
-    result.permissions = { changePrice: can.changePrice, approve: can.approveDiscounts && shown.approval?.status === 'PENDING', addProducts: hasInventory(ctx) };
+    result.permissions = { changePrice: can.changePrice, changePlace: isOwner(ctx) && shown.gstSetupActive, approve: can.approveDiscounts && shown.approval?.status === 'PENDING', addProducts: hasInventory(ctx) };
     // Products: how many are in the main store right now (issuing is refused if there aren't enough)
     const skuIds = shown.lines.filter((l) => l.kind === 'PRODUCT').map((l) => l.skuId);
     if (skuIds.length > 0) {
@@ -329,8 +348,8 @@ export async function getInvoice(ctx, id) {
 export async function quoteDraft(ctx, id, edits) {
   const invoice = await loadInvoice(ctx, id);
   assertDraft(invoice);
-  const { fields, settings, limits } = await priceDraft(ctx, invoice, edits);
-  return present(ctx, { ...invoice, ...fields }, { settings, limits, preview: true });
+  const { fields, settings, limits, blockers } = await priceDraft(ctx, invoice, edits);
+  return present(ctx, { ...invoice, ...fields, gstBlockers: blockers }, { settings, limits, preview: true });
 }
 
 // Saves the draft's changes. `version` must be the one the screen loaded, so two people never overwrite each other.
@@ -341,6 +360,9 @@ async function saveChanges(ctx, invoice, fields, priceChanges, session, extra = 
     { returnDocument: 'after', session, runValidators: true }
   ).lean();
   if (!updated) throw stale();
+  if (fields.placeOfSupply?.chosen && fields.placeOfSupply.stateCode !== invoice.placeOfSupply?.stateCode) {
+    await logActivity(ctx, { action: 'billing.place_of_supply_changed', branchId: invoice.branchId, invoiceId: invoice._id, summary: `Set the place of supply on ${invoice.customerSnapshot?.name}'s bill to ${fields.placeOfSupply.stateName}`, before: { placeOfSupply: invoice.placeOfSupply }, after: { placeOfSupply: fields.placeOfSupply } }, session);
+  }
   for (const c of priceChanges) {
     await logActivity(
       ctx,
@@ -459,7 +481,8 @@ export async function issueInvoice(ctx, id, { version, payments = [], useAdvance
       if (kind.requiresAddon && !ctx.addons?.includes(kind.requiresAddon)) throw new AppError(403, 'ADDON_DISABLED', `Selling ${kind.label.toLowerCase()}s needs the ${kind.requiresAddon} add-on`);
     }
 
-    const { fields, priceChanges, settings, limits } = await priceDraft(ctx, invoice, edits, { session });
+    const { fields, priceChanges, settings, limits, gst, blockers } = await priceDraft(ctx, invoice, edits, { session });
+    if (blockers.length > 0) throw new AppError(409, blockers[0].code, blockers[0].message, { blockers });
     if (limits.needsApproval) {
       if (fields.approval.status === 'PENDING') throw new AppError(409, 'APPROVAL_PENDING', 'This discount is waiting for an owner to approve it');
       throw new AppError(409, 'APPROVAL_NEEDED', `The discount is above the front desk limit of ${limits.limitBps / 100}% (${formatMoney(limits.limitAmount)} on this bill). Ask an owner to approve it first.`);
@@ -472,7 +495,7 @@ export async function issueInvoice(ctx, id, { version, payments = [], useAdvance
 
     const branch = await Branch.findById(invoice.branchId).select('name address city timezone').session(session).lean();
     const billing = await branchBilling(ctx, invoice.branchId, settings, session);
-    if (settings.gstRegistered && !billing.gstin) {
+    if (settings.gstRegistered && !gst && !billing.gstin) {
       throw new AppError(409, 'GSTIN_MISSING', `${branch.name} has no GSTIN yet. An owner needs to add it in Billing settings before GST bills can be issued.`);
     }
 
@@ -486,7 +509,7 @@ export async function issueInvoice(ctx, id, { version, payments = [], useAdvance
     const now = new Date();
     const fy = financialYear(now, branch.timezone);
     const counter = await Counter.findOneAndUpdate({ _id: `invoice:${branch._id}:${fy}` }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after', session });
-    const customer = invoice.customerId ? await Customer.findOne(scoped(ctx, { _id: invoice.customerId })).select('name phone').session(session).lean() : null;
+    const customer = invoice.customerId ? await Customer.findOne(scoped(ctx, { _id: invoice.customerId })).select('name phone gstin gstLegalName').session(session).lean() : null;
     const org = await Organization.findById(ctx.orgId).select('name').session(session).lean();
 
     const issued = await saveChanges(ctx, invoice, fields, priceChanges, session, {
@@ -495,16 +518,18 @@ export async function issueInvoice(ctx, id, { version, payments = [], useAdvance
       financialYear: fy,
       issuedAt: now,
       issuedBy: ctx.userId,
+      taxDate: gst?.taxDate ?? todayInZone(branch.timezone),
       seller: {
-        legalName: settings.legalName || org.name,
+        legalName: gst?.registration.legalName ?? (settings.legalName || org.name),
         tradeName: org.name,
         branchName: branch.name,
         address: [branch.address, branch.city].filter(Boolean).join(', '),
-        gstin: settings.gstRegistered ? billing.gstin : undefined,
-        stateCode: billing.stateCode ?? undefined,
-        stateName: billing.stateName ?? undefined,
+        gstin: gst?.registration.gstin ?? (settings.gstRegistered ? billing.gstin : undefined),
+        stateCode: gst?.registration.stateCode ?? billing.stateCode ?? undefined,
+        stateName: gst ? GST_STATES[gst.registration.stateCode] : (billing.stateName ?? undefined),
       },
       customerSnapshot: customer ? { name: customer.name, phone: customer.phone } : invoice.customerSnapshot,
+      ...(gst && customer?.gstin ? { buyer: { gstin: customer.gstin, legalName: customer.gstLegalName || customer.name } } : {}),
       amountPaid: 0,
       balanceDue: fields.grandTotal,
       settlementStatus: 'UNPAID',

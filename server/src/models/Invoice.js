@@ -29,17 +29,29 @@ const lineSchema = new mongoose.Schema({
   taxRateBps: { type: Number, min: 0, default: 0 },
   cgst: money({ default: 0 }),
   sgst: money({ default: 0 }),
+  igst: money({ default: 0 }), // instead of CGST + SGST, on a sale to another state
   lineTotal: money({ default: 0 }), // what the customer pays for this line
+  // The approved tax rule used (once GST setup is active), as it was on the day of the bill
+  taxRuleId: ref('GstTaxRule', { default: null }),
+  taxRuleName: String,
+  itcType: String,
   // Refunds so far (credit notes): how many units, and how much of each amount was taken back
   refundedQty: { type: Number, min: 0, default: 0 },
   creditedTaxable: money({ default: 0 }),
   creditedCgst: money({ default: 0 }),
   creditedSgst: money({ default: 0 }),
+  creditedIgst: money({ default: 0 }),
   creditedAmount: money({ default: 0 }),
 });
 
 const taxRowSchema = new mongoose.Schema(
-  { rateBps: Number, taxableAmount: money(), cgst: money(), sgst: money() },
+  { rateBps: Number, taxableAmount: money(), cgst: money(), sgst: money(), igst: money() },
+  { _id: false }
+);
+
+// Where the sale is taxed. chosen: an owner picked it; otherwise it is the branch's state.
+const placeOfSupplySchema = new mongoose.Schema(
+  { stateCode: String, stateName: String, chosen: { type: Boolean, default: false } },
   { _id: false }
 );
 
@@ -102,6 +114,11 @@ const invoiceSchema = new mongoose.Schema(
     // How tax was worked out (a snapshot of the salon's settings)
     gstRegistered: { type: Boolean, default: false },
     pricesIncludeTax: { type: Boolean, default: true },
+    gstSetupActive: { type: Boolean, default: false }, // worked out from approved tax rules (GST setup)
+    interstate: { type: Boolean, default: false }, // place of supply is another state: IGST
+    placeOfSupply: { type: placeOfSupplySchema, default: null },
+    taxDate: String, // the day that decides the tax rule and GSTIN, in the branch's time: "2026-11-06"
+    buyer: { gstin: String, legalName: String }, // business customers
 
     subtotal: money({ default: 0 }), // list prices x qty
     comboDiscountTotal: money({ default: 0 }),
@@ -112,6 +129,7 @@ const invoiceSchema = new mongoose.Schema(
     taxableTotal: money({ default: 0 }),
     cgstTotal: money({ default: 0 }),
     sgstTotal: money({ default: 0 }),
+    igstTotal: money({ default: 0 }),
     taxTotal: money({ default: 0 }),
     grandTotal: money({ default: 0 }),
     amountPaid: money({ default: 0 }), // money put on this bill (payments and advances), less reversed payments

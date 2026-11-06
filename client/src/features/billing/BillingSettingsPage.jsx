@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Info } from 'lucide-react';
 import { useBillingSettings, useSaveBillingSettings } from '../../api/billing';
-import { GST_RATE_OPTIONS, GST_STATES, percentLabel } from '../../lib/billing';
+import { GST_RATE_OPTIONS, percentLabel } from '../../lib/billing';
 import { newRequestKey } from '../../lib/requestKey';
 import { Button, Card, EmptyState, Input, PageHeader, PageSpinner, Select } from '../../components/ui';
 
@@ -13,10 +13,9 @@ function currentFy() {
   const start = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
   return `${String(start % 100).padStart(2, '0')}-${String((start + 1) % 100).padStart(2, '0')}`;
 }
-const GSTIN_SHAPE = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 
 // Billing settings (owners): GST registration, how prices work, the front desk discount limit, and each
-// branch's GSTIN and bill prefix. Only the business owner can change them; branch owners can look.
+// branch's bill prefix. GSTINs are kept in GST setup. Only the business owner can change these; branch owners can look.
 export default function BillingSettingsPage() {
   const settingsQuery = useBillingSettings();
   if (settingsQuery.isPending) {
@@ -52,14 +51,13 @@ function SettingsForm({ saved }) {
   const limitError = !/^\d+(\.\d{1,2})?$/.test(values.discountLimit.trim()) || limit > 100 ? 'A percentage from 0 to 100' : null;
   const legalError = values.gstRegistered && !values.legalName.trim() ? 'Needed on GST bills' : null;
   const branchErrors = branches.map((b) => ({
-    gstin: b.gstin && !GSTIN_SHAPE.test(b.gstin) ? '15 characters, like 27AAKCG4821M1Z5' : null,
     prefix: b.invoicePrefix && !/^[A-Z0-9]{1,4}$/.test(b.invoicePrefix) ? '1 to 4 letters or digits' : null,
   }));
-  const hasErrors = limitError || legalError || branchErrors.some((e) => e.gstin || e.prefix) || (values.defaultSacCode && !/^\d{4,8}$/.test(values.defaultSacCode));
+  const hasErrors = limitError || legalError || branchErrors.some((e) => e.prefix) || (values.defaultSacCode && !/^\d{4,8}$/.test(values.defaultSacCode));
 
   function submit(e) {
     e.preventDefault();
-    const branchRows = branches.map((b) => ({ branchId: b.branchId, gstin: b.gstin, stateCode: b.stateCode, invoicePrefix: b.invoicePrefix }));
+    const branchRows = branches.map((b) => ({ branchId: b.branchId, invoicePrefix: b.invoicePrefix }));
     save.mutate(
       canEdit ? {
         key,
@@ -101,13 +99,16 @@ function SettingsForm({ saved }) {
       />
       {!canEdit && (
         <p className="mb-4 rounded-lg bg-surface p-3 text-sm text-muted">
-          {canEditBranches ? 'You can change your branches’ GSTIN and bill prefix. The other settings are the business owner’s.' : 'Only the business owner can change billing settings.'}
+          {canEditBranches ? 'You can change your branches’ bill prefix. The other settings are the business owner’s.' : 'Only the business owner can change billing settings.'}
         </p>
       )}
 
       <div className="flex flex-col gap-4">
       <fieldset disabled={!canEdit} className="flex flex-col gap-4">
-        <Card title="GST">
+        <Card title="GST" actions={<Link to="/app/settings/gst" className="text-sm text-brown underline">GST setup</Link>}>
+          {saved.gstSetupActive ? (
+            <p className="text-sm text-muted">GST setup is active, so tax on new bills comes from your approved tax rules. Registrations, tax rules and how prices work are all in GST setup.</p>
+          ) : (
           <div className="flex flex-col gap-4 text-sm">
             <div className="flex flex-col gap-2">
               <label className="flex items-start gap-2">
@@ -148,6 +149,7 @@ function SettingsForm({ saved }) {
               Please have your tax adviser check the GST rate, SAC codes and bill wording before you start issuing GST bills.
             </p>
           </div>
+          )}
         </Card>
 
         <Card title="Discounts and sales">
@@ -182,7 +184,7 @@ function SettingsForm({ saved }) {
             </label>
             <label className="flex items-center gap-2">
               <input type="checkbox" className="accent-gold" checked={values.branchOwners.editSettings} onChange={setDelegation('editSettings')} />
-              Change their branches’ GSTIN and bill prefix
+              Change their branches’ bill prefix
             </label>
             <label className="mt-2 flex items-center gap-2">
               <input type="checkbox" className="accent-gold" checked={values.frontDesk.closeCash} onChange={(e) => setValues((v) => ({ ...v, frontDesk: { closeCash: e.target.checked } }))} />
@@ -199,22 +201,16 @@ function SettingsForm({ saved }) {
             {branches.map((b, i) => {
               const prefix = b.invoicePrefix || b.autoPrefix;
               return (
-                <div key={b.branchId} className="grid gap-3 py-3 sm:grid-cols-[8rem_1fr_1fr_8rem]">
+                <div key={b.branchId} className="grid gap-3 py-3 sm:grid-cols-[8rem_1fr_8rem]">
                   <div className="text-sm">
                     <p className="font-medium">{b.name}</p>
                     {b.status === 'archived' && <p className="text-xs text-muted">Archived</p>}
                   </div>
-                  <Input
-                    label="GSTIN"
-                    value={b.gstin}
-                    onChange={(e) => {
-                      const gstin = e.target.value.toUpperCase().replace(/\s/g, '');
-                      setBranch(i, { gstin, ...(gstin.length >= 2 && GST_STATES.some((s) => s.value === gstin.slice(0, 2)) ? { stateCode: gstin.slice(0, 2) } : {}) });
-                    }}
-                    error={branchErrors[i].gstin || (values.gstRegistered && !b.gstin && b.status !== 'archived' ? 'Needed before GST bills can be issued here' : null)}
-                    maxLength={15}
-                  />
-                  <Select label="State" placeholder="Choose a state" options={GST_STATES} value={b.stateCode} onChange={(e) => setBranch(i, { stateCode: e.target.value })} />
+                  <div className="text-sm">
+                    <p className="font-medium">GSTIN</p>
+                    {b.gstin ? <p className="mt-2 font-mono">{b.gstin}</p> : <p className="mt-2 text-muted">None</p>}
+                    {values.gstRegistered && !b.gstin && b.status !== 'archived' && <p className="text-xs text-danger">Needed before GST bills can be issued here. Add it in GST setup.</p>}
+                  </div>
                   <Input
                     label="Bill prefix"
                     placeholder={b.autoPrefix}
@@ -228,7 +224,9 @@ function SettingsForm({ saved }) {
               );
             })}
           </div>
-          <p className="mt-2 text-xs text-muted">Bill numbers start again from 00001 every financial year (1 April). Bills made before now keep their old numbers.</p>
+          <p className="mt-2 text-xs text-muted">
+            Bill numbers start again from 00001 every financial year (1 April). Bills made before now keep their old numbers. GSTINs are changed in <Link to="/app/settings/gst" className="underline">GST setup</Link>, with the date each one starts.
+          </p>
         </Card>
       </fieldset>
       </div>

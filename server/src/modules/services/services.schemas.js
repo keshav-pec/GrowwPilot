@@ -12,6 +12,7 @@ export const createServiceSchema = z.object({
   // GST: null / empty = use the salon's default (Billing settings)
   taxRateBps: z.number().int().refine((v) => GST_RATES_BPS.includes(v), 'Choose a GST rate from the list').nullable().optional(),
   sacCode: z.string().trim().regex(/^(\d{4,8})?$/, 'SAC code is 4 to 8 digits').optional(),
+  taxRuleGroupId: objectId.nullable().optional(), // once GST setup is active, the rule gives the rate and code
 });
 
 export const updateServiceSchema = createServiceSchema.partial();

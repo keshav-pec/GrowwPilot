@@ -19,7 +19,12 @@ const schema = z.object({
   homeBranchId: z.string().min(1, 'Choose a home branch'),
   preferredStaffId: z.string(),
   notes: z.string(),
+  gstin: z.string().trim().toUpperCase().refine((v) => v === '' || /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(v), '15 characters, like 29AABCT3518Q1Z5'),
+  gstLegalName: z.string().trim(),
 });
+
+// The GSTIN's shape is checked here; its check character only on the server
+const gstinRefusal = (err) => (Array.isArray(err.details) ? err.details.find((d) => d.field === 'body.gstin')?.message : null);
 
 // Add a customer (customer = null) or edit one. onSaved gets the saved customer.
 export default function CustomerFormModal({ customer, onClose, onSaved }) {
@@ -49,6 +54,7 @@ export default function CustomerFormModal({ customer, onClose, onSaved }) {
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
@@ -59,6 +65,8 @@ export default function CustomerFormModal({ customer, onClose, onSaved }) {
       homeBranchId: customer?.homeBranchId ?? activeBranchId ?? '',
       preferredStaffId: preferred?._id ?? '',
       notes: customer?.notes ?? '',
+      gstin: customer?.gstin ?? '',
+      gstLegalName: customer?.gstLegalName ?? '',
     },
   });
 
@@ -75,6 +83,7 @@ export default function CustomerFormModal({ customer, onClose, onSaved }) {
         onError: (err) => {
           if (err.code === 'CUSTOMER_EXISTS') setExisting(err.details.customer);
           else if (err.code === 'OFFER_CHANGE_NEEDS_CONFIRM') setConfirmCorrection(values);
+          else if (gstinRefusal(err)) setError('gstin', { message: gstinRefusal(err) });
           else toast.error(err.message);
         },
       }
@@ -119,6 +128,14 @@ export default function CustomerFormModal({ customer, onClose, onSaved }) {
             <OccasionDateFields label="Birthday (optional)" value={birthday} onChange={setBirthday} />
             <OccasionDateFields label="Wedding anniversary (optional)" value={anniversary} onChange={setAnniversary} />
             <p className="text-xs text-muted sm:col-span-2">Used for birthday and anniversary month offers. The year is never asked.</p>
+          </div>
+        </details>
+        {/* Business customers: printed on their bills */}
+        <details className="rounded-lg border border-border px-3 py-2 sm:col-span-2" open={Boolean(customer?.gstin)}>
+          <summary className="cursor-pointer text-sm font-medium text-brown">Optional details: business customer</summary>
+          <div className="mt-3 grid gap-4 pb-1 sm:grid-cols-2">
+            <Input label="GSTIN" maxLength={15} error={errors.gstin?.message} {...register('gstin')} />
+            <Input label="Business name" hint="As on their GST registration" {...register('gstLegalName')} />
           </div>
         </details>
         <div className="sm:col-span-2">

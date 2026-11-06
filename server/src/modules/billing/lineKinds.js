@@ -4,6 +4,7 @@ import { scoped } from '../../utils/scoped.js';
 import { LINE_KINDS as KIND_NAMES } from '../../config/billing.js';
 import { reverseCommissions } from '../payroll/commission.service.js';
 import { postMovement } from '../inventory/stock/stock.engine.js';
+import { ruleTax } from '../gst/gst.billing.js';
 
 // ---------------------------------------------------------------------------
 // The kinds of line a bill can have. Billing only talks to a line through its kind.
@@ -16,7 +17,8 @@ import { postMovement } from '../inventory/stock/stock.engine.js';
 //   hasQuantity      true: the desk can change how many
 //   requiresAddon    the salon add-on it needs (e.g. 'inventory')
 //   lookup(ctx, lines, session)      -> what tax() needs, loaded once for all lines of this kind
-//   tax(line, settings, lookup)      -> { taxRateBps, sacCode?, hsnCode? } today's GST rate and code
+//   tax(line, settings, lookup, gst) -> { taxRateBps, sacCode?, hsnCode?, taxRuleId? } today's GST rate and code.
+//                                       gst: set once the salon has activated GST setup; then only an approved rule counts
 //   onIssue(ctx, { invoice, lines }, session)              when the bill is issued (same transaction)
 //   onRefund(ctx, { invoice, refund, lines (the refunded parts), day }, session)  when lines are refunded
 //   onVoid(ctx, { invoice, lines }, session)               when the bill is voided (same transaction)
@@ -54,10 +56,11 @@ export const LINE_KINDS = {
     removable: false,
     hasQuantity: false,
     async lookup(ctx, lines, session) {
-      return Service.find(scoped(ctx, { _id: { $in: lines.map((l) => l.serviceId).filter(Boolean) } })).select('taxRateBps sacCode').session(session).lean();
+      return Service.find(scoped(ctx, { _id: { $in: lines.map((l) => l.serviceId).filter(Boolean) } })).select('taxRateBps sacCode taxRuleGroupId').session(session).lean();
     },
-    tax(line, settings, services) {
+    tax(line, settings, services, gst) {
       const service = find(services, line.serviceId);
+      if (gst) return ruleTax(gst, service?.taxRuleGroupId, 'sacCode');
       return {
         taxRateBps: settings.gstRegistered ? (service?.taxRateBps ?? settings.defaultServiceTaxBps) : 0,
         sacCode: service?.sacCode || settings.defaultSacCode || undefined,
@@ -79,10 +82,11 @@ export const LINE_KINDS = {
     hasQuantity: true,
     requiresAddon: 'inventory',
     async lookup(ctx, lines, session) {
-      return InventorySku.find(scoped(ctx, { _id: { $in: lines.map((l) => l.skuId).filter(Boolean) } })).select('taxRateBps hsnCode').session(session).lean();
+      return InventorySku.find(scoped(ctx, { _id: { $in: lines.map((l) => l.skuId).filter(Boolean) } })).select('taxRateBps hsnCode taxRuleGroupId').session(session).lean();
     },
-    tax(line, settings, skus) {
+    tax(line, settings, skus, gst) {
       const sku = find(skus, line.skuId);
+      if (gst) return ruleTax(gst, sku?.taxRuleGroupId, 'hsnCode');
       return {
         taxRateBps: settings.gstRegistered ? (sku?.taxRateBps ?? settings.defaultProductTaxBps ?? 1800) : 0,
         hsnCode: sku?.hsnCode || undefined,

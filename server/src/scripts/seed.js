@@ -37,6 +37,7 @@ import { setInvoiceOffer } from '../modules/occasions/checkout/checkout.service.
 import { runForOrg } from '../modules/occasions/engine/scheduler.js';
 import { migrateBilling } from './migrate-billing-v2.js';
 import { migrateOccasions } from './migrate-occasions-v1.js';
+import { saveSetup } from '../modules/gst/gst.service.js';
 import { DESERT_ROSE_CUSTOMERS, DESERT_ROSE_SERVICES, GLAMOUR_CUSTOMERS, GLAMOUR_SERVICES, LEADS } from './seed-data.js';
 
 const { Organization, Branch, User, Staff, Service, Combo, Customer, Appointment, Invoice, Lead, Attendance, Counter } = models;
@@ -457,6 +458,11 @@ const oneSerum = await serumSale(gc['Isha Patel'], 1, (total) => [{ method: 'CAS
 await createRefund(desk, { invoiceId: oneSerum._id, lines: [{ lineId: String(oneSerum.lines[0]._id), qty: 1, restock: 'DAMAGED' }], reason: 'Bottle was cracked when opened at home', method: 'CASH' }, key());
 // Desert Rose: a plain bill (not GST registered), paid in cash
 await bill(atMarina, await visit(desertRose, 'Dubai Marina', desertCustomers[1], [ds.Haircut, staff.Omar]), [{ method: 'CASH', amount: ds.Haircut.price }]);
+
+// GST setup, started but not activated, to try out: Glamour Studio's GSTINs are now dated registrations and the starter
+// 5% rule waits for approval. One customer is a business from another state. Bills stay as they are until the owner activates.
+await saveSetup(owner, { scheme: 'REGULAR', startMonth: now.setZone('Asia/Kolkata').toFormat('yyyy-MM') }, key());
+await Customer.updateOne({ _id: gc['Amit Verma']._id }, { $set: { gstin: demoGstin('29AABCT3518Q1Z'), gstLegalName: 'Verma Traders LLP' } });
 
 // Yesterday's cash days, counted and closed (Andheri was ₹50 short); today's are left for the desk to open
 for (const [branchName, ctx, float, gap, note] of [['Andheri', desk, toPaise(3000), -toPaise(50), 'Gave change twice to one customer'], ['Dubai Marina', atMarina, toPaise(1500), 0, undefined]]) {

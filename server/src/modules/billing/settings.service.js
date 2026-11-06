@@ -1,4 +1,4 @@
-import { BillingSettings, Branch, Invoice, Organization } from '../../models/index.js';
+import { BillingSettings, Branch, GstRegistration, Invoice, Organization } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { escapeRegex } from '../../utils/regex.js';
@@ -88,6 +88,7 @@ export async function getSettingsForScreen(ctx) {
     guestProductSales: settings.guestProductSales,
     branchOwners: { approveRefunds: settings.branchOwners?.approveRefunds !== false, voidBills: settings.branchOwners?.voidBills !== false, editSettings: Boolean(settings.branchOwners?.editSettings) },
     frontDesk: { closeCash: settings.frontDesk?.closeCash !== false },
+    gstSetupActive: settings.gst?.status === 'ACTIVE',
     branches: visible.map((b) => {
       const saved = settings.branches?.find((x) => String(x.branchId) === String(b._id));
       return { branchId: b._id, name: b.name, status: b.status, gstin: saved?.gstin ?? '', stateCode: saved?.stateCode ?? '', invoicePrefix: prefixes[String(b._id)], prefixIsSaved: Boolean(saved?.invoicePrefix) };
@@ -108,7 +109,7 @@ const WORDS = {
   frontDeskDiscountLimitBps: 'front desk discount limit',
   guestProductSales: 'guest product sales',
 };
-const DELEGATION_WORDS = { approveRefunds: 'branch owners approve refunds', voidBills: 'branch owners void bills', editSettings: 'branch owners edit their branches’ GST details' };
+const DELEGATION_WORDS = { approveRefunds: 'branch owners approve refunds', voidBills: 'branch owners void bills', editSettings: 'branch owners edit their branches’ bill prefix' };
 function describe(field, value) {
   if (typeof value === 'boolean') return `${WORDS[field]}: ${value ? 'on' : 'off'}`;
   if (field.endsWith('Bps')) return `${WORDS[field]}: ${value / 100}%`;
@@ -125,6 +126,11 @@ export async function updateSettings(ctx, input, key) {
     if (salonWide.length > 0) throw new AppError(403, 'FORBIDDEN', 'Only the business owner changes the salon-wide billing rules');
     if ((input.branches ?? []).some((b) => !ctx.allowedBranchIds.includes(b.branchId))) throw new AppError(404, 'NOT_FOUND', 'Branch not found');
   }
+  // GST setup is the one place for GSTINs once it has registrations, and it decides "GST registered" once it is active
+  if (input.gstRegistered === false && before.gst?.status === 'ACTIVE') throw new AppError(409, 'USE_GST_SETUP', 'GST setup is active. Change the registration type in GST setup.');
+  const savedRow = (id) => before.branches?.find((b) => String(b.branchId) === id);
+  const gstinChanged = (input.branches ?? []).some((b) => (b.gstin !== undefined && (b.gstin || null) !== (savedRow(b.branchId)?.gstin ?? null)) || (b.stateCode !== undefined && (b.stateCode || null) !== (savedRow(b.branchId)?.stateCode ?? null)));
+  if (gstinChanged && (await GstRegistration.exists(scoped(ctx)))) throw new AppError(409, 'USE_GST_SETUP', 'GSTINs are kept in GST setup, with the date each one starts. Change it there.');
   const branches = await Branch.find(scoped(ctx)).select('name createdAt').sort({ createdAt: 1, _id: 1 }).lean();
 
   // Branch rows: start from what's saved, apply what was sent
@@ -133,15 +139,15 @@ export async function updateSettings(ctx, input, key) {
   for (const change of input.branches ?? []) {
     const branch = branches.find((b) => String(b._id) === change.branchId);
     if (!branch) throw new AppError(404, 'NOT_FOUND', 'Branch not found');
-    const gstin = change.gstin || null;
-    let stateCode = change.stateCode || null;
-    if (gstin) {
+    const old = rows.get(String(branch._id));
+    const gstin = change.gstin !== undefined ? change.gstin || null : (old?.gstin ?? null);
+    let stateCode = change.stateCode !== undefined ? change.stateCode || null : (old?.stateCode ?? null);
+    if (gstin && (change.gstin !== undefined || change.stateCode !== undefined)) {
       if (!isValidGstin(gstin)) throw new AppError(400, 'INVALID_GSTIN', `The GSTIN for ${branch.name} doesn't look right. Please check it.`);
       if (stateCode && stateCode !== gstin.slice(0, 2)) throw new AppError(400, 'INVALID_GSTIN', `The GSTIN for ${branch.name} belongs to ${GST_STATES[gstin.slice(0, 2)]}, not ${GST_STATES[stateCode]}`);
       stateCode = gstin.slice(0, 2);
     }
     const row = { branchId: branch._id, gstin, stateCode, invoicePrefix: change.invoicePrefix || null };
-    const old = rows.get(String(branch._id));
     if (old?.gstin !== row.gstin || old?.stateCode !== row.stateCode || old?.invoicePrefix !== row.invoicePrefix) {
       branchWords.push(`${branch.name}: GSTIN ${row.gstin ?? '(none)'}, prefix ${row.invoicePrefix ?? 'automatic'}`);
     }

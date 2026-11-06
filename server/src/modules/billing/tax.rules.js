@@ -33,8 +33,17 @@ function discountAmount(amount, discount, what) {
 //   Prices include GST:  ₹1,180 at 18% -> taxable ₹1,000 + CGST ₹90 + SGST ₹90 = ₹1,180 (the customer pays the price shown)
 //   GST added on top:    ₹1,000 at 18% -> taxable ₹1,000 + CGST ₹90 + SGST ₹90 = ₹1,180
 //   Not GST registered:  no tax at all
-export function lineTax(amount, rateBps, { gstRegistered, pricesIncludeTax }) {
+// Salons with GST setup active (useTaxRules): the whole tax is rounded first, then shared, so CGST can be 1 paisa more than SGST:
+//   ₹4,999 at 5% -> taxable ₹4,760.95 + CGST ₹119.03 + SGST ₹119.02 (₹238.05). A sale to another state is all IGST.
+export function lineTax(amount, rateBps, { gstRegistered, pricesIncludeTax, useTaxRules, interstate }) {
   if (!gstRegistered || !rateBps) return { taxableAmount: amount, cgst: 0, sgst: 0, lineTotal: amount };
+  if (useTaxRules) {
+    const tax = pricesIncludeTax ? roundHalfUp(amount * rateBps, 10000 + rateBps) : roundHalfUp(amount * rateBps, 10000);
+    const taxableAmount = pricesIncludeTax ? amount - tax : amount;
+    const cgst = interstate ? 0 : roundHalfUp(tax, 2);
+    const sgst = interstate ? 0 : tax - cgst;
+    return { taxableAmount, cgst, sgst, igst: interstate ? tax : 0, lineTotal: taxableAmount + tax };
+  }
   if (pricesIncludeTax) {
     const half = roundHalfUp(amount * rateBps, 2 * (10000 + rateBps));
     return { taxableAmount: amount - 2 * half, cgst: half, sgst: half, lineTotal: amount };
@@ -71,7 +80,7 @@ export function occasionDiscount(rules, eligibleSubtotal) {
 // lines: [{ unitPrice, qty, comboDiscount, discount: { type, value } | null, taxRateBps, name, discountable (default true), occasionEligible }]
 // A line that is not discountable takes no line discount and no share of the bill discount.
 // billDiscount: { type, value } | null
-// mode: { gstRegistered, pricesIncludeTax }
+// mode: { gstRegistered, pricesIncludeTax, useTaxRules?, interstate? } (see lineTax)
 // occasion: an offer's rules (see occasionDiscount), or null. Old bills have none and price exactly as before.
 // ---------------------------------------------------------------------------
 export function computeBill(lines, billDiscount, mode, occasion = null) {
@@ -110,7 +119,7 @@ export function computeBill(lines, billDiscount, mode, occasion = null) {
     };
   });
 
-  const sum = (field) => out.reduce((total, l) => total + l[field], 0);
+  const sum = (field) => out.reduce((total, l) => total + (l[field] ?? 0), 0);
   const subtotal = sum('gross');
   const comboDiscountTotal = sum('comboDiscount');
   const lineDiscountTotal = sum('lineDiscount');
@@ -124,6 +133,7 @@ export function computeBill(lines, billDiscount, mode, occasion = null) {
     row.taxableAmount += l.taxableAmount;
     row.cgst += l.cgst;
     row.sgst += l.sgst;
+    if (l.igst) row.igst = (row.igst ?? 0) + l.igst;
     byRate.set(l.taxRateBps, row);
   }
 
@@ -140,7 +150,8 @@ export function computeBill(lines, billDiscount, mode, occasion = null) {
       taxableTotal: sum('taxableAmount'),
       cgstTotal: sum('cgst'),
       sgstTotal: sum('sgst'),
-      taxTotal: sum('cgst') + sum('sgst'),
+      igstTotal: sum('igst'),
+      taxTotal: sum('cgst') + sum('sgst') + sum('igst'),
       grandTotal: sum('lineTotal'),
     },
     taxSummary: [...byRate.values()].sort((a, b) => a.rateBps - b.rateBps),
@@ -168,14 +179,15 @@ export function moneyState(invoice) {
   return { netValue, netPaid, balanceDue: Math.max(netValue - netPaid, 0), settlementStatus: settlementStatus(netPaid, netValue) };
 }
 
-// The part of one bill line that `qty` units take back (a refund): taxable value, CGST, SGST and total.
+// The part of one bill line that `qty` units take back (a refund): taxable value, CGST, SGST, IGST and total.
 // The last units take whatever is left, so all the refunds of a line always add up to exactly the line.
 export function creditForLine(line, qty) {
   const left = line.qty - (line.refundedQty ?? 0);
   if (qty < 1 || qty > left) throw new AppError(400, 'VALIDATION_ERROR', `Only ${left} of ${line.name} can still be refunded`);
-  const part = (field, credited) => (qty === left ? line[field] - (line[credited] ?? 0) : roundHalfUp(line[field] * qty, line.qty));
+  const part = (field, credited) => (qty === left ? (line[field] ?? 0) - (line[credited] ?? 0) : roundHalfUp((line[field] ?? 0) * qty, line.qty));
   const taxableAmount = part('taxableAmount', 'creditedTaxable');
   const cgst = part('cgst', 'creditedCgst');
   const sgst = part('sgst', 'creditedSgst');
-  return { taxableAmount, cgst, sgst, amount: taxableAmount + cgst + sgst, taxRateBps: line.taxRateBps };
+  const igst = part('igst', 'creditedIgst');
+  return { taxableAmount, cgst, sgst, igst, amount: taxableAmount + cgst + sgst + igst, taxRateBps: line.taxRateBps };
 }

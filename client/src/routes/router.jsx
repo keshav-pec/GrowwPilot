@@ -25,6 +25,7 @@ import CheckoutPage from '../features/checkout/CheckoutPage';
 import InvoicePage from '../features/checkout/InvoicePage';
 import BillsListPage from '../features/billing/BillsListPage';
 import BillingSettingsPage from '../features/billing/BillingSettingsPage';
+import GstSetupPage from '../features/gst/GstSetupPage';
 import OccasionSettingsPage from '../features/occasions/settings/OccasionSettingsPage';
 import EmailSettingsPage from '../features/mail/EmailSettingsPage';
 import CampaignDetailPage from '../features/occasions/campaigns/CampaignDetailPage';
@@ -139,6 +140,7 @@ export const router = createBrowserRouter([
               { path: 'team', element: <TeamPage /> },
               { path: 'catalog', element: <CatalogPage /> },
               { path: 'settings/billing', element: <BillingSettingsPage /> },
+              { path: 'settings/gst', element: <GstSetupPage /> },
               { path: 'settings/occasions', element: <OccasionSettingsPage /> }, // Birthday & Anniversary Offers
               { path: 'settings/occasions/setup', element: <QuickSetup /> },
               { path: 'settings/email', element: <EmailSettingsPage /> }, // business owner: is email set up, test email

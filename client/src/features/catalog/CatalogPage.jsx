@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Package, Plus, Scissors } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
@@ -26,6 +26,15 @@ export default function CatalogPage() {
   const combosQuery = useCombos();
   const branches = useBranches().data;
   const [editing, setEditing] = useState(null); // null | 'new' | service/combo object
+
+  // A link from a bill (?service=<id>): opens that service, once, so its tax rule can be fixed
+  const linkedServiceId = searchParams.get('service');
+  useEffect(() => {
+    const linked = linkedServiceId && servicesQuery.data?.find((s) => s._id === linkedServiceId);
+    if (!linked) return;
+    if (canEdit) setEditing(linked);
+    setSearchParams({ tab: 'services' }, { replace: true });
+  }, [linkedServiceId, servicesQuery.data, canEdit, setSearchParams]);
 
   const serviceColumns = [
     {

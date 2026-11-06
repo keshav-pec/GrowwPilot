@@ -57,6 +57,18 @@ export default function RefundPage() {
           <span className="text-xs text-muted">Customer</span>
           <br />
           {note?.customerSnapshot?.name ?? refund.customerName}
+          {note?.buyer?.gstin && (
+            <>
+              <br />
+              {note.buyer.legalName} · GSTIN <span className="font-mono">{note.buyer.gstin}</span>
+            </>
+          )}
+          {note?.placeOfSupply?.stateCode && (
+            <>
+              <br />
+              <span className="text-muted">Place of supply: {note.placeOfSupply.stateName} ({note.placeOfSupply.stateCode})</span>
+            </>
+          )}
         </p>
 
         <table className="mb-4 w-full text-sm">
@@ -89,8 +101,14 @@ export default function RefundPage() {
           {note && (
             <>
               <SummaryRow label="Taxable value" value={formatMoney(note.taxableTotal)} />
-              <SummaryRow label="CGST" value={formatMoney(note.cgstTotal)} />
-              <SummaryRow label="SGST" value={formatMoney(note.sgstTotal)} />
+              {note.igstTotal > 0 ? (
+                <SummaryRow label="IGST" value={formatMoney(note.igstTotal)} />
+              ) : (
+                <>
+                  <SummaryRow label="CGST" value={formatMoney(note.cgstTotal)} />
+                  <SummaryRow label="SGST" value={formatMoney(note.sgstTotal)} />
+                </>
+              )}
             </>
           )}
           <div className="flex justify-between border-t border-border pt-1 text-base font-bold text-brown">

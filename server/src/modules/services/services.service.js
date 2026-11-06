@@ -2,6 +2,7 @@ import { Service } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
 import { assertAllowedBranches } from '../branches/branches.service.js';
+import { assertTaxRuleLink } from '../gst/gst.billing.js';
 
 async function findService(ctx, id) {
   const service = await Service.findOne(scoped(ctx, { _id: id }));
@@ -13,8 +14,9 @@ export function listServices(ctx) {
   return Service.find(scoped(ctx)).sort({ status: 1, category: 1, name: 1 }).lean();
 }
 
-export function createService(ctx, input) {
+export async function createService(ctx, input) {
   if (input.branchIds) assertAllowedBranches(ctx, input.branchIds);
+  await assertTaxRuleLink(ctx, 'SERVICE', input.taxRuleGroupId);
   return Service.create({ ...input, orgId: ctx.orgId });
 }
 
@@ -22,6 +24,7 @@ export function createService(ctx, input) {
 export async function updateService(ctx, id, input) {
   const service = await findService(ctx, id);
   if (input.branchIds) assertAllowedBranches(ctx, input.branchIds);
+  await assertTaxRuleLink(ctx, 'SERVICE', input.taxRuleGroupId);
   service.set(input);
   return service.save();
 }

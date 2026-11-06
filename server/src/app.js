@@ -20,6 +20,7 @@ import leadRoutes from './modules/leads/leads.routes.js';
 import invoiceRoutes from './modules/invoices/invoices.routes.js';
 import paymentRoutes from './modules/payments/payments.routes.js';
 import billingRoutes from './modules/billing/billing.routes.js';
+import gstRoutes from './modules/gst/gst.routes.js';
 import advanceRoutes from './modules/payments/advances.routes.js';
 import refundRoutes from './modules/refunds/refunds.routes.js';
 import publicRoutes from './modules/invoices/public.routes.js';
@@ -71,6 +72,7 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/gst', gstRoutes); // GST setup (owners)
 app.use('/api/advances', advanceRoutes);
 app.use('/api/refunds', refundRoutes);
 app.use('/api/cash-sessions', cashRoutes);

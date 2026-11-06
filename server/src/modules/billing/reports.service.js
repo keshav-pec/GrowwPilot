@@ -63,7 +63,7 @@ async function sales(ctx, { branches, from, to }) {
     const r = rowFor(refund.branchId, localDay(refund.decidedAt, zoneOf(branches, refund.branchId)));
     for (const l of refund.lines) {
       r.refundedTaxable += l.taxableAmount;
-      r.refundedGst += l.cgst + l.sgst;
+      r.refundedGst += l.cgst + l.sgst + (l.igst ?? 0);
     }
   }
   const list = [...rows.values()].map((r) => ({ ...r, netSales: r.taxable - r.refundedTaxable, netGst: r.gst - r.refundedGst })).sort((a, b) => a.day.localeCompare(b.day) || a.branch.localeCompare(b.branch));
@@ -91,13 +91,14 @@ async function sales(ctx, { branches, from, to }) {
 async function gst(ctx, { branches, from, to }) {
   const [bills, refunds] = await Promise.all([billsIn(ctx, branches, from, to), refundsIn(ctx, branches, from, to)]);
   const rows = new Map();
-  const rowFor = (rateBps) => add(rows, rateBps, () => ({ rate: `${rateBps / 100}%`, rateBps, taxable: 0, cgst: 0, sgst: 0, creditTaxable: 0, creditCgst: 0, creditSgst: 0 }));
+  const rowFor = (rateBps) => add(rows, rateBps, () => ({ rate: `${rateBps / 100}%`, rateBps, taxable: 0, cgst: 0, sgst: 0, igst: 0, creditTaxable: 0, creditCgst: 0, creditSgst: 0, creditIgst: 0 }));
   for (const b of bills.filter((x) => x.gstRegistered)) {
     for (const t of b.taxSummary ?? []) {
       const r = rowFor(t.rateBps);
       r.taxable += t.taxableAmount;
       r.cgst += t.cgst;
       r.sgst += t.sgst;
+      r.igst += t.igst ?? 0;
     }
   }
   for (const refund of refunds) {
@@ -106,11 +107,15 @@ async function gst(ctx, { branches, from, to }) {
       r.creditTaxable += l.taxableAmount;
       r.creditCgst += l.cgst;
       r.creditSgst += l.sgst;
+      r.creditIgst += l.igst ?? 0;
     }
   }
   const list = [...rows.values()]
     .sort((a, b) => a.rateBps - b.rateBps)
-    .map((r) => ({ ...r, netTaxable: r.taxable - r.creditTaxable, netCgst: r.cgst - r.creditCgst, netSgst: r.sgst - r.creditSgst }));
+    .map((r) => ({ ...r, netTaxable: r.taxable - r.creditTaxable, netCgst: r.cgst - r.creditCgst, netSgst: r.sgst - r.creditSgst, netIgst: r.igst - r.creditIgst }));
+  // IGST columns only when a bill or credit note in the period has IGST
+  const hasIgst = list.some((r) => r.igst || r.creditIgst);
+  const igstColumn = (key, label) => (hasIgst ? [{ key, label, money: true }] : []);
   return {
     title: 'GST collected',
     note: 'Bills issued in the period, less credit notes made in the period. Please have your tax adviser check before filing.',
@@ -119,15 +124,18 @@ async function gst(ctx, { branches, from, to }) {
       { key: 'taxable', label: 'Taxable (bills)', money: true },
       { key: 'cgst', label: 'CGST (bills)', money: true },
       { key: 'sgst', label: 'SGST (bills)', money: true },
+      ...igstColumn('igst', 'IGST (bills)'),
       { key: 'creditTaxable', label: 'Taxable (credit notes)', money: true },
       { key: 'creditCgst', label: 'CGST (credit notes)', money: true },
       { key: 'creditSgst', label: 'SGST (credit notes)', money: true },
+      ...igstColumn('creditIgst', 'IGST (credit notes)'),
       { key: 'netTaxable', label: 'Net taxable', money: true },
       { key: 'netCgst', label: 'Net CGST', money: true },
       { key: 'netSgst', label: 'Net SGST', money: true },
+      ...igstColumn('netIgst', 'Net IGST'),
     ],
     rows: list,
-    totals: totalsOf(list, ['taxable', 'cgst', 'sgst', 'creditTaxable', 'creditCgst', 'creditSgst', 'netTaxable', 'netCgst', 'netSgst']),
+    totals: totalsOf(list, ['taxable', 'cgst', 'sgst', 'igst', 'creditTaxable', 'creditCgst', 'creditSgst', 'creditIgst', 'netTaxable', 'netCgst', 'netSgst', 'netIgst']),
   };
 }
 
@@ -281,7 +289,7 @@ async function retail(ctx, { branches, from, to }) {
       const r = rowFor(l.name);
       r.sold += l.qty;
       r.sales += l.taxableAmount;
-      r.gst += l.cgst + l.sgst;
+      r.gst += l.cgst + l.sgst + (l.igst ?? 0);
     }
   }
   for (const refund of refunds) {
@@ -289,7 +297,7 @@ async function retail(ctx, { branches, from, to }) {
       const r = rowFor(l.name);
       r.returned += l.qty;
       r.returnedValue += l.taxableAmount;
-      r.gst -= l.cgst + l.sgst;
+      r.gst -= l.cgst + l.sgst + (l.igst ?? 0);
     }
   }
   const list = [...rows.values()].map((r) => ({ ...r, netQty: r.sold - r.returned, netSales: r.sales - r.returnedValue })).sort((a, b) => b.netSales - a.netSales);

@@ -259,10 +259,30 @@ export const KNOWLEDGE = [
     id: 'gst-settings',
     title: 'GST and billing settings',
     audiences: OWNERS,
-    keywords: ['*gst', 'gstin', 'tax invoice', 'billing settings', 'sac code', 'hsn', 'bill prefix', 'bill number', 'cgst', 'sgst', 'tax rate'],
+    keywords: ['*gst', 'tax invoice', 'billing settings', 'bill prefix', 'bill number', 'cgst', 'sgst', 'tax rate'],
     answer:
-      'Open **Bills → Billing settings** (the business owner changes them). Choose **GST registered** or **Not registered**; if registered, enter the legal name, whether menu prices include GST, the default rate for services and products, and each branch’s **GSTIN** and bill prefix (numbers look like AND/26-27/00001 and start again every 1 April). A service or product can have its own rate. **Please have your tax adviser check the rates, SAC/HSN codes and bill wording before you start issuing GST bills.** Bills already issued never change.',
+      'Open **Bills → Billing settings** (the business owner changes them) for the front desk discount limit and each branch’s bill prefix (numbers look like AND/26-27/00001 and start again every 1 April). GSTINs are kept in **GST setup**, with the date each one starts. Until GST setup is active, this page also holds whether the salon is **GST registered**, whether menu prices include GST and the default rates, and a service or product can have its own rate. **Please have your tax adviser check the rates and codes.**',
     link: { label: 'Billing settings', to: '/app/settings/billing' },
+  },
+
+  {
+    id: 'gst-setup',
+    title: 'GST setup: registrations, tax rules and activating',
+    audiences: OWNERS,
+    keywords: ['gst setup', 'gstin', 'activate gst', 'tax rule', 'approve rule', 'sac code', 'hsn', 'start month', 'gst registration', 'change gstin', 'test bill', 'composition', 'qrmp'],
+    answer:
+      'Open **Bills → GST setup** (the business owner changes it; branch owners can look). 1. Choose **Regular** and a start month. 2. Check your **GSTINs**: each branch has one GSTIN on any date, and replacing one adds a new dated row. 3. **Approve your tax rules**: a salon starts with a draft rule of 5% without ITC from 22 Sep 2025, which your GST practitioner should check. An approved rule can’t change; a new rate is a new dated row. 4. **Link** services and products to a rule. 5. Try a **test bill**, then **Activate**. From then on each bill uses the rule for its date, and old bills never change. Composition and QRMP aren’t supported.',
+    link: { label: 'GST setup', to: '/app/settings/gst' },
+  },
+
+  {
+    id: 'gst-igst',
+    title: 'Place of supply, IGST and business customers',
+    audiences: ['PRIMARY_OWNER', 'BRANCH_OWNER', 'FRONT_DESK'],
+    keywords: ['igst', 'place of supply', 'another state', 'interstate', 'customer gstin', 'business customer', 'b2b', 'can’t be issued', 'no approved tax rule'],
+    answer:
+      'Once GST setup is active, a bill’s **place of supply** is the branch’s state, which gives CGST and SGST. An owner can choose another state on the draft bill, and the bill then has **IGST** instead. For a business customer, add their **GSTIN** in the customer’s details and it prints on their bills. If a bill says it **can’t be issued yet**, a service or product has no approved tax rule, or the branch has no GSTIN for today: an owner needs to fix that, because the app never issues a bill with the tax left out.',
+    link: { label: 'Bills', to: '/app/bills' },
   },
 
   // ---------------------------------------------------------------- attendance

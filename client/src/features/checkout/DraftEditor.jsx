@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CheckCircle2, Clock, Minus, Pencil, Plus, ShieldAlert, ShoppingBag, Trash2 } from 'lucide-react';
+import { Ban, CheckCircle2, Clock, Minus, Pencil, Plus, ShieldAlert, ShoppingBag, Trash2 } from 'lucide-react';
 import { useAddProduct, useApproveDiscount, useDiscardDraft, useIssueInvoice, useQuote, useRejectDiscount, useRemoveLine, useRequestApproval, useSaveDraft } from '../../api/invoices';
 import { formatMoney, isValidRupees, toPaise } from '../../lib/money';
-import { percentLabel } from '../../lib/billing';
+import { GST_STATES, percentLabel, taxRows } from '../../lib/billing';
 import { newRequestKey } from '../../lib/requestKey';
 import { useDebounce } from '../../lib/useDebounce';
-import { Button, Card, Input, Modal, ModalFooter, Spinner, SummaryRow, Textarea } from '../../components/ui';
+import { Button, Card, Input, Modal, ModalFooter, Select, Spinner, SummaryRow, Textarea } from '../../components/ui';
 import DiscountInput, { discountText, parseDiscount } from '../billing/DiscountInput';
 import PaymentRows, { emptyPayment, paidTotal, paymentsPayload, rowsInvalid } from '../billing/PaymentRows';
 import ProductPickerModal from '../billing/ProductPickerModal';
@@ -37,6 +37,7 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
   const [picking, setPicking] = useState(false);
   const [advanceText, setAdvanceText] = useState('');
   const [keepExtra, setKeepExtra] = useState(false);
+  const [place, setPlace] = useState(undefined); // the state an owner picks; undefined = not touched
 
   const saveDraft = useSaveDraft();
   const issue = useIssueInvoice();
@@ -56,6 +57,7 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
   const inputError = parsedLines.some((p) => p.error) || Boolean(parsedBill.error);
   const payload = {
     billDiscount: parsedBill.value ?? null,
+    ...(place !== undefined && { placeOfSupply: place }),
     lines: draft.lines.map((l, i) => {
       const e = lineEdit(l);
       return {
@@ -91,7 +93,8 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
   const approval = shown.approval ?? { status: 'NONE' };
   const permissions = shown.permissions ?? {};
   const canKeepExtra = extra > 0 && Boolean(draft.customerId);
-  const canIssue = upToDate && draft.lines.length > 0 && !rowsInvalid(rows) && !advanceError && (due >= 0 || (canKeepExtra && keepExtra)) && !limits.needsApproval && !stockShort;
+  const blockers = shown.gstBlockers ?? []; // GST: something an owner must fix before this bill can be issued
+  const canIssue = upToDate && draft.lines.length > 0 && !rowsInvalid(rows) && !advanceError && (due >= 0 || (canKeepExtra && keepExtra)) && !limits.needsApproval && !stockShort && blockers.length === 0;
   const busy = saveDraft.isPending || issue.isPending || requestApproval.isPending || approve.isPending || reject.isPending || addProduct.isPending || removeLine.isPending;
 
   function setLine(line, change) {
@@ -178,7 +181,7 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
                       {line.kind === 'PRODUCT' ? 'Product' : line.staffName}
                       {now.sacCode && ` · SAC ${now.sacCode}`}
                       {now.hsnCode && ` · HSN ${now.hsnCode}`}
-                      {shown.gstRegistered && ` · GST ${percentLabel(now.taxRateBps)}`}
+                      {shown.gstRegistered && (shown.gstSetupActive && !now.taxRuleId ? ' · no tax rule yet' : ` · GST ${percentLabel(now.taxRateBps)}`)}
                     </p>
                   </div>
                   <div className="text-right">
@@ -262,11 +265,8 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
           {shown.gstRegistered && (
             <>
               <SummaryRow label="Taxable value" value={formatMoney(shown.taxableTotal)} muted />
-              {shown.taxSummary.map((t) => (
-                <div key={t.rateBps}>
-                  <SummaryRow label={`CGST ${percentLabel(t.rateBps / 2)}`} value={formatMoney(t.cgst)} muted />
-                  <SummaryRow label={`SGST ${percentLabel(t.rateBps / 2)}`} value={formatMoney(t.sgst)} muted />
-                </div>
+              {taxRows(shown.taxSummary).map((t) => (
+                <SummaryRow key={t.key} label={t.label} value={formatMoney(t.amount)} muted />
               ))}
             </>
           )}
@@ -277,6 +277,8 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
           {shown.gstRegistered && <p className="text-xs text-muted">{shown.pricesIncludeTax ? 'Prices include GST.' : 'GST is added on top of the prices.'}</p>}
           {quote.isError && <p className="text-sm text-danger">{quote.error.message}</p>}
         </dl>
+        {shown.gstSetupActive && <PlaceOfSupply bill={shown} canChange={permissions.changePlace} value={place} onChange={setPlace} disabled={busy} />}
+        {blockers.length > 0 && <TaxBlockers blockers={blockers} canFix={permissions.changePrice} />}
       </Card>
 
       <Card title="Payment">
@@ -388,6 +390,58 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
           }
         />
       )}
+    </div>
+  );
+}
+
+// Where the sale is taxed, and the customer's GSTIN. Owners can choose another state, which makes it IGST.
+function PlaceOfSupply({ bill, canChange, value, onChange, disabled }) {
+  const saved = bill.placeOfSupply;
+  const buyerGstin = bill.customerId?.gstin;
+  const otherState = buyerGstin && saved?.stateCode && buyerGstin.slice(0, 2) !== saved.stateCode;
+  return (
+    <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3 text-sm">
+      {buyerGstin && (
+        <p>
+          Business customer: {bill.customerId.gstLegalName || bill.customerId.name} · GSTIN <span className="font-mono">{buyerGstin}</span>
+        </p>
+      )}
+      {canChange ? (
+        <Select
+          label="Place of supply"
+          options={[{ value: '', label: 'This branch’s state' }, ...GST_STATES]}
+          value={value ?? (saved?.chosen ? saved.stateCode : '')}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          hint={bill.interstate ? 'Another state: this bill has IGST, not CGST and SGST.' : undefined}
+        />
+      ) : (
+        <p className="text-muted">Place of supply: {saved?.stateName ?? 'not known'}</p>
+      )}
+      {otherState && !bill.interstate && <p className="text-xs text-orange">This customer’s GSTIN is from another state. Check the place of supply.</p>}
+    </div>
+  );
+}
+
+// Why this bill can't be issued yet. Owners get a link to fix it; the front desk is asked to tell an owner.
+function TaxBlockers({ blockers, canFix }) {
+  return (
+    <div className="mt-3 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm">
+      <p className="flex items-center gap-2 font-medium text-danger">
+        <Ban size={16} /> This bill can’t be issued yet
+      </p>
+      <ul className="mt-1 flex flex-col gap-1">
+        {blockers.map((b) => (
+          <li key={`${b.code}:${b.lineId ?? ''}`}>
+            {b.message}{' '}
+            {canFix && b.link && (
+              <Link to={b.link} className="font-medium underline">
+                Fix it
+              </Link>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

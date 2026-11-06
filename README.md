@@ -71,6 +71,7 @@ There are **two kinds of owner**: the **primary owner** (shown as **Business own
 
 - **Bills:** checkout opens a **draft**; **Issue & Pay** gives it its number (`AND/26-27/00001`, per branch and financial year) and locks it.
 - **GST** (optional per salon): GSTIN per branch, prices with or without GST, a rate per service and product, CGST + SGST per line. **Not GST registered** salons get plain bills.
+- **GST setup** (**Bills → GST setup**, business owner): dated GST registrations with each branch linked to one GSTIN per date, owner-approved tax rules that can't be edited (a new rate is a new dated row, starting from 5% without ITC), test bills, then **Activate**. After that, each bill takes its rate and code from the rule for its date, a line with no approved rule can't be issued, a business customer's GSTIN prints on the bill, and a place of supply in another state gives **IGST** on the bill, tax table, PDF, credit note and GST report. Salons that haven't activated bill as before.
 - **Discounts** per line or on the whole bill. The front desk has a limit (10%); above it an owner approves. Only owners change a price.
 - **Payments:** split (Cash, UPI, Card, Other), part payments and pay later. Never recorded twice, never more than the bill. Owners can reverse a wrong payment.
 - **Products** (with the Inventory add-on): add retail products at checkout or make a **New sale**.
@@ -249,6 +250,8 @@ Also: `inventory_settings` (front desk switches, approval limits), `inventory_ap
 
 **Billing** (every row has `orgId` and `branchId`): `invoices` (draft → issued → void; lines with their tax snapshot; `version` for stale edits), `payments` (money in or handed back) and `payment_allocations` (which bill each payment, or advance, paid), `customer_advances`, `refunds` and `credit_notes`, `cash_sessions` and `cash_movements` (append-only), and `billing_settings` (one per salon: GST, limits, branch GSTINs and prefixes, what branch owners and the front desk may do). Bill numbers come from `counters` (`invoice:<branch>:<financial year>`).
 
+**GST** (every row has `orgId`): `gst_registrations` (GSTIN, legal name, state, and each branch's dates) and `gst_tax_rules` (code, rate, ITC type, dates, draft or approved). Rules of the same `groupId` are one rule over time; services and products point to the group. The salon's registration type, start month and active status are in `billing_settings.gst`.
+
 **Important indexes:** `customer (orgId, phone)` unique, `invoice.appointmentId` unique while the bill isn't void, `invoice (orgId, invoiceNumber)` unique, one open cash day per branch, one refund waiting per bill, `attendance (staffId, date)` unique. Payroll: `payPlan (staffId, effectiveFrom)`, `commissionEntry (invoiceId, itemId, type, eventKey)`, `payrollRun (branchId, month)`, `payrollItem (runId, staffId)` and `payrollPayment (orgId, idempotencyKey)` are all unique, so nothing is counted or paid twice.
 
 ---
@@ -280,7 +283,7 @@ npm run dev
 
 ```bash
 cd server
-npm test                  # 788 Vitest tests, on a temporary in-memory MongoDB replica set (never your real data)
+npm test                  # 843 Vitest tests, on a temporary in-memory MongoDB replica set (never your real data)
 npm run smoke:isolation   # tenant isolation check against a running API with the demo seed (see section 7)
 ```
 
@@ -290,6 +293,7 @@ The tests cover the parts where a bug would cost money or trust:
 - **State machines:** every allowed and blocked appointment and lead status change.
 - **Lead conversion:** links to an existing customer by phone; a clash rolls everything back.
 - **Billing:** GST and rounding, discount approval, guest sales, refunds, voids, cash closing, reports that reconcile, the old-bill migration, and an API test that logs in as each role and tries **every billing action**.
+- **GST setup:** the 16-character number limit, GSTIN and state checks, overlapping branch links and rule dates, approved rules that can't change, activation checks, the tax on haircut and product bills, IGST, rate changes that leave old bills alone, blocked bills, and role and salon access. Salons that haven't activated are shown to bill as before.
 - **Dashboard warnings:** no-show, waiting and running-late rules.
 - **Payroll:** each way of paying, mid-month changes, commission never counted twice, locking, part payments, advances, and role and salon access including front desk pay.
 - **Inventory:** stock never going below zero under simultaneous requests, the same request sent twice, approval limits, CSV import, recipe versions, the add-on switch, photo uploads, and an API test for **every inventory action** by role, with cost visibility.
@@ -311,13 +315,13 @@ The repo includes `render.yaml` (API) and `client/vercel.json` (web app).
 4. **Seed production once, on purpose:** in Render's shell run `npm run seed -- --force`.
 5. Log in on the Vercel URL. Optionally run `API_URL=https://<your-vercel-url> npm run smoke:isolation` from your machine.
 6. **Inventory add-on (per salon):** log in as Super Admin, open the salon and click **Switch on** next to Inventory. The owner then creates inventory logins in **Team → Inventory logins**.
-7. **Billing:** nothing to switch on. Older bills are moved onto the current bill records when the API starts (`npm run migrate:billing` does the same by hand). Salons start as **Not GST registered** until the business owner fills in **Bills → Billing settings**.
+7. **Billing:** nothing to switch on. Older bills are moved onto the current bill records when the API starts (`npm run migrate:billing` does the same by hand). Salons start as **Not GST registered** until the business owner fills in **Bills → Billing settings**. Branch GSTINs move into **Bills → GST setup** when the API starts (`npm run migrate:gst` does the same by hand), and GST setup is where they are changed from then on. Nothing else changes for a salon until its owner activates GST setup.
 8. **Product photos** are stored in MongoDB GridFS and count towards your Atlas storage: 1,000 products with photos use roughly 100 MB.
 
 **Before going live:**
 
 - Have a lawyer check the consent wording and how permission is recorded (India's DPDP Act) before sending offers.
-- Have a tax professional check the GST rates, SAC/HSN codes and bill and credit note wording. Salon services moved from 18% to 5% GST (without input tax credit) from 22 Sep 2025; the app's default for services is 18%, and each salon sets its own rate in Billing settings.
+- Have a tax professional check the GST rates, SAC/HSN codes and bill and credit note wording. Salon services moved from 18% to 5% GST (without input tax credit) from 22 Sep 2025; the app's default for services is 18% until a salon activates GST setup, whose starter rule is 5% and must be approved by the owner. A rounded tax can make CGST and SGST differ by 1 paisa on activated salons: have the practitioner confirm this, and the SAC code in the starter rule (`999721`).
 
 ### Setting up email
 

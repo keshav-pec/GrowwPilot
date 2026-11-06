@@ -12,6 +12,7 @@ const creditNoteLineSchema = new mongoose.Schema(
     taxRateBps: Number,
     cgst: money(),
     sgst: money(),
+    igst: money({ default: 0 }),
     amount: money(),
   },
   { _id: false }
@@ -33,9 +34,12 @@ const creditNoteSchema = new mongoose.Schema(
     taxableTotal: money(),
     cgstTotal: money(),
     sgstTotal: money(),
+    igstTotal: money({ default: 0 }),
     total: money(),
     seller: { legalName: String, tradeName: String, branchName: String, address: String, gstin: String, stateCode: String, stateName: String },
     customerSnapshot: { name: String, phone: String },
+    buyer: { gstin: String, legalName: String },
+    placeOfSupply: { stateCode: String, stateName: String },
     createdBy: ref('User'),
   },
   { timestamps: { createdAt: true, updatedAt: false }, collection: 'credit_notes' }

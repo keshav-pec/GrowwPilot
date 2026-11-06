@@ -39,6 +39,7 @@ const inventorySkuSchema = new mongoose.Schema(
     sellPrice: money({ default: null }), // per stock unit; empty = not for sale
     taxRateBps: { type: Number, enum: [...GST_RATES_BPS, null], default: null }, // GST rate; empty = the salon's default for products
     hsnCode: { type: String, trim: true, default: '' }, // GST goods code, e.g. 3305
+    taxRuleGroupId: { type: mongoose.Schema.Types.ObjectId, default: null }, // once GST setup is active, the rule gives the rate and code
 
     status: { type: String, enum: ['active', 'inactive'], default: 'active' }, // inactive keeps all its history (and photos)
     version: { type: Number, default: 1 }, // goes up on every edit; a stale edit is refused (STALE_VERSION)

@@ -186,6 +186,7 @@ async function carryOut(ctx, refund, { session, settings }) {
       creditedTaxable: (line.creditedTaxable ?? 0) + part.taxableAmount,
       creditedCgst: (line.creditedCgst ?? 0) + part.cgst,
       creditedSgst: (line.creditedSgst ?? 0) + part.sgst,
+      creditedIgst: (line.creditedIgst ?? 0) + part.igst,
       creditedAmount: (line.creditedAmount ?? 0) + part.amount,
     };
   });
@@ -239,14 +240,17 @@ async function carryOut(ctx, refund, { session, settings }) {
           reason: refund.reason,
           lines: plan.lines.map((l) => {
             const line = invoice.lines.find((x) => String(x._id) === String(l.lineId));
-            return { name: l.name, code: line.sacCode ?? line.hsnCode, qty: l.qty, taxableAmount: l.taxableAmount, taxRateBps: l.taxRateBps, cgst: l.cgst, sgst: l.sgst, amount: l.amount };
+            return { name: l.name, code: line.sacCode ?? line.hsnCode, qty: l.qty, taxableAmount: l.taxableAmount, taxRateBps: l.taxRateBps, cgst: l.cgst, sgst: l.sgst, igst: l.igst, amount: l.amount };
           }),
           taxableTotal: sum('taxableAmount'),
           cgstTotal: sum('cgst'),
           sgstTotal: sum('sgst'),
+          igstTotal: sum('igst'),
           total: plan.creditTotal,
           seller: invoice.seller,
           customerSnapshot: invoice.customerSnapshot,
+          buyer: invoice.buyer,
+          placeOfSupply: invoice.placeOfSupply ? { stateCode: invoice.placeOfSupply.stateCode, stateName: invoice.placeOfSupply.stateName } : undefined,
           createdBy: ctx.userId,
         },
       ],

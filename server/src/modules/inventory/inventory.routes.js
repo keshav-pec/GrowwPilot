@@ -4,6 +4,8 @@ import { tenantContext } from '../../middleware/tenantContext.js';
 import { requireRole } from '../../middleware/requireRole.js';
 import { requireAddon } from '../../middleware/requireAddon.js';
 import { capabilities, inventoryRole } from './permissions.js';
+import { getBillingSettings } from '../billing/settings.service.js';
+import { gstSetupActive } from '../gst/gst.billing.js';
 import { getBranchSettings } from './settings/settings.service.js';
 import skuRoutes from './skus/skus.routes.js';
 import locationRoutes from './locations/locations.routes.js';
@@ -32,7 +34,9 @@ router.use(requireAuth, tenantContext, requireRole('OWNER', 'FRONT_DESK', 'INVEN
 router.get('/access', async (req, res) => {
   const branchId = req.ctx.activeBranchId;
   const settings = await getBranchSettings(req.ctx, branchId);
-  res.json({ branchId, role: inventoryRole(req.ctx), can: capabilities(req.ctx, settings) });
+  // Once GST setup is active a product's rate comes from its tax rule, so the form doesn't ask for one
+  const billing = await getBillingSettings(req.ctx);
+  res.json({ branchId, role: inventoryRole(req.ctx), can: capabilities(req.ctx, settings), gstRulesActive: gstSetupActive(billing) });
 });
 
 router.use('/skus', imageRoutes); // photos: /skus/:id/images...

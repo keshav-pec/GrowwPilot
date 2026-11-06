@@ -7,7 +7,7 @@ import { downloadInvoicePdf, useBillEmails, useInvoice, useInvoiceHistory, useRe
 import { useApproveRefund, useRejectRefund } from '../../api/refunds';
 import { formatMoney } from '../../lib/money';
 import { formatDateTime } from '../../lib/time';
-import { METHOD_LABEL, billBadge, percentLabel } from '../../lib/billing';
+import { METHOD_LABEL, billBadge, percentLabel, taxRows } from '../../lib/billing';
 import { newRequestKey } from '../../lib/requestKey';
 import { Badge, Button, EmptyState, PageSpinner, Spinner, SummaryRow } from '../../components/ui';
 import RecordPaymentModal from '../billing/RecordPaymentModal';
@@ -150,6 +150,12 @@ export default function InvoicePage() {
           <p className="text-xs text-muted">Billed to</p>
           <p className="font-medium">{invoice.customerSnapshot?.name ?? invoice.customerId?.name}</p>
           <p className="text-muted">{invoice.customerSnapshot?.phone ?? invoice.customerId?.phone}</p>
+          {invoice.buyer?.gstin && (
+            <p>
+              {invoice.buyer.legalName} · GSTIN <span className="font-mono">{invoice.buyer.gstin}</span>
+            </p>
+          )}
+          {invoice.placeOfSupply?.stateCode && <p className="text-muted">Place of supply: {invoice.placeOfSupply.stateName} ({invoice.placeOfSupply.stateCode})</p>}
         </div>
 
         <div className="mb-4 overflow-x-auto">
@@ -197,11 +203,8 @@ export default function InvoicePage() {
           {gst && (
             <>
               <SummaryRow label="Taxable value" value={formatMoney(invoice.taxableTotal)} muted />
-              {invoice.taxSummary.map((t) => (
-                <div key={t.rateBps}>
-                  <SummaryRow label={`CGST ${percentLabel(t.rateBps / 2)}`} value={formatMoney(t.cgst)} muted />
-                  <SummaryRow label={`SGST ${percentLabel(t.rateBps / 2)}`} value={formatMoney(t.sgst)} muted />
-                </div>
+              {taxRows(invoice.taxSummary).map((t) => (
+                <SummaryRow key={t.key} label={t.label} value={formatMoney(t.amount)} muted />
               ))}
             </>
           )}

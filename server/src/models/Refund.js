@@ -16,7 +16,8 @@ const refundLineSchema = new mongoose.Schema(
     taxRateBps: { type: Number, default: 0 },
     cgst: money({ default: 0 }),
     sgst: money({ default: 0 }),
-    amount: money({ default: 0 }), // taxable + CGST + SGST
+    igst: money({ default: 0 }),
+    amount: money({ default: 0 }), // taxable + CGST + SGST + IGST
   },
   { _id: false }
 );

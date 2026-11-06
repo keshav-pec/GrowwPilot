@@ -12,6 +12,8 @@ export { default as Appointment } from './Appointment.js';
 export { default as Invoice } from './Invoice.js';
 export { default as Counter } from './Counter.js';
 export { default as BillingSettings } from './BillingSettings.js';
+export { default as GstRegistration } from './GstRegistration.js';
+export { default as GstTaxRule } from './GstTaxRule.js';
 export { default as Payment } from './Payment.js';
 export { default as PaymentAllocation } from './PaymentAllocation.js';
 export { default as CustomerAdvance } from './CustomerAdvance.js';

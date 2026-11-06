@@ -22,12 +22,13 @@ import { availableToIssue, branchStock } from '../stock/stock.queries.js';
 import { ensureBranchLocations, listLocations } from '../locations/locations.service.js';
 import { reserveSkuCodes } from './skuCodes.js';
 import { findSupplier } from '../suppliers/suppliers.service.js';
+import { assertTaxRuleLink } from '../../gst/gst.billing.js';
 
 const PAGE_SIZE = 50;
 const HISTORY_PAGE_SIZE = 25;
 
 // The fields that describe the product itself (the same at every branch)
-const PRODUCT_FIELDS = ['name', 'category', 'brand', 'barcodes', 'type', 'stockUnit', 'wayOfUse', 'baseUnit', 'unitsPerStockUnit', 'sellPrice', 'taxRateBps', 'hsnCode'];
+const PRODUCT_FIELDS = ['name', 'category', 'brand', 'barcodes', 'type', 'stockUnit', 'wayOfUse', 'baseUnit', 'unitsPerStockUnit', 'sellPrice', 'taxRateBps', 'hsnCode', 'taxRuleGroupId'];
 const BRANCH_FIELDS = ['reorderPoint', 'reorderQty', 'leadTimeDays', 'preferredSupplierId'];
 
 // What I may do here, with the selected branch's settings
@@ -90,6 +91,7 @@ export async function createSku(ctx, input, key) {
   const { settings, canSeeCosts } = await access(ctx);
   assertCan(ctx, 'inventory.editProducts', { settings });
   if (input.openingUnitCost != null && !canSeeCosts) throw new AppError(403, 'PERMISSION_DENIED', 'Only owners can enter costs');
+  await assertTaxRuleLink(ctx, 'PRODUCT', input.taxRuleGroupId);
 
   const { mainStore } = await ensureBranchLocations(ctx, branchId);
   const { openingQty, openingUnitCost, reorderPoint = null, reorderQty = null, leadTimeDays = null, preferredSupplierId = null, code, ...product } = input;
@@ -142,6 +144,7 @@ export async function updateSku(ctx, id, input, key) {
     else delete productChanges[field];
   }
 
+  await assertTaxRuleLink(ctx, 'PRODUCT', productChanges.taxRuleGroupId);
   if (Object.keys(productChanges).length > 0) {
     if (!(await canEditProduct(ctx, sku))) {
       throw new AppError(403, 'PERMISSION_DENIED', 'This product is also used at other branches. Ask the business owner to change it.');
