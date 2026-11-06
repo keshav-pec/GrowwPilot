@@ -90,7 +90,10 @@ export const REFUND_REQUEST_STATUSES = ['REQUESTED', 'REJECTED', 'DONE'];
 // What happens to a returned product: back on the shelf, or written off as damaged
 export const RESTOCK_OPTIONS = ['SELLABLE', 'DAMAGED'];
 
-// ("AND", "26-27", 1) -> "CN-AND/26-27/001". Kept to 16 characters (a GST rule): a 4-letter prefix drops the dash.
-export function formatCreditNoteNumber(prefix, fy, seq) {
-  return `CN${prefix.length > 3 ? '' : '-'}${prefix}/${fy}/${String(seq).padStart(3, '0')}`;
+// ("CN", "AND", "26-27", 1) -> "CN-AND/26-27/001": credit notes (CN), receipt vouchers (RV) and refund vouchers (RF).
+// Kept to 16 characters (a GST rule): a 4-letter prefix drops the dash.
+export function formatVoucherNumber(code, prefix, fy, seq) {
+  return `${code}${prefix.length > 3 ? '' : '-'}${prefix}/${fy}/${String(seq).padStart(3, '0')}`;
 }
+
+export const formatCreditNoteNumber = (prefix, fy, seq) => formatVoucherNumber('CN', prefix, fy, seq);

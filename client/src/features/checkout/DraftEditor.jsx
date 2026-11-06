@@ -295,6 +295,7 @@ export default function DraftEditor({ draft, onReplace, onStale }) {
             </div>
           </div>
         )}
+        {shown.advanceElsewhere > 0 && <p className="mb-3 text-xs text-muted">{formatMoney(shown.advanceElsewhere)} of this customer’s advance was taxed under another GSTIN or state, so it can’t be used on this bill.</p>}
         {total === 0 ? <p className="text-sm text-muted">Nothing to pay.</p> : <PaymentRows rows={rows} onChange={setRows} total={Math.max(total - advanceUse, 0)} />}
 
         <div

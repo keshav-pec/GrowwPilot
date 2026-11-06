@@ -62,3 +62,8 @@ export const registerSchema = overviewSchema.extend({
   page: z.coerce.number().int().min(1).default(1),
   format: z.enum(['json', 'csv']).default('json'),
 });
+export const advancesViewSchema = z.object({
+  gstin: z.string().trim().toUpperCase().length(15).optional(),
+  open: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+  format: z.enum(['json', 'csv']).default('json'),
+});

@@ -3,15 +3,17 @@ import { useGstSetup } from '../../api/gst';
 import { Badge, EmptyState, PageHeader, PageSpinner, Tabs } from '../../components/ui';
 import GstOverviewTab from './GstOverviewTab';
 import GstSalesTab from './GstSalesTab';
+import GstAdvancesTab from './GstAdvancesTab';
 import GstSettingsTab from './GstSettingsTab';
 
 const RECORD_TABS = [
   { value: 'overview', label: 'Overview' },
   { value: 'sales', label: 'Sales & Returns' },
+  { value: 'advances', label: 'Advances' },
 ];
 const SETTINGS_TAB = { value: 'settings', label: 'Settings' };
 
-// The GST menu. Branch owners get Overview and Sales & Returns only if the business owner switched them on.
+// The GST menu. Branch owners get Overview, Sales & Returns and Advances only if the business owner switched them on.
 // The open tab lives in the URL (?tab=sales), so a refresh or a link keeps it.
 export default function GstPage() {
   const setupQuery = useGstSetup();
@@ -30,6 +32,7 @@ export default function GstPage() {
       <Tabs tabs={tabs} value={tab} onChange={(value) => setSearchParams({ tab: value })} />
       {tab === 'overview' && <GstOverviewTab today={setup.today} onOpenSettings={() => setSearchParams({ tab: 'settings' })} />}
       {tab === 'sales' && <GstSalesTab today={setup.today} />}
+      {tab === 'advances' && <GstAdvancesTab />}
       {tab === 'settings' && <GstSettingsTab setup={setup} />}
     </>
   );

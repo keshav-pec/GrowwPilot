@@ -11,7 +11,7 @@ const billLink = (invoiceId) => `/app/invoices/${invoiceId}`;
 const SAME = ['taxable', 'cgst', 'sgst', 'igst'];
 
 // -> [difference], comparing what the documents say with what the record says
-export function compareDocuments({ bills, voids, notes, refundsById, registrations, entries }) {
+export function compareDocuments({ bills, voids, notes, advances = [], uses = [], refundsById, registrations, entries }) {
   const bySource = new Map(entries.map((e) => [e.sourceKey, e]));
   const used = new Set();
   const differences = [];
@@ -21,8 +21,8 @@ export function compareDocuments({ bills, voids, notes, refundsById, registratio
     const entry = bySource.get(sourceKey);
     used.add(sourceKey);
     if (!entry) return add(sourceKey, 'ENTRY_MISSING', `${name} has no entry in the tax record.`, null, invoiceId, branchId);
-    if (SAME.some((field) => (entry[field] ?? 0) !== want[field])) {
-      const wantTotal = SAME.reduce((sum, f) => sum + want[f], 0);
+    if (SAME.some((field) => (entry[field] ?? 0) !== (want[field] || 0))) {
+      const wantTotal = SAME.reduce((sum, f) => sum + (want[f] || 0), 0);
       add(sourceKey, 'AMOUNT_DIFFERENT', `${name} is ${formatMoney(Math.abs(wantTotal))}, but the tax record has ${formatMoney(Math.abs(entry.total))}, or the tax is split differently.`, null, invoiceId, branchId);
     }
   };
@@ -43,6 +43,23 @@ export function compareDocuments({ bills, voids, notes, refundsById, registratio
     if (!refundsById.has(String(note.refundId))) continue;
     compare(`creditnote:${note.refundId}`, `Credit note ${note.number}`, note.invoiceId, note.branchId, { taxable: -note.taxableTotal, cgst: -note.cgstTotal, sgst: -note.sgstTotal, igst: -(note.igstTotal ?? 0) });
   }
+  for (const advance of advances) {
+    const g = advance.gst;
+    const number = advance.receiptNumber;
+    const parts = (p) => ({ taxable: -p.taxable, cgst: -p.cgst, sgst: -p.sgst, igst: -p.igst });
+    compare(`advance:${advance._id}`, `Receipt voucher ${number}`, null, advance.branchId, { taxable: g.taxable, cgst: g.cgst, sgst: g.sgst, igst: g.igst });
+    for (const refund of advance.refunds) compare(`advancerefund:${refund.paymentId}`, `Refund voucher ${refund.number}`, null, advance.branchId, parts(refund));
+    if (advance.reversedAt) compare(`advancereverse:${advance._id}`, `Reversal of receipt voucher ${number}`, null, advance.branchId, parts(g));
+    const myUses = uses.filter((u) => String(u.advanceId) === String(advance._id));
+    for (const u of myUses) compare(`advanceuse:${u._id}`, `Advance ${number} used on a bill`, u.invoiceId, advance.branchId, parts(u.advanceTax ?? {}));
+    // The money and the tax must both add up: what was taken = used + given back + what is left
+    const taken = myUses.reduce((sum, u) => sum + u.amount, 0) + advance.givenBack + advance.remaining;
+    const tax = (u) => (u?.cgst ?? 0) + (u?.sgst ?? 0) + (u?.igst ?? 0);
+    const taxTaken = myUses.reduce((sum, u) => sum + tax(u.advanceTax), 0) + advance.refunds.reduce((sum, r) => sum + tax(r), 0) + g.leftCgst + g.leftSgst + g.leftIgst;
+    if (!advance.reversedAt && (taken !== advance.amount || taxTaken !== g.cgst + g.sgst + g.igst)) {
+      differences.push({ key: `advancebalance:${advance._id}`, code: 'ADVANCE_DOES_NOT_ADD_UP', message: `Receipt voucher ${number} doesn’t add up: what was used, given back and left isn’t what was taken.`, branchId: advance.branchId, link: `/app/advances/${advance._id}` });
+    }
+  }
   for (const entry of entries) {
     if (!used.has(entry.sourceKey)) add(entry.sourceKey, 'SOURCE_MISSING', `The tax record has ${entry.documentNumber}, but no matching bill or credit note was found.`, null, entry.invoiceId, entry.branchId);
   }
@@ -55,27 +72,28 @@ export async function runTaxCheck(orgId, { now = new Date() } = {}) {
   if (settings?.gst?.status !== 'ACTIVE' || !settings.gst.startMonth) return null;
 
   await addOlderDocuments(orgId, settings);
-  const { bills, voids, notes } = await documentsInScope(orgId, settings);
+  const { bills, voids, notes, advances, uses } = await documentsInScope(orgId, settings);
   const [entries, registrations, refunds, previous] = await Promise.all([
     GstTaxEntry.find({ orgId }).select('sourceKey documentNumber invoiceId branchId taxable cgst sgst igst total').lean(),
     GstRegistration.find({ orgId }).lean(),
     Refund.find({ _id: { $in: notes.map((n) => n.note.refundId) } }).select('_id').lean(),
     GstCheck.findOne({ orgId }).lean(),
   ]);
-  const differences = compareDocuments({ bills, voids, notes, refundsById: new Map(refunds.map((r) => [String(r._id), r])), registrations, entries });
+  const differences = compareDocuments({ bills, voids, notes, advances, uses, refundsById: new Map(refunds.map((r) => [String(r._id), r])), registrations, entries });
+  const checked = bills.length + voids.length + notes.length + advances.length;
 
   const before = new Set((previous?.differences ?? []).map((d) => d.key));
   const fresh = differences.filter((d) => !before.has(d.key));
   await GstCheck.updateOne(
     { orgId },
-    { $set: { ranAt: now, checked: bills.length + voids.length + notes.length, differences, ranOn: DateTime.fromJSDate(now, { zone: 'Asia/Kolkata' }).toISODate() } },
+    { $set: { ranAt: now, checked, differences, ranOn: DateTime.fromJSDate(now, { zone: 'Asia/Kolkata' }).toISODate() } },
     { upsert: true }
   );
   if (fresh.length > 0) {
     const owners = await User.find({ orgId, role: 'OWNER', status: 'active', allBranches: true }).distinct('_id');
     await notify({ orgId, userId: null }, owners, { message: `GST check: ${fresh.length} difference${fresh.length === 1 ? '' : 's'} between your bills and the tax record. Please review.`, link: '/app/gst' });
   }
-  return { checked: bills.length + voids.length + notes.length, differences };
+  return { checked, differences };
 }
 
 // ---- the night timer ------------------------------------------------------

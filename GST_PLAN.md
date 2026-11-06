@@ -1,6 +1,6 @@
 # GST Engine: Build Plan
 
-Based on `GrowwPilot_GST_Engine_Technical_PRD_v1.pdf` (1 Nov 2026) and a check of the current code on 4 Nov 2026. **Phase 1 is built and committed. Phase 2 is built (6 Nov 2026), not yet committed.** Phases 3 to 5 are not built.
+Based on `GrowwPilot_GST_Engine_Technical_PRD_v1.pdf` (1 Nov 2026) and a check of the current code on 4 Nov 2026. **Phases 1 and 2 are built and committed. Phase 3 is built (6 Nov 2026), not yet committed.** Phases 4 and 5 are not built.
 
 **The goal:** a salon's bills become a correct, traceable GST record. From that record the owner can prepare GSTR-1, check purchases and input credit, and prepare a GSTR-3B working sheet. The owner still files on the GST portal.
 
@@ -156,9 +156,9 @@ GST Phase 2: permanent tax record saved with each bill, credit notes and voids a
 - **Taking an advance:** a new choice, "for named services", which uses an approved rule. Tax is worked out when the money comes in, and the customer gets a numbered receipt voucher with a PDF.
 - **Plain advances** and extra money kept at checkout stay untaxed (decision 5).
 - **Using it on a later bill:** the bill links to the advance and the tax already paid is used up, so the same money is never taxed twice. Tax is added only on any extra amount.
-- **Limits:** the tax used can never exceed the tax originally paid. If a bill already covers that money, no advance tax is recorded.
-- **Different GSTIN:** today advances work at any branch. A taxed advance taken under one GSTIN is refused at a branch on another GSTIN, as the PRD asks. Plain advances are unchanged.
-- **Giving back unused money:** new, because today only an unused payment can be reversed in full. Refunds and reversals add linked minus entries.
+- **Limits:** the tax used can never exceed the tax originally paid. If a bill already covers that money, the advance is refused and the desk is pointed to Record payment on that bill, so no advance tax is recorded.
+- **Different GSTIN:** today advances work at any branch. A taxed advance taken under one GSTIN is refused at a branch on another GSTIN, as the PRD asks. Plain advances are unchanged. It is also refused on a bill with another place of supply, because IGST can't use up CGST and SGST.
+- **Giving back unused money:** new for every advance, because until now only an unused payment could be reversed in full. Those who may approve refunds do it. Refunds and reversals add linked minus entries.
 - **Advances view:** taken, used and left, with tax, for each GSTIN.
 
 **Done when**

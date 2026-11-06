@@ -148,7 +148,7 @@ async function gst(ctx, { branches, from, to }) {
   const igstColumn = (key, label) => (hasIgst ? [{ key, label, money: true }] : []);
   return {
     title: 'GST collected',
-    note: 'Bills issued in the period, less credit notes made in the period. Please have your tax adviser check before filing.',
+    note: 'Bills issued in the period, less credit notes made in the period. On activated salons, the bills side also has advances for named services: their tax when taken, less the tax used on bills, given back or reversed. Please have your tax adviser check before filing.',
     columns: [
       { key: 'rate', label: 'GST rate' },
       { key: 'taxable', label: 'Taxable (bills)', money: true },
@@ -284,14 +284,16 @@ async function advances(ctx, { branches, from, to }) {
   const taken = await CustomerAdvance.find({ orgId: oid(ctx.orgId), ...inRange(branches, 'createdAt', from, to) }).lean();
   const used = await PaymentAllocation.find({ orgId: oid(ctx.orgId), advanceId: { $ne: null }, status: 'VALID', ...inRange(branches, 'createdAt', from, to) }).populate('advanceId', 'customerId').lean();
   const rows = new Map();
-  const rowFor = (customerId) => add(rows, String(customerId), () => ({ customerId, taken: 0, used: 0 }));
+  const rowFor = (customerId) => add(rows, String(customerId), () => ({ customerId, taken: 0, used: 0, givenBack: 0 }));
   for (const a of taken) rowFor(a.customerId).taken += a.amount;
+  const handedBack = await Payment.find({ orgId: oid(ctx.orgId), status: 'VALID', kind: 'REFUND', advanceId: { $ne: null }, ...inRange(branches, 'receivedAt', from, to) }).select('customerId amount').lean();
+  for (const p of handedBack) rowFor(p.customerId).givenBack += p.amount;
   for (const u of used) if (u.advanceId) rowFor(u.advanceId.customerId).used += u.amount;
   const customers = await Customer.find(scoped(ctx, { _id: { $in: [...rows.keys()] } })).select('name phone').lean();
   const list = [];
   for (const r of rows.values()) {
     const customer = customers.find((c) => String(c._id) === String(r.customerId));
-    list.push({ customer: customer?.name ?? '?', phone: customer?.phone ?? '', taken: r.taken, used: r.used, balance: (await advancesOf(ctx, r.customerId)).balance });
+    list.push({ customer: customer?.name ?? '?', phone: customer?.phone ?? '', taken: r.taken, used: r.used, givenBack: r.givenBack, balance: (await advancesOf(ctx, r.customerId)).balance });
   }
   list.sort((a, b) => b.balance - a.balance || a.customer.localeCompare(b.customer));
   return {
@@ -302,10 +304,11 @@ async function advances(ctx, { branches, from, to }) {
       { key: 'phone', label: 'Phone' },
       { key: 'taken', label: 'Taken', money: true },
       { key: 'used', label: 'Used', money: true },
+      { key: 'givenBack', label: 'Given back', money: true },
       { key: 'balance', label: 'Left now', money: true },
     ],
     rows: list,
-    totals: totalsOf(list, ['taken', 'used']),
+    totals: totalsOf(list, ['taken', 'used', 'givenBack']),
   };
 }
 

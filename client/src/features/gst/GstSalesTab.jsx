@@ -13,10 +13,14 @@ const TYPES = [
   { value: 'BILL_ISSUED', label: 'Bills' },
   { value: 'CREDIT_NOTE', label: 'Credit notes' },
   { value: 'BILL_VOIDED', label: 'Voided bills' },
+  { value: 'ADVANCE_RECEIVED', label: 'Advances taken' },
+  { value: 'ADVANCE_USED', label: 'Advances used' },
+  { value: 'ADVANCE_REFUNDED', label: 'Advances given back' },
+  { value: 'ADVANCE_REVERSED', label: 'Advances reversed' },
 ];
-const TYPE_TONE = { Bill: 'neutral', 'Credit note': 'orange', 'Voided bill': 'danger' };
+const TYPE_TONE = { Bill: 'neutral', 'Credit note': 'orange', 'Voided bill': 'danger', 'Advance taken': 'gold', 'Advance used': 'yellow', 'Advance given back': 'orange', 'Advance reversed': 'danger' };
 
-// The sales register: every entry of the tax record for a month. A row opens its bill.
+// The sales register: every entry of the tax record for a month. A row opens its bill or receipt voucher.
 export default function GstSalesTab({ today }) {
   const navigate = useNavigate();
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -83,7 +87,7 @@ export default function GstSalesTab({ today }) {
       {register.isError ? (
         <EmptyState title="Couldn’t load the register" message={register.error.message} />
       ) : (
-        <Table columns={columns} rows={data?.rows} loading={register.isPending} onRowClick={(r) => navigate(`/app/invoices/${r.invoiceId}`)} empty={<EmptyState title="Nothing in this month" message="Bills, credit notes and voids appear here as they happen." />} />
+        <Table columns={columns} rows={data?.rows} loading={register.isPending} onRowClick={(r) => navigate(r.link)} empty={<EmptyState title="Nothing in this month" message="Bills, credit notes and voids appear here as they happen." />} />
       )}
 
       {data?.total > 0 && (

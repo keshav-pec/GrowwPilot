@@ -1,6 +1,9 @@
-import { CustomerAdvance, PaymentAllocation } from '../../models/index.js';
+import { Branch, CustomerAdvance, PaymentAllocation } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { formatMoney } from '../../utils/money.js';
+import { todayInZone } from '../../utils/time.js';
+import { advanceFitsBill, advanceTaxPart, sellerOfBill, takeAdvanceTax } from '../gst/gst.advances.js';
+import { postAdvanceUsed } from '../gst/gst.ledger.js';
 
 // ---------------------------------------------------------------------------
 // Money a customer already has with the salon, that can pay a bill: their advances.
@@ -26,17 +29,30 @@ export const PAYMENT_SOURCES = {
     allocationField: 'advanceId',
     balance: async (ctx, customerId, session) => (await advancesOf(ctx, customerId, session)).balance,
     // Oldest advances first. Each one only ever goes down with a guarded update, so the same money
-    // can never be used twice, even from two desks at once.
+    // can never be used twice, even from two desks at once. A taxed advance only pays bills under its own GSTIN
+    // and place of supply, and its tax is used up with the money, so the same money is never taxed twice.
     async take(ctx, invoice, amount, session) {
       const { advances, balance } = await advancesOf(ctx, invoice.customerId, session);
-      if (balance < amount) throw new AppError(400, 'ADVANCE_TOO_LOW', `Only ${formatMoney(balance)} is left in advances`);
+      const seller = sellerOfBill(invoice);
+      const usable = advances.filter((a) => advanceFitsBill(a, seller));
+      const usableBalance = usable.reduce((sum, a) => sum + a.remaining, 0);
+      if (usableBalance < amount) {
+        if (balance >= amount) throw new AppError(409, 'ADVANCE_OTHER_GSTIN', `${formatMoney(balance - usableBalance)} of this customer’s advance was taxed under another GSTIN or state, so it can’t be used on this bill. ${formatMoney(usableBalance)} can.`);
+        throw new AppError(400, 'ADVANCE_TOO_LOW', `Only ${formatMoney(usableBalance)} is left in advances`);
+      }
       let left = amount;
-      for (const advance of advances) {
+      for (const advance of usable) {
         if (left === 0) break;
         const part = Math.min(advance.remaining, left);
-        const used = await CustomerAdvance.updateOne({ _id: advance._id, remaining: { $gte: part } }, { $inc: { remaining: -part } }, { session });
+        const tax = advance.taxed ? advanceTaxPart(advance, part) : null;
+        const used = await CustomerAdvance.updateOne({ _id: advance._id, remaining: { $gte: part } }, { $inc: { remaining: -part, ...(tax ? takeAdvanceTax(tax) : {}) } }, { session });
         if (used.modifiedCount !== 1) throw new AppError(409, 'ADVANCE_CHANGED', 'That advance was just used on another bill. Please try again.');
-        await PaymentAllocation.create([{ orgId: invoice.orgId, branchId: invoice.branchId, advanceId: advance._id, invoiceId: invoice._id, amount: part }], { session });
+        const advanceTax = tax ? { taxable: tax.taxableAmount, cgst: tax.cgst, sgst: tax.sgst, igst: tax.igst } : undefined;
+        const [allocation] = await PaymentAllocation.create([{ orgId: invoice.orgId, branchId: invoice.branchId, advanceId: advance._id, invoiceId: invoice._id, amount: part, advanceTax }], { session });
+        if (tax) {
+          const branch = await Branch.findById(invoice.branchId).select('timezone').session(session).lean();
+          await postAdvanceUsed(ctx, advance, { allocationId: allocation._id, invoice, part: advanceTax, taxDate: todayInZone(branch.timezone) }, session);
+        }
         left -= part;
       }
     },

@@ -23,5 +23,6 @@ export const GST_SETUP_LINK = '/app/gst?tab=settings';
 export const CATALOG_LINK = '/app/catalog';
 export const PRODUCTS_LINK = '/app/inventory?tab=products';
 
-// Entries in the permanent tax record. A bill adds a plus entry; a credit note or a void adds a minus entry.
-export const TAX_ENTRY_TYPES = ['BILL_ISSUED', 'CREDIT_NOTE', 'BILL_VOIDED'];
+// Entries in the permanent tax record. A bill or a taxed advance adds a plus entry. A credit note, a void, an advance
+// used on a bill (its tax was already paid), or an advance given back or reversed adds a minus entry.
+export const TAX_ENTRY_TYPES = ['BILL_ISSUED', 'CREDIT_NOTE', 'BILL_VOIDED', 'ADVANCE_RECEIVED', 'ADVANCE_USED', 'ADVANCE_REFUNDED', 'ADVANCE_REVERSED'];

@@ -6,7 +6,7 @@ import { validate } from '../../middleware/validate.js';
 import { requireIdempotencyKey } from '../../middleware/idempotency.js';
 import * as schemas from './gst.schemas.js';
 import * as gst from './gst.service.js';
-import { checkNow, overview, salesRegister } from './gst.record.js';
+import { advancesView, checkNow, overview, salesRegister } from './gst.record.js';
 import { sendCsv } from '../../utils/csv.js';
 
 // /api/gst — GST setup. Owners only: branch owners can look, the business owner changes things (checked in the service).
@@ -49,6 +49,12 @@ router.get('/register', validate({ query: schemas.registerSchema }), async (req,
   const register = await salesRegister(req.ctx, { ...filters, all: format === 'csv' });
   if (format === 'csv') return sendCsv(res, `sales-register-${register.month}.csv`, register);
   res.json(register);
+});
+router.get('/advances', validate({ query: schemas.advancesViewSchema }), async (req, res) => {
+  const { format, ...filters } = req.valid.query;
+  const view = await advancesView(req.ctx, filters);
+  if (format === 'csv') return sendCsv(res, 'gst-advances.csv', view);
+  res.json(view);
 });
 router.post('/check', once, async (req, res) => {
   res.json(await checkNow(req.ctx, req.idempotencyKey));

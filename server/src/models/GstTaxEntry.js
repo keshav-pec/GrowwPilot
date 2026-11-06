@@ -31,12 +31,15 @@ const gstTaxEntrySchema = new mongoose.Schema(
     orgId: ref('Organization', { required: true }),
     branchId: ref('Branch', { required: true }),
     type: { type: String, enum: TAX_ENTRY_TYPES, required: true },
-    sourceKey: { type: String, required: true }, // what caused it: "bill:<id>", "creditnote:<refund id>", "void:<id>"
-    invoiceId: ref('Invoice', { required: true }),
+    // What caused it: "bill:<id>", "creditnote:<refund id>", "void:<id>", "advance:<id>", "advanceuse:<allocation id>",
+    // "advancerefund:<payment id>", "advancereverse:<id>"
+    sourceKey: { type: String, required: true },
+    invoiceId: ref('Invoice'), // empty for an advance that hasn't been used on a bill
+    advanceId: ref('CustomerAdvance'),
     refundId: ref('Refund'),
-    originalEntryId: ref('GstTaxEntry'), // minus entries: the bill's entry, when the bill is in the record
-    documentNumber: { type: String, required: true }, // the bill or credit note number
-    invoiceNumber: { type: String, required: true },
+    originalEntryId: ref('GstTaxEntry'), // minus entries: the original's entry, when it is in the record
+    documentNumber: { type: String, required: true }, // the bill, credit note or voucher number
+    invoiceNumber: String,
     taxDate: { type: String, required: true, match: /^\d{4}-\d{2}-\d{2}$/ }, // in the branch's time
     period: { type: String, required: true, match: /^\d{4}-\d{2}$/ }, // the month it counts in
     gstin: { type: String, required: true }, // the salon's GSTIN on the document: returns are per GSTIN
@@ -64,6 +67,7 @@ gstTaxEntrySchema.index({ orgId: 1, sourceKey: 1 }, { unique: true });
 gstTaxEntrySchema.index({ orgId: 1, gstin: 1, period: 1, taxDate: -1 });
 gstTaxEntrySchema.index({ orgId: 1, branchId: 1, taxDate: 1 });
 gstTaxEntrySchema.index({ invoiceId: 1 });
+gstTaxEntrySchema.index({ advanceId: 1 });
 appendOnly(gstTaxEntrySchema, 'A tax entry');
 
 export default mongoose.model('GstTaxEntry', gstTaxEntrySchema);

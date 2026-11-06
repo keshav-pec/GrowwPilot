@@ -54,9 +54,10 @@ export default function GstOverviewTab({ today, onOpenSettings }) {
       </div>
       {before && <p className="rounded-lg bg-surface p-3 text-sm text-muted">Your tax record begins in {formatMonth(data.startMonth)}. Earlier months aren’t in it.</p>}
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile {...HEADLINE_TILE} label="Output tax" value={formatMoney(data.net.tax)} hint={formatMonth(data.month)} />
-        <StatTile {...HEADLINE_TILE} label="Taxable value" value={formatMoney(data.net.taxable)} hint="After credit notes and voids" />
+        <StatTile {...HEADLINE_TILE} label="Taxable value" value={formatMoney(data.net.taxable)} hint="After credit notes, voids and advances used" />
+        <StatTile {...HEADLINE_TILE} label="Money collected" value={formatMoney(data.collected)} hint="Received less handed back. Not the same as tax." />
         <StatTile {...HEADLINE_TILE} label="Bills" value={data.bills.count} hint={`${data.creditNotes.count} credit note${data.creditNotes.count === 1 ? '' : 's'}, ${data.voided.count} voided`} />
       </div>
 
@@ -71,6 +72,12 @@ export default function GstOverviewTab({ today, onOpenSettings }) {
               <dd>{formatMoney(data.net.tax)}</dd>
             </div>
           </dl>
+          {(data.advanceTaken.count > 0 || data.advanceUsed.count > 0) && (
+            <dl className="mt-3 flex flex-col gap-1 border-t border-border pt-2 text-xs text-muted">
+              <SummaryRow label={`Included: tax on ${data.advanceTaken.count} advance${data.advanceTaken.count === 1 ? '' : 's'} taken`} value={formatMoney(data.advanceTaken.tax)} muted />
+              <SummaryRow label="Included: advance tax used on bills" value={formatMoney(data.advanceUsed.tax)} muted />
+            </dl>
+          )}
           <p className="mt-3 text-xs text-muted">Please have your tax adviser check these before filing.</p>
         </Card>
 

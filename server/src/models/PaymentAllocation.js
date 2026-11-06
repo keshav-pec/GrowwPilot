@@ -11,6 +11,8 @@ const paymentAllocationSchema = new mongoose.Schema(
     advanceId: ref('CustomerAdvance', { default: null }), // ...or money the customer paid earlier
     invoiceId: ref('Invoice', { required: true }),
     amount: money({ required: true, min: 1 }),
+    // A taxed advance: the tax already paid on this money, used up here so it isn't charged twice
+    advanceTax: { taxable: money(), cgst: money(), sgst: money(), igst: money() },
     status: { type: String, enum: ['VALID', 'REVERSED'], default: 'VALID' },
   },
   { timestamps: true, collection: 'payment_allocations' }
@@ -18,5 +20,6 @@ const paymentAllocationSchema = new mongoose.Schema(
 
 paymentAllocationSchema.index({ invoiceId: 1 });
 paymentAllocationSchema.index({ paymentId: 1 });
+paymentAllocationSchema.index({ advanceId: 1 });
 
 export default mongoose.model('PaymentAllocation', paymentAllocationSchema);

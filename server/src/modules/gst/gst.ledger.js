@@ -1,7 +1,7 @@
 // The permanent tax record. Billing calls this inside its own transaction, so a bill and its entry
 // are saved together or not at all. The same event twice gives the one entry it already has.
 import { DateTime } from 'luxon';
-import { Branch, CreditNote, GstRegistration, GstTaxEntry, Invoice, Refund } from '../../models/index.js';
+import { Branch, CreditNote, CustomerAdvance, GstRegistration, GstTaxEntry, Invoice, PaymentAllocation, Refund } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { registrationFor } from './gst.rules.js';
 
@@ -136,6 +136,68 @@ export async function postCreditNote(ctx, invoice, note, refund, settings, { tax
 }
 
 // ---------------------------------------------------------------------------
+// Taxed advances. Taken: a plus entry with its receipt voucher. Used on a bill: the bill has its own entry, and a minus
+// entry takes off the tax already paid, so the same money is never taxed twice. Given back or reversed: a minus entry.
+// A minus entry only follows an original that is in the record (an advance from before the start month stays out).
+// ---------------------------------------------------------------------------
+function advanceEntry(advance, { type, sourceKey, documentNumber, taxDate, sign, part, actor, invoice, originalEntryId }) {
+  const g = advance.gst;
+  const parts = { taxable: sign * part.taxable, cgst: sign * part.cgst, sgst: sign * part.sgst, igst: sign * part.igst };
+  const total = parts.taxable + parts.cgst + parts.sgst + parts.igst;
+  return {
+    orgId: advance.orgId,
+    branchId: advance.branchId,
+    type,
+    sourceKey,
+    advanceId: advance._id,
+    invoiceId: invoice?._id,
+    invoiceNumber: invoice?.invoiceNumber,
+    originalEntryId,
+    documentNumber,
+    taxDate,
+    period: taxDate.slice(0, 7),
+    gstin: g.gstin,
+    legalName: g.legalName,
+    customerName: g.customerName,
+    buyer: g.buyer?.gstin ? { gstin: g.buyer.gstin, legalName: g.buyer.legalName } : undefined,
+    placeOfSupply: { stateCode: g.placeOfSupply?.stateCode, stateName: g.placeOfSupply?.stateName },
+    interstate: false,
+    lines: [{ kind: 'ADVANCE', name: advance.forServices.map((f) => f.name).join(', '), code: g.code, qty: 1, rateBps: g.rateBps, taxRuleId: g.taxRuleId, itcType: g.itcType, ...parts, total }],
+    ...parts,
+    tax: parts.cgst + parts.sgst + parts.igst,
+    total,
+    createdBy: actor?.userId,
+    createdByName: actor?.userName,
+  };
+}
+
+const wholeAdvance = (advance) => ({ taxable: advance.gst.taxable, cgst: advance.gst.cgst, sgst: advance.gst.sgst, igst: advance.gst.igst });
+const originalOfAdvance = (advance, session) => GstTaxEntry.findOne({ orgId: advance.orgId, sourceKey: `advance:${advance._id}` }).select('_id').session(session).lean();
+
+export async function postAdvanceReceived(ctx, advance, settings, session) {
+  if (settings.gst?.status !== 'ACTIVE' || advance.gst.taxDate.slice(0, 7) < settings.gst.startMonth) return null;
+  return saveOnce(advanceEntry(advance, { type: 'ADVANCE_RECEIVED', sourceKey: `advance:${advance._id}`, documentNumber: advance.receiptNumber, taxDate: advance.gst.taxDate, sign: 1, part: wholeAdvance(advance), actor: actorOf(ctx) }), session);
+}
+
+export async function postAdvanceUsed(ctx, advance, { allocationId, invoice, part, taxDate }, session) {
+  const original = await originalOfAdvance(advance, session);
+  if (!original) return null;
+  return saveOnce(advanceEntry(advance, { type: 'ADVANCE_USED', sourceKey: `advanceuse:${allocationId}`, documentNumber: invoice.invoiceNumber, taxDate, sign: -1, part, actor: actorOf(ctx), invoice, originalEntryId: original._id }), session);
+}
+
+export async function postAdvanceRefunded(ctx, advance, { paymentId, number, part, taxDate }, session) {
+  const original = await originalOfAdvance(advance, session);
+  if (!original) return null;
+  return saveOnce(advanceEntry(advance, { type: 'ADVANCE_REFUNDED', sourceKey: `advancerefund:${paymentId}`, documentNumber: number, taxDate, sign: -1, part, actor: actorOf(ctx), originalEntryId: original._id }), session);
+}
+
+export async function postAdvanceReversed(ctx, advance, { taxDate }, session) {
+  const original = await originalOfAdvance(advance, session);
+  if (!original) return null;
+  return saveOnce(advanceEntry(advance, { type: 'ADVANCE_REVERSED', sourceKey: `advancereverse:${advance._id}`, documentNumber: advance.receiptNumber, taxDate, sign: -1, part: wholeAdvance(advance), actor: actorOf(ctx), originalEntryId: original._id }), session);
+}
+
+// ---------------------------------------------------------------------------
 // Older documents: everything before the salon's record began (settings.gst.recordFrom), from its start month on,
 // is added once. A bill whose GSTIN doesn't match its branch's registration is left out; the nightly check lists it.
 // Each entry stands alone and the unique index keeps it once, so this can stop and start again at any point.
@@ -164,7 +226,11 @@ export async function documentsInScope(orgId, settings, { before = null } = {}) 
   const voids = (await Invoice.find(voidQuery).lean()).map((invoice) => ({ invoice, taxDate: dayOf(invoice.voidedAt, invoice.branchId) })).filter((v) => v.invoice.seller?.gstin && inScope(v.taxDate));
 
   const notes = (await CreditNote.find({ orgId, issuedAt: { $gte: since, ...until } }).lean()).map((note) => ({ note, taxDate: dayOf(note.issuedAt, note.branchId) })).filter((n) => inScope(n.taxDate));
-  return { bills, voids, notes };
+  // Taxed advances in the period, and every use of them
+  const advances = await CustomerAdvance.find({ orgId, taxed: true }).lean();
+  const inPeriod = advances.filter((a) => inScope(a.gst.taxDate));
+  const uses = await PaymentAllocation.find({ advanceId: { $in: inPeriod.map((a) => a._id) }, status: 'VALID' }).lean();
+  return { bills, voids, notes, advances: inPeriod, uses };
 }
 
 export async function addOlderDocuments(orgId, settings) {

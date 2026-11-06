@@ -20,6 +20,8 @@ describe('Understanding the question', () => {
     ['approve a tax rule', 'gst-setup'],
     ['what is igst and place of supply', 'gst-igst'],
     ['where is the sales register', 'gst-record'],
+    ['how do I get a receipt voucher', 'gst-advance'],
+    ['take an advance for named services', 'gst-advance'],
     ['what is the nightly check for gst', 'gst-record'],
     ['new booking', 'book'],
     ['how do i cancel a booking', 'cancel'],

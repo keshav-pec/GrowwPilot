@@ -60,6 +60,12 @@ export function useGstRegister(params) {
 }
 export const downloadGstRegister = (params) => downloadFile('/gst/register', { ...params, format: 'csv' }, 'sales-register.csv');
 
+// Advances for named services: { columns, rows, totals, byGstin, plainLeft }. params: { gstin, open }
+export function useGstAdvances(params) {
+  return useQuery({ queryKey: ['gst-advances', params], queryFn: () => api.get('/gst/advances', { params }).then((res) => res.data), placeholderData: keepPreviousData });
+}
+export const downloadGstAdvances = (params) => downloadFile('/gst/advances', { ...params, format: 'csv' }, 'gst-advances.csv');
+
 // Compares bills with the tax record now, as the night timer does
 export function useRunGstCheck() {
   const queryClient = useQueryClient();

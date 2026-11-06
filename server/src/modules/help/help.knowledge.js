@@ -224,7 +224,16 @@ export const KNOWLEDGE = [
     audiences: EVERYONE,
     keywords: ['*advance', 'deposit', 'paid in advance', 'pay ahead', 'use advance', 'extra money'],
     answer:
-      'On the customer’s profile, click **Take advance** for money paid ahead (for example a bridal deposit). At checkout, the advance shows in the payment box: type how much to use. If a customer pays more than the bill, tick **Keep the extra as an advance**. Advances can be used at any branch.',
+      'On the customer’s profile, click **Take advance** for money paid ahead (for example a bridal deposit). At checkout, the advance shows in the payment box: type how much to use. If a customer pays more than the bill, tick **Keep the extra as an advance**. Plain advances can be used at any branch. Once GST setup is active you can also choose **For named services**: see *Advances for named services*. Owners can **Give back** unused money from the customer’s profile.',
+  },
+
+  {
+    id: 'gst-advance',
+    title: 'Advances for named services',
+    audiences: EVERYONE,
+    keywords: ['advance for named services', '*voucher', 'receipt voucher', 'refund voucher', 'tax on advance', 'gst on advance', 'advance tax', 'package advance', 'give back advance', 'advance under another gstin'],
+    answer:
+      'When GST setup is active, **Take advance** can be **For named services**. Choose the services and the app works out the tax from their approved rule, so nobody picks a rate. The customer gets a numbered **receipt voucher**. When the money is used on a later bill, the tax already paid is used up, so it isn’t taxed twice, and tax is added only on any extra amount. It can only be used at branches on the same GSTIN and state. If the money is for a bill already issued, record the payment on that bill instead: the bill already has the tax. An owner can **give back** unused money, which takes its tax back with a numbered refund voucher. Your tax person should confirm that plain advances, which aren’t taxed when received, are right for your salon.',
   },
 
   {
@@ -281,7 +290,7 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['*nightly', 'tax record', 'sales register', 'output tax', 'gst overview', 'gst menu', 'nightly check', 'gst difference', 'tax entry', 'credit note in gst', 'gst csv'],
     answer:
-      'Open **GST** in the menu. **Overview** shows a month’s output tax for one GSTIN or all of them, and anything that needs attention. **Sales & Returns** lists every bill, credit note and voided bill of the month with its tax: click a row to open the bill, or download a CSV for your accountant. Each issued bill gets a permanent entry saved together with the bill. It is never changed: a refund or a void adds a new minus entry. Every night the app compares bills with the record and lists any difference, with a link to the bill. Branch owners see this for their own branches only if the business owner switches it on in Billing settings.',
+      'Open **GST** in the menu. **Overview** shows a month’s output tax for one GSTIN or all of them, and anything that needs attention. **Sales & Returns** lists every bill, credit note, voided bill and advance entry of the month with its tax: click a row to open it, or download a CSV for your accountant. **Advances** shows what was taken, used and left, with tax, for each GSTIN. Each issued bill gets a permanent entry saved together with the bill. It is never changed: a refund or a void adds a new minus entry. Every night the app compares bills with the record and lists any difference, with a link to the bill. Branch owners see this for their own branches only if the business owner switches it on in Billing settings.',
     link: { label: 'GST', to: '/app/gst' },
   },
 

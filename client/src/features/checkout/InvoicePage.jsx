@@ -233,6 +233,7 @@ export default function InvoicePage() {
                   <span>
                     <span className={p.status === 'REVERSED' ? 'line-through' : ''}>{p.kind === 'PAYMENT' ? METHOD_LABEL[p.method] : (p.label ?? p.kind)}</span>
                     {p.reference && <span className="text-muted"> · {p.reference}</span>}
+                    {p.taxAlreadyPaid > 0 && <span className="text-xs text-muted"> · includes {formatMoney(p.taxAlreadyPaid)} GST already paid</span>}
                     <span className="text-xs text-muted"> · {formatDateTime(p.receivedAt, branch.timezone)}</span>
                     {p.status === 'REVERSED' && <span className="block text-xs">Reversed by {p.reversal?.byName}: {p.reversal?.reason}</span>}
                     {permissions.reversePayments && p.kind === 'PAYMENT' && p.status === 'VALID' && (

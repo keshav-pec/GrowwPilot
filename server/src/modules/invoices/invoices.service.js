@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import {
-  ActivityLog, Appointment, Branch, Counter, Customer, InventorySku, InventorySkuBranch, Invoice, Organization, Payment, PaymentAllocation, Refund,
+  ActivityLog, Appointment, Branch, Counter, Customer, CustomerAdvance, InventorySku, InventorySkuBranch, Invoice, Organization, Payment, PaymentAllocation, Refund,
 } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { scoped } from '../../utils/scoped.js';
@@ -25,6 +25,7 @@ import { makeShareToken, readShareToken, SHARE_DAYS } from './share.js';
 import { redeemOffer, restoreOffer } from '../occasions/checkout/redeem.js';
 import { billContext, gstSetupActive, missingRuleBlocker } from '../gst/gst.billing.js';
 import { postBill, postVoid } from '../gst/gst.ledger.js';
+import { advanceFitsBill, sellerOfBill } from '../gst/gst.advances.js';
 
 export { branchCode } from '../billing/settings.service.js';
 
@@ -188,13 +189,18 @@ function limitInfo(ctx, invoice, settings) {
 async function paymentsOf(invoiceId, session = null) {
   const allocations = await PaymentAllocation.find({ invoiceId }).sort({ createdAt: 1 }).session(session).lean();
   if (allocations.length === 0) return [];
+  const advances = await CustomerAdvance.find({ _id: { $in: allocations.map((a) => a.advanceId).filter(Boolean) } }).select('receiptNumber').session(session).lean();
   const payments = await Payment.find({ _id: { $in: allocations.map((a) => a.paymentId).filter(Boolean) } })
     .populate('recordedBy', 'name')
     .session(session)
     .lean();
   return allocations.map((a) => {
     const from = allocationSource(a); // money the customer already had (an advance...)
-    if (from) return { _id: a._id, kind: from, method: from, label: PAYMENT_SOURCES[from].label, amount: a.amount, receivedAt: a.createdAt, source: from, status: a.status };
+    if (from) {
+      const receipt = advances.find((x) => String(x._id) === String(a.advanceId))?.receiptNumber;
+      const taxPaid = (a.advanceTax?.cgst ?? 0) + (a.advanceTax?.sgst ?? 0) + (a.advanceTax?.igst ?? 0);
+      return { _id: a._id, kind: from, method: from, label: PAYMENT_SOURCES[from].label, amount: a.amount, receivedAt: a.createdAt, source: from, status: a.status, reference: receipt, taxAlreadyPaid: taxPaid || undefined };
+    }
     const p = payments.find((x) => String(x._id) === String(a.paymentId));
     return {
       _id: p._id,
@@ -228,7 +234,7 @@ export async function present(ctx, invoice, { session = null, settings, limits, 
   const result = {
     ...shown,
     payments: await paymentsOf(invoice._id, session),
-    advanceBalance: customerId ? (await advancesOf(ctx, customerId, session)).balance : 0,
+    ...(customerId ? await advancesForBill(ctx, customerId, shown, settings, session) : { advanceBalance: 0, advanceElsewhere: 0 }),
   };
 
   if (shown.status === 'DRAFT') {
@@ -250,6 +256,19 @@ export async function present(ctx, invoice, { session = null, settings, limits, 
     };
   }
   return result;
+}
+
+// What this customer's advances can pay on this bill. A taxed advance only pays bills under its own GSTIN and place of supply.
+async function advancesForBill(ctx, customerId, bill, settings, session) {
+  const { advances, balance } = await advancesOf(ctx, customerId, session);
+  if (!advances.some((a) => a.taxed)) return { advanceBalance: balance, advanceElsewhere: 0 };
+  let seller = sellerOfBill(bill);
+  if (bill.status === 'DRAFT') {
+    const gst = gstSetupActive(settings) ? await billContext(ctx, { branchId: bill.branchId?._id ?? bill.branchId, place: bill.placeOfSupply?.chosen ? bill.placeOfSupply.stateCode : null }, session) : null;
+    seller = { gstin: gst?.registration?.gstin ?? null, place: gst?.placeOfSupply.stateCode ?? null };
+  }
+  const usable = advances.filter((a) => advanceFitsBill(a, seller)).reduce((sum, a) => sum + a.remaining, 0);
+  return { advanceBalance: usable, advanceElsewhere: balance - usable };
 }
 
 // The worked-out fields of an unsaved preview (quote), laid over the saved draft

@@ -54,6 +54,7 @@ export default function RecordPaymentModal({ invoice, onClose }) {
           </div>
         </div>
       )}
+      {invoice.advanceElsewhere > 0 && <p className="mb-3 text-xs text-muted">{formatMoney(invoice.advanceElsewhere)} of this customer’s advance was taxed under another GSTIN or state, so it can’t be used on this bill.</p>}
       <PaymentRows rows={rows} onChange={setRows} total={Math.max(invoice.balanceDue - advanceUse, 0)} />
       <p className={`mt-3 text-sm font-medium ${left < 0 ? 'text-danger' : left > 0 ? 'text-orange' : 'text-brown'}`}>
         {left < 0 ? `Too much by ${formatMoney(-left)}` : left > 0 ? `${formatMoney(left)} will still be due` : 'This pays the bill in full'}

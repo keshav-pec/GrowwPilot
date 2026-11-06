@@ -34,6 +34,7 @@ import OccasionsPage from '../features/occasions/worklist/OccasionsPage';
 import OccasionReportsPage from '../features/occasions/reports/OccasionReportsPage';
 import SaleEditPage from '../features/billing/SaleEditPage';
 import RefundPage from '../features/billing/RefundPage';
+import AdvancePage from '../features/billing/AdvancePage';
 import CashPage from '../features/billing/CashPage';
 import DuesPage from '../features/billing/DuesPage';
 import BillingReportsPage from '../features/billing/BillingReportsPage';
@@ -114,6 +115,7 @@ export const router = createBrowserRouter([
               { path: 'bills', element: <BillsListPage /> },
               { path: 'bills/:id/edit', element: <SaleEditPage /> }, // a product-only sale while it's a draft
               { path: 'refunds/:id', element: <RefundPage /> }, // credit note or refund receipt
+              { path: 'advances/:id', element: <AdvancePage /> }, // receipt voucher
               { path: 'cash', element: <CashPage /> },
               { path: 'dues', element: <DuesPage /> },
               { path: 'billing/reports', element: <BillingReportsPage /> }, // front desk: today's collections only
