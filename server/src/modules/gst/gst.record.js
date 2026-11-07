@@ -1,5 +1,5 @@
 // What owners read from the tax record: the overview and the sales register.
-import { Branch, CustomerAdvance, GstCheck, GstRegistration, GstTaxEntry, Payment, PaymentAllocation } from '../../models/index.js';
+import { Branch, CustomerAdvance, GstCheck, GstPurchaseBill, GstRegistration, GstTaxEntry, Payment, PaymentAllocation } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { oid, scoped } from '../../utils/scoped.js';
 import { DateTime } from 'luxon';
@@ -94,6 +94,7 @@ export async function overview(ctx, { month, gstin }) {
     advanceTaken: byType.ADVANCE_RECEIVED ?? NO_TOTALS,
     advanceUsed: byType.ADVANCE_USED ?? NO_TOTALS,
     collected: await moneyCollected(ctx, period, gstin, registrations),
+    purchasesToDecide: await GstPurchaseBill.countDocuments(scoped(ctx, { period, gstin: gstin ?? { $in: gstins.map((g) => g.gstin) }, 'cancelled.at': null, decisionId: null })),
     check: { ranAt: check?.ranAt ?? null, checked: check?.checked ?? 0, differences },
     setupProblems: problems,
     canRunCheck: Boolean(ctx.isPrimaryOwner),

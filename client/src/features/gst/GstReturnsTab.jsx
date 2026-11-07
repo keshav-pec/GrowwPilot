@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { refusalText, useGstReturns, usePrepareReturn } from '../../api/gst';
+import { refusalText, useGstReturns, usePrepareReturn, usePrepareWorksheet } from '../../api/gst';
 import { formatMoney } from '../../lib/money';
 import { formatMonth } from '../../lib/time';
 import { newRequestKey } from '../../lib/requestKey';
 import { Badge, Button, EmptyState, PageSpinner, Select, Table } from '../../components/ui';
-import { RETURN_STATUS } from './returnStatus';
+import { RETURN_STATUS, WORKSHEET_STATUS } from './returnStatus';
 
 // GSTR-1: each month of a GSTIN and where its return stands. Returns are per GSTIN, not per branch.
 export default function GstReturnsTab() {
@@ -14,6 +14,7 @@ export default function GstReturnsTab() {
   const [gstin, setGstin] = useState('');
   const query = useGstReturns({ gstin: gstin || undefined });
   const prepare = usePrepareReturn();
+  const prepareSheet = usePrepareWorksheet();
   if (query.isPending) return <PageSpinner />;
   if (query.isError) return <EmptyState title="Couldn’t load returns" message={query.error.message} />;
   const data = query.data;
@@ -24,6 +25,16 @@ export default function GstReturnsTab() {
       { key: newRequestKey(), gstin: data.gstin, period: month.period },
       {
         onSuccess: ({ returnId }) => navigate(`/app/gst/returns/${returnId}`),
+        onError: (err) => toast.error(refusalText(err)),
+      }
+    );
+  }
+
+  function startSheet(month) {
+    prepareSheet.mutate(
+      { key: newRequestKey(), gstin: data.gstin, period: month.period },
+      {
+        onSuccess: ({ worksheetId }) => navigate(`/app/gst/worksheets/${worksheetId}`),
         onError: (err) => toast.error(refusalText(err)),
       }
     );
@@ -46,6 +57,20 @@ export default function GstReturnsTab() {
     { key: 'tax', header: 'Net tax', render: (m) => (m.tax == null ? '—' : formatMoney(m.tax)) },
     { key: 'arn', header: 'ARN', render: (m) => (m.arn ? <span className="font-mono text-xs">{m.arn}</span> : '—') },
     {
+      key: 'gstr3b',
+      header: 'GSTR-3B',
+      render: (m) =>
+        m.worksheetId ? (
+          <button type="button" onClick={() => navigate(`/app/gst/worksheets/${m.worksheetId}`)}>
+            <Badge tone={WORKSHEET_STATUS[m.worksheetStatus].tone}>{WORKSHEET_STATUS[m.worksheetStatus].label}</Badge>
+          </button>
+        ) : (
+          data.canWork && (
+            <Button size="sm" variant="secondary" loading={prepareSheet.isPending} onClick={() => startSheet(m)}>Working sheet</Button>
+          )
+        ),
+    },
+    {
       key: 'actions',
       header: '',
       render: (m) =>
@@ -65,7 +90,7 @@ export default function GstReturnsTab() {
         <Select label="GSTIN" options={data.gstins.map((g) => ({ value: g.gstin, label: `${g.gstin} · ${g.legalName}` }))} value={data.gstin ?? ''} onChange={(e) => setGstin(e.target.value)} />
       </div>
       <Table columns={columns} rows={data.months} rowKey="period" empty={<EmptyState title="No months yet" message="Months appear from your start month on." />} />
-      <p className="text-xs text-muted">The app prepares the return and its file. You upload and file it on the GST portal.</p>
+      <p className="text-xs text-muted">The app prepares the return, its file and the working sheet. You upload, pay and file on the GST portal.</p>
     </div>
   );
 }

@@ -14,3 +14,9 @@ export const ADJUSTMENT_STATUS = {
   FILED: { label: 'Filed, manually confirmed', tone: 'brown' },
   NEEDS_REVIEW: { label: 'Needs your tax person', tone: 'danger' },
 };
+// The GSTR-3B working sheet. Filed says nothing about money: the tax is paid on the portal.
+export const WORKSHEET_STATUS = {
+  DRAFT: { label: 'Sheet in draft', tone: 'yellow' },
+  APPROVED: { label: 'Sheet approved, not filed', tone: 'orange' },
+  FILED: { label: 'Filed, manually confirmed', tone: 'brown' },
+};

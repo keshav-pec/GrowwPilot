@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { DateTime } from 'luxon';
-import { BillingSettings, Branch, Counter, CustomerAdvance, GstAdjustment, GstRegistration, GstReturn, GstTaxEntry, GstTaxRule, InventorySku, Invoice, Service } from '../../models/index.js';
+import { BillingSettings, Branch, Counter, CustomerAdvance, GstAdjustment, GstRegistration, GstReturn, GstTaxEntry, GstTaxRule, GstWorksheet, InventorySku, Invoice, Service } from '../../models/index.js';
 import { AppError } from '../../utils/AppError.js';
 import { oid, scoped } from '../../utils/scoped.js';
 import { dayRangeUTC, todayInZone } from '../../utils/time.js';
@@ -23,22 +23,22 @@ import { reviewRows } from './gstr1.review.js';
 
 const INDIA = 'Asia/Kolkata';
 
-async function myGstins(ctx, session = null) {
+export async function myGstins(ctx, session = null) {
   const registrations = await GstRegistration.find(scoped(ctx)).session(session).lean();
   const mine = registrations.filter((r) => ctx.isPrimaryOwner || r.branches.some((link) => ctx.allowedBranchIds.includes(String(link.branchId))));
   return { registrations, mine };
 }
 
 // The business owner sees all. A branch owner sees their GSTINs' returns if switched on, and works on them only if that is switched on too.
-function mayView(ctx, settings) {
+export function mayView(ctx, settings) {
   if (ctx.isPrimaryOwner) return;
   if (ctx.role !== 'OWNER' || !settings.branchOwners?.viewGst) throw new AppError(403, 'FORBIDDEN', 'The business owner hasn’t given you access to GST returns');
 }
-function mayWork(ctx, settings) {
+export function mayWork(ctx, settings) {
   if (ctx.isPrimaryOwner) return;
   if (ctx.role !== 'OWNER' || !settings.branchOwners?.approveReturns) throw new AppError(403, 'FORBIDDEN', 'Only the business owner can do this');
 }
-const canWork = (ctx, settings) => Boolean(ctx.isPrimaryOwner || (ctx.role === 'OWNER' && settings.branchOwners?.approveReturns));
+export const canWork = (ctx, settings) => Boolean(ctx.isPrimaryOwner || (ctx.role === 'OWNER' && settings.branchOwners?.approveReturns));
 
 async function loadReturn(ctx, id, session = null) {
   const found = await GstReturn.findOne(scoped(ctx, { _id: id })).session(session).lean();
@@ -281,20 +281,6 @@ export async function recordFiling(ctx, id, { arn, filedOn }, proof, key) {
   });
 }
 
-// Once GSTR-3B of the month is filed, GSTR-1A closes for that month
-export async function recordGstr3b(ctx, id, { arn, filedOn }, key) {
-  const settings = await getBillingSettings(ctx);
-  mayWork(ctx, settings);
-  const first = await loadReturn(ctx, id);
-  if (first.status !== 'FILED') throw new AppError(409, 'NOT_FILED', 'Record GSTR-1 as filed first');
-  await assertFilingDate(ctx, first.period, filedOn);
-  return runOnce(ctx, { key, operation: 'gst.return.gstr3b' }, async (session) => {
-    await GstReturn.updateOne({ _id: first._id, status: 'FILED' }, { $set: { gstr3b: { arn, filedOn, recordedByName: ctx.userName, recordedAt: new Date() } } }, { session });
-    await logActivity(ctx, { action: 'billing.gst_3b_recorded', summary: `Recorded GSTR-3B for ${first.gstin}, ${first.period} as filed, ARN ${arn}`, after: { returnId: first._id, arn } }, session);
-    return { recorded: true };
-  });
-}
-
 // ---- after filing ----------------------------------------------------------
 
 // Entries of a filed month that its return (and any correction since) doesn't cover
@@ -387,6 +373,7 @@ export async function listReturns(ctx, { gstin }) {
     for (let m = DateTime.fromISO(`${thisMonth}-01`); m.toFormat('yyyy-MM') >= settings.gst.startMonth && months.length < 36; m = m.minus({ months: 1 })) months.push(m.toFormat('yyyy-MM'));
   }
   const latest = await GstReturn.find(scoped(ctx, { gstin: chosen, superseded: false })).select('period revision status totals filing.arn issues').lean();
+  const sheets = await GstWorksheet.find(scoped(ctx, { gstin: chosen, superseded: false })).select('period revision status filing.arn').lean();
   return {
     active: gstSetupActive(settings),
     gstins,
@@ -394,7 +381,8 @@ export async function listReturns(ctx, { gstin }) {
     canWork: canWork(ctx, settings),
     months: months.map((period) => {
       const r = latest.find((x) => x.period === period);
-      return { period, returnId: r?._id ?? null, revision: r?.revision ?? null, status: r?.status ?? 'NOT_PREPARED', taxable: r?.totals?.taxable ?? null, tax: r?.totals?.tax ?? null, arn: r?.filing?.arn ?? null, toFix: r?.issues?.filter((i) => i.severity === 'BLOCKER').length ?? 0 };
+      const sheet = sheets.find((x) => x.period === period);
+      return { period, returnId: r?._id ?? null, revision: r?.revision ?? null, status: r?.status ?? 'NOT_PREPARED', taxable: r?.totals?.taxable ?? null, tax: r?.totals?.tax ?? null, arn: r?.filing?.arn ?? null, toFix: r?.issues?.filter((i) => i.severity === 'BLOCKER').length ?? 0, worksheetId: sheet?._id ?? null, worksheetStatus: sheet?.status ?? null };
     }),
   };
 }
@@ -441,7 +429,7 @@ export async function returnTrail(ctx, id, row) {
 export async function filingProof(ctx, proofId) {
   const settings = await getBillingSettings(ctx);
   mayView(ctx, settings);
-  const owner = (await GstReturn.findOne(scoped(ctx, { 'filing.proofFileId': proofId })).select('gstin').lean()) ?? (await GstAdjustment.findOne(scoped(ctx, { 'filing.proofFileId': proofId })).select('gstin').lean());
+  const owner = (await GstReturn.findOne(scoped(ctx, { 'filing.proofFileId': proofId })).select('gstin').lean()) ?? (await GstAdjustment.findOne(scoped(ctx, { 'filing.proofFileId': proofId })).select('gstin').lean()) ?? (await GstWorksheet.findOne(scoped(ctx, { 'filing.proofFileId': proofId })).select('gstin').lean());
   const { mine } = await myGstins(ctx);
   if (!owner || !mine.some((r) => r.gstin === owner.gstin)) throw new AppError(404, 'NOT_FOUND', 'Proof not found');
   const proof = await openProof(proofId, ctx.orgId);

@@ -37,3 +37,11 @@ export const ADJUSTMENT_STATUSES = ['DRAFT', 'EXPORTED', 'FILED', 'NEEDS_REVIEW'
 export const UNIT_CODES = ['BAG', 'BAL', 'BDL', 'BKL', 'BOU', 'BOX', 'BTL', 'BUN', 'CAN', 'CBM', 'CCM', 'CMS', 'CTN', 'DOZ', 'DRM', 'GGK', 'GMS', 'GRS', 'GYD', 'KGS', 'KLR', 'KME', 'LTR', 'MLT', 'MTR', 'MTS', 'NOS', 'OTH', 'PAC', 'PCS', 'PRS', 'QTL', 'ROL', 'SET', 'SQF', 'SQM', 'SQY', 'TBS', 'TGM', 'THD', 'TON', 'TUB', 'UGS', 'UNT', 'YDS'];
 // What a salon's own word for a unit usually means. Only a suggestion on screen: the owner confirms it.
 export const UNIT_SUGGESTIONS = { bottle: 'BTL', tube: 'TUB', tub: 'TUB', box: 'BOX', piece: 'PCS', pcs: 'PCS', pack: 'PAC', packet: 'PAC', kit: 'SET', set: 'SET', can: 'CAN', roll: 'ROL', pair: 'PRS', bag: 'BAG', litre: 'LTR', ml: 'MLT', kg: 'KGS', g: 'GMS', gram: 'GMS' };
+
+// What a purchase is used for decides its input tax credit
+export const PURCHASE_USES = ['NO_ITC_SERVICES', 'RESALE', 'MIXED', 'OTHER'];
+// Bills and GSTR-2B rows compared. NOT_CHECKED: no GSTR-2B imported for that month yet.
+export const MATCH_STATUSES = ['MATCHED', 'MISSING_IN_2B', 'MISSING_IN_BOOKS', 'AMOUNT_MISMATCH', 'DUPLICATE', 'REVIEW_REQUIRED', 'NOT_CHECKED'];
+// A small rounding gap between a bill and GSTR-2B still counts as a match, in each of taxable, IGST, CGST and SGST
+export const MATCH_TOLERANCE_PAISE = 100;
+export const WORKSHEET_STATUSES = ['DRAFT', 'APPROVED', 'FILED'];

@@ -10,6 +10,7 @@ const inventorySupplierSchema = new mongoose.Schema(
     contactName: { type: String, trim: true },
     phone: { type: String, trim: true },
     email: { type: String, trim: true, lowercase: true },
+    gstin: { type: String, trim: true, uppercase: true }, // fills in purchase bills for GST
     paymentTerms: { type: String, trim: true }, // e.g. "30 days", "Cash on delivery"
     leadTimeDays: wholeNumber({ default: null }), // how many days a delivery usually takes
     notes: { type: String, trim: true },

@@ -47,6 +47,7 @@ function SupplierFormModal({ supplier, onClose }) {
     contactName: supplier?.contactName ?? '',
     phone: supplier?.phone ?? '',
     email: supplier?.email ?? '',
+    gstin: supplier?.gstin ?? '',
     paymentTerms: supplier?.paymentTerms ?? '',
     leadTimeDays: supplier?.leadTimeDays != null ? String(supplier.leadTimeDays) : '',
     notes: supplier?.notes ?? '',
@@ -88,6 +89,7 @@ function SupplierFormModal({ supplier, onClose }) {
         <Input id="sup-name" label="Name" value={values.name} onChange={set('name')} />
         <Input id="sup-contact" label="Contact person (optional)" value={values.contactName} onChange={set('contactName')} />
         <Input id="sup-phone" label="Phone (optional)" value={values.phone} onChange={set('phone')} />
+        <Input id="sup-gstin" label="GSTIN (optional)" maxLength={15} hint="Fills in purchase bills for GST" value={values.gstin} onChange={(e) => setValues((v) => ({ ...v, gstin: e.target.value.toUpperCase().replace(/\s/g, '') }))} />
         <Input id="sup-email" label="Email (optional)" value={values.email} onChange={set('email')} />
         <Input id="sup-terms" label="Payment terms (optional)" placeholder="e.g. 30 days" value={values.paymentTerms} onChange={set('paymentTerms')} />
         <Input id="sup-lead" label="Delivery takes (days)" inputMode="numeric" value={values.leadTimeDays} onChange={set('leadTimeDays')} />

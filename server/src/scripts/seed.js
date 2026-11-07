@@ -38,6 +38,7 @@ import { runForOrg } from '../modules/occasions/engine/scheduler.js';
 import { migrateBilling } from './migrate-billing-v2.js';
 import { migrateOccasions } from './migrate-occasions-v1.js';
 import { saveSetup } from '../modules/gst/gst.service.js';
+import { addPurchase, import2b } from '../modules/gst/gst.purchases.js';
 import { DESERT_ROSE_CUSTOMERS, DESERT_ROSE_SERVICES, GLAMOUR_CUSTOMERS, GLAMOUR_SERVICES, LEADS } from './seed-data.js';
 
 const { Organization, Branch, User, Staff, Service, Combo, Customer, Appointment, Invoice, Lead, Attendance, Counter } = models;
@@ -466,6 +467,19 @@ await saveSetup(owner, { scheme: 'REGULAR', startMonth: now.setZone('Asia/Kolkat
 const halfRefunded = await bill(desk, await visit(glamour, 'Andheri', gc['Karan Malhotra'], [gs.Haircut, staff.Rahul]), [{ method: 'CASH', amount: gs.Haircut.price }]);
 await createRefund(owner, { invoiceId: halfRefunded._id, lines: [{ lineId: String(halfRefunded.lines[0]._id), partAmount: Math.round(gs.Haircut.price / 2) }], reason: 'Customer only wanted half the cut redone' }, key());
 await models.BillingSettings.updateOne({ orgId: glamour._id }, { $set: { 'branchOwners.viewGst': true } }); // Vikram can see GST for Bandra
+// Purchases to try out: one bill that matches GSTR-2B and one that doesn't, and a GSTR-2B row that isn't in the books
+const gstMonth = now.setZone('Asia/Kolkata').toFormat('yyyy-MM');
+const billDay = now.setZone('Asia/Kolkata').toISODate();
+const andheriGstin = demoGstin('27AAKCG4821M1Z');
+const supplierGstin = demoGstin('27AABCS1429B1Z');
+const demoBill = (billNumber, taxable, use) => addPurchase(owner, { gstin: andheriGstin, period: gstMonth, supplierName: 'Glow Salon Supplies', supplierGstin, billNumber, billDate: billDay, taxable: toPaise(taxable), igst: 0, cgst: toPaise(taxable * 0.09), sgst: toPaise(taxable * 0.09), use }, key());
+await demoBill('GSS-009', 500, 'NO_ITC_SERVICES');
+await demoBill('GSS-111', 1000, 'RESALE');
+const demo2b = { data: { gstin: andheriGstin, rtnprd: now.setZone('Asia/Kolkata').toFormat('MMyyyy'), docdata: { b2b: [{ ctin: supplierGstin, trdnm: 'Glow Salon Supplies', inv: [
+  { inum: 'GSS-009', dt: now.setZone('Asia/Kolkata').toFormat('dd-MM-yyyy'), val: 590, pos: '27', typ: 'R', itcavl: 'Y', items: [{ num: 1, rt: 18, txval: 500, igst: 0, cgst: 45, sgst: 45, cess: 0 }] },
+  { inum: 'GSS-222', dt: now.setZone('Asia/Kolkata').toFormat('dd-MM-yyyy'), val: 236, pos: '27', typ: 'R', itcavl: 'Y', items: [{ num: 1, rt: 18, txval: 200, igst: 0, cgst: 18, sgst: 18, cess: 0 }] },
+] }] } } };
+await import2b(owner, { gstin: andheriGstin, period: gstMonth }, { originalname: 'GSTR2B-demo.json', buffer: Buffer.from(JSON.stringify(demo2b)) }, key());
 await Customer.updateOne({ _id: gc['Amit Verma']._id }, { $set: { gstin: demoGstin('29AABCT3518Q1Z'), gstLegalName: 'Verma Traders LLP' } });
 
 // Yesterday's cash days, counted and closed (Andheri was ₹50 short); today's are left for the desk to open

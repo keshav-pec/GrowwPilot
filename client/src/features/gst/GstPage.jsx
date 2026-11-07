@@ -5,12 +5,14 @@ import GstOverviewTab from './GstOverviewTab';
 import GstSalesTab from './GstSalesTab';
 import GstAdvancesTab from './GstAdvancesTab';
 import GstReturnsTab from './GstReturnsTab';
+import GstPurchasesTab from './GstPurchasesTab';
 import GstSettingsTab from './GstSettingsTab';
 
 const RECORD_TABS = [
   { value: 'overview', label: 'Overview' },
   { value: 'sales', label: 'Sales & Returns' },
   { value: 'advances', label: 'Advances' },
+  { value: 'purchases', label: 'Purchases & ITC' },
   { value: 'returns', label: 'Returns' },
 ];
 const SETTINGS_TAB = { value: 'settings', label: 'Settings' };
@@ -35,6 +37,7 @@ export default function GstPage() {
       {tab === 'overview' && <GstOverviewTab today={setup.today} onOpenSettings={() => setSearchParams({ tab: 'settings' })} />}
       {tab === 'sales' && <GstSalesTab today={setup.today} />}
       {tab === 'advances' && <GstAdvancesTab />}
+      {tab === 'purchases' && <GstPurchasesTab today={setup.today} initialMonth={searchParams.get('month')} />}
       {tab === 'returns' && <GstReturnsTab />}
       {tab === 'settings' && <GstSettingsTab setup={setup} />}
     </>

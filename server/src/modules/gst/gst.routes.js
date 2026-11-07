@@ -13,6 +13,8 @@ import { AppError } from '../../utils/AppError.js';
 import { MAX_PROOF_BYTES, PROOF_TYPES } from './gst.proofs.js';
 import * as gstr1 from './gstr1.service.js';
 import { reviewCsv, writeReviewPdf } from './gstr1.review.js';
+import * as purchases from './gst.purchases.js';
+import * as worksheet from './gst.worksheet.js';
 
 // /api/gst — GST setup. Owners only: branch owners can look, the business owner changes things (checked in the service).
 const router = Router();
@@ -116,9 +118,6 @@ router.post('/returns/:id/reject', once, validate({ body: schemas.rejectSchema }
 router.post('/returns/:id/file', once, receiveProof, validate({ body: schemas.filingSchema }), async (req, res) => {
   res.json(await gstr1.recordFiling(req.ctx, req.params.id, req.valid.body, req.file, req.idempotencyKey));
 });
-router.post('/returns/:id/gstr3b', once, validate({ body: schemas.filingSchema }), async (req, res) => {
-  res.json(await gstr1.recordGstr3b(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
-});
 router.post('/returns/:id/adjustments', once, validate({ body: schemas.adjustmentSchema }), async (req, res) => {
   res.status(201).json(await gstr1.createAdjustment(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
 });
@@ -134,6 +133,56 @@ router.get('/proofs/:id', async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${proof.file.filename.replace(/[^\w.-]/g, '_')}"`);
   proof.stream.pipe(res);
 });
+// ---- Purchases & ITC ----
+const upload2b = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, done) => (/\.(json|csv)$/i.test(file.originalname) ? done(null, true) : done(new AppError(400, 'FILE_NOT_READABLE', 'Choose a .json or .csv file'))),
+});
+const receive2b = (req, res, next) =>
+  upload2b.single('file')(req, res, (err) => {
+    if (err?.code === 'LIMIT_FILE_SIZE') return next(new AppError(400, 'FILE_NOT_READABLE', 'The file can be at most 10 MB'));
+    next(err);
+  });
+router.get('/purchases', validate({ query: schemas.purchasesQuerySchema }), async (req, res) => {
+  res.json(await purchases.purchasesScreen(req.ctx, req.valid.query));
+});
+router.post('/purchases', once, validate({ body: schemas.addPurchaseSchema }), async (req, res) => {
+  res.status(201).json(await purchases.addPurchase(req.ctx, req.valid.body, req.idempotencyKey));
+});
+router.post('/purchases/import-2b', once, receive2b, validate({ body: schemas.import2bSchema }), async (req, res) => {
+  res.json(await purchases.import2b(req.ctx, req.valid.body, req.file, req.idempotencyKey));
+});
+router.post('/purchases/not-claimed', once, validate({ body: schemas.decideMissingSchema }), async (req, res) => {
+  res.status(201).json(await purchases.decideMissingRow(req.ctx, req.valid.body, req.idempotencyKey));
+});
+router.post('/purchases/:id/cancel', once, validate({ body: schemas.cancelPurchaseSchema }), async (req, res) => {
+  res.json(await purchases.cancelPurchase(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
+});
+router.post('/purchases/:id/decision', once, validate({ body: schemas.decideSchema }), async (req, res) => {
+  res.status(201).json(await purchases.decideItc(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
+});
+
+// ---- GSTR-3B working sheet ----
+router.post('/worksheets', once, validate({ body: schemas.worksheetSchema }), async (req, res) => {
+  res.status(201).json(await worksheet.prepareWorksheet(req.ctx, req.valid.body, req.idempotencyKey));
+});
+router.get('/worksheets/:id', async (req, res) => {
+  res.json(await worksheet.getWorksheet(req.ctx, req.params.id));
+});
+router.get('/worksheets/:id/trail', validate({ query: schemas.sheetTrailSchema }), async (req, res) => {
+  res.json(await worksheet.worksheetTrail(req.ctx, req.params.id, req.valid.query.row));
+});
+router.put('/worksheets/:id/portal', once, validate({ body: schemas.portalSchema }), async (req, res) => {
+  res.json(await worksheet.savePortalFigures(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
+});
+router.post('/worksheets/:id/approve', once, validate({ body: schemas.approveSheetSchema }), async (req, res) => {
+  res.json(await worksheet.approveWorksheet(req.ctx, req.params.id, req.valid.body, req.idempotencyKey));
+});
+router.post('/worksheets/:id/file', once, receiveProof, validate({ body: schemas.filingSchema }), async (req, res) => {
+  res.json(await worksheet.recordWorksheetFiling(req.ctx, req.params.id, req.valid.body, req.file, req.idempotencyKey));
+});
+
 router.patch('/units', once, validate({ body: schemas.unitsSchema }), change((req) => gstr1.saveUnitCodes(req.ctx, req.valid.body, req.idempotencyKey)));
 
 export default router;

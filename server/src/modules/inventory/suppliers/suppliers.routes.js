@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { validate } from '../../../middleware/validate.js';
 import { requireIdempotencyKey } from '../../../middleware/idempotency.js';
 import { email, optionalPhone } from '../../../utils/schemas.js';
+import { isValidGstin } from '../../../config/billing.js';
 import * as service from './suppliers.service.js';
 
 // /api/inventory/suppliers
@@ -14,6 +15,7 @@ const fields = {
   contactName: text(100),
   phone: optionalPhone,
   email: email.optional().or(z.literal('').transform(() => undefined)),
+  gstin: z.string().trim().toUpperCase().refine((v) => v === '' || isValidGstin(v), 'This GSTIN doesn’t look right. Please check it.').optional(),
   paymentTerms: text(100),
   leadTimeDays: z.number().int().min(0).max(365).nullable().optional(),
   notes: text(500),

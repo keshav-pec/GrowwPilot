@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { CheckCircle2, ChevronDown, ChevronRight, CircleAlert, Download, Info, TriangleAlert } from 'lucide-react';
-import { downloadProof, downloadReview, refusalText, useApproveReturn, useCreateAdjustment, useExportFile, useGstReturn, usePrepareReturn, useRecordFiling, useRecordGstr3b, useRejectReturn, useReturnTrail } from '../../api/gst';
+import { downloadProof, downloadReview, refusalText, useApproveReturn, useCreateAdjustment, useExportFile, useGstReturn, usePrepareReturn, useRecordFiling, useRejectReturn, useReturnTrail } from '../../api/gst';
 import { formatMoney } from '../../lib/money';
 import { formatDate, formatDateTime, formatMonth } from '../../lib/time';
 import { newRequestKey } from '../../lib/requestKey';
@@ -22,7 +22,7 @@ export default function GstReturnPage() {
 
 function ReturnScreen({ found }) {
   const navigate = useNavigate();
-  const [asking, setAsking] = useState(null); // 'file' | 'reject' | 'gstr3b' | 'adjust' | { adjustmentId }
+  const [asking, setAsking] = useState(null); // 'file' | 'reject' | 'adjust' | { adjustmentId }
   const prepare = usePrepareReturn();
   const approve = useApproveReturn();
   const exportFile = useExportFile();
@@ -106,7 +106,9 @@ function ReturnScreen({ found }) {
                   <Button variant="secondary" onClick={() => setAsking('reject')}>Portal rejected it</Button>
                 </>
               )}
-              {filed && !found.gstr3b?.arn && <Button variant="secondary" onClick={() => setAsking('gstr3b')}>GSTR-3B is filed</Button>}
+              {filed && !found.gstr3b?.arn && (
+                <Link to="/app/gst?tab=returns" className="text-sm text-brown underline">GSTR-3B working sheet</Link>
+              )}
               {filed && <Button variant="secondary" onClick={() => setAsking('adjust')}>Create adjustment case</Button>}
             </div>
             <p className="mt-2 text-xs text-muted">
@@ -231,7 +233,6 @@ function ReturnScreen({ found }) {
       {asking === 'file' && <FilingModal title="Record filing" path={`returns/${found._id}`} onClose={() => setAsking(null)} />}
       {asking?.adjustmentId && <FilingModal title="Record GSTR-1A filing" path={`adjustments/${asking.adjustmentId}`} onClose={() => setAsking(null)} />}
       {asking === 'reject' && <RejectModal found={found} onClose={() => setAsking(null)} />}
-      {asking === 'gstr3b' && <Gstr3bModal found={found} onClose={() => setAsking(null)} />}
       {asking === 'adjust' && <AdjustModal found={found} onClose={() => setAsking(null)} />}
     </>
   );
@@ -353,23 +354,6 @@ function RejectModal({ found, onClose }) {
     <Modal open onClose={onClose} title="The portal rejected the upload" footer={<ModalFooter onClose={onClose} disabled={text.trim().length < 3} loading={reject.isPending} onClick={() => reject.mutate({ key, _id: found._id, text }, { onSuccess: () => { toast.success('Marked as rejected'); onClose(); } })}>Mark as rejected</ModalFooter>}>
       <Textarea label="What the portal said" hint="One error per line. Lines with a bill number link to that bill." value={text} onChange={(e) => setText(e.target.value)} />
       {reject.isError && <p className="mt-2 text-sm text-danger">{refusalText(reject.error)}</p>}
-    </Modal>
-  );
-}
-
-function Gstr3bModal({ found, onClose }) {
-  const record = useRecordGstr3b();
-  const [key] = useState(newRequestKey);
-  const [arn, setArn] = useState('');
-  const [filedOn, setFiledOn] = useState('');
-  return (
-    <Modal open onClose={onClose} title={`GSTR-3B for ${formatMonth(found.period)}`} footer={<ModalFooter onClose={onClose} disabled={!ARN_SHAPE.test(arn.trim()) || !filedOn} loading={record.isPending} onClick={() => record.mutate({ key, _id: found._id, arn: arn.trim().toUpperCase(), filedOn }, { onSuccess: () => { toast.success('GSTR-3B recorded'); onClose(); } })}>Record</ModalFooter>}>
-      <div className="flex flex-col gap-4">
-        <p className="text-sm text-muted">Once GSTR-3B is filed, GSTR-1A closes for this month. Later corrections go to your tax person as an amendment.</p>
-        <Input label="ARN" maxLength={15} value={arn} onChange={(e) => setArn(e.target.value)} />
-        <Input label="Filed on" type="date" value={filedOn} onChange={(e) => setFiledOn(e.target.value)} />
-        {record.isError && <p className="text-sm text-danger">{refusalText(record.error)}</p>}
-      </div>
     </Modal>
   );
 }

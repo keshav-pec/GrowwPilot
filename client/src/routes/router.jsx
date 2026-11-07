@@ -27,6 +27,7 @@ import BillsListPage from '../features/billing/BillsListPage';
 import BillingSettingsPage from '../features/billing/BillingSettingsPage';
 import GstPage from '../features/gst/GstPage';
 import GstReturnPage from '../features/gst/GstReturnPage';
+import GstWorksheetPage from '../features/gst/GstWorksheetPage';
 import OccasionSettingsPage from '../features/occasions/settings/OccasionSettingsPage';
 import EmailSettingsPage from '../features/mail/EmailSettingsPage';
 import CampaignDetailPage from '../features/occasions/campaigns/CampaignDetailPage';
@@ -145,6 +146,7 @@ export const router = createBrowserRouter([
               { path: 'settings/billing', element: <BillingSettingsPage /> },
               { path: 'gst', element: <GstPage /> },
               { path: 'gst/returns/:id', element: <GstReturnPage /> },
+              { path: 'gst/worksheets/:id', element: <GstWorksheetPage /> },
               { path: 'settings/gst', element: <Navigate to="/app/gst?tab=settings" replace /> }, // old link
               { path: 'settings/occasions', element: <OccasionSettingsPage /> }, // Birthday & Anniversary Offers
               { path: 'settings/occasions/setup', element: <QuickSetup /> },

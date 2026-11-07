@@ -290,7 +290,7 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['*nightly', 'tax record', 'sales register', 'output tax', 'gst overview', 'gst menu', 'nightly check', 'gst difference', 'tax entry', 'credit note in gst', 'gst csv'],
     answer:
-      'Open **GST** in the menu. **Overview** shows a month’s output tax for one GSTIN or all of them, and anything that needs attention. **Sales & Returns** lists every bill, credit note, voided bill and advance entry of the month with its tax: click a row to open it, or download a CSV for your accountant. **Advances** shows what was taken, used and left, with tax, for each GSTIN. **Returns** is where you prepare GSTR-1. Each issued bill gets a permanent entry saved together with the bill. It is never changed: a refund or a void adds a new minus entry. Every night the app compares bills with the record and lists any difference, with a link to the bill. Branch owners see this for their own branches only if the business owner switches it on in Billing settings.',
+      'Open **GST** in the menu. **Overview** shows a month’s output tax for one GSTIN or all of them, and anything that needs attention. **Sales & Returns** lists every bill, credit note, voided bill and advance entry of the month with its tax: click a row to open it, or download a CSV for your accountant. **Advances** shows what was taken, used and left, with tax, for each GSTIN. **Purchases & ITC** is for supplier bills and credit, and **Returns** is where you prepare GSTR-1 and the GSTR-3B working sheet. Each issued bill gets a permanent entry saved together with the bill. It is never changed: a refund or a void adds a new minus entry. Every night the app compares bills with the record and lists any difference, with a link to the bill. Branch owners see this for their own branches only if the business owner switches it on in Billing settings.',
     link: { label: 'GST', to: '/app/gst' },
   },
 
@@ -310,7 +310,27 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['*gstr-1a', '*gstr1a', 'adjustment case', 'filed month', 'correct filed', 'amendment', 'bill left out', 'void filed bill', 'gstr-3b filed'],
     answer:
-      'A filed month can’t be changed, so a bill in it can’t be voided. Open the return and click **Create adjustment case**. If a bill was left out and GSTR-3B for that month isn’t filed yet, the case makes a **GSTR-1A** file with only that bill: upload and file it on the portal, then record its ARN and proof. Once you’ve recorded GSTR-3B as filed, GSTR-1A closes, and the case goes to your tax person as an amendment in a later month. To give money back on a filed bill, use **Refund / return**: its credit note counts in the current month and nothing filed changes.',
+      'A filed month can’t be changed, so a bill in it can’t be voided. Open the return and click **Create adjustment case**. If a bill was left out and GSTR-3B for that month isn’t filed yet, the case makes a **GSTR-1A** file with only that bill: upload and file it on the portal, then record its ARN and proof. Once you’ve recorded GSTR-3B as filed on its working sheet, GSTR-1A closes, and the case goes to your tax person as an amendment in a later month. To give money back on a filed bill, use **Refund / return**: its credit note counts in the current month and nothing filed changes.',
+    link: { label: 'Returns', to: '/app/gst?tab=returns' },
+  },
+
+  {
+    id: 'gst-purchases',
+    title: 'Purchases, GSTR-2B and input tax credit',
+    audiences: OWNERS,
+    keywords: ['*itc', '*gstr-2b', '*gstr2b', 'input tax credit', 'purchase bill', 'supplier bill', 'import 2b', 'supplier gstin', 'missing in 2b', 'missing in books', 'amount mismatch', 'claim credit'],
+    answer:
+      'Open **GST → Purchases & ITC** and choose the month. **Add bill** for each supplier bill, and say how the goods are used. **Import GSTR-2B** with the file from the portal, and the same file twice isn’t counted again. Each row then shows **Matched**, **Missing in 2B**, **Missing in books**, **Amount mismatch**, **Duplicate** or **Needs review**. A match alone never claims credit: click a row, look at the suggestion and **decide** with a reason. A purchase used only for 5%-without-ITC services gets ₹0. Stock for resale and mixed use need your own decision, so please check with your tax person. Credit can only be claimed on a bill that matches GSTR-2B.',
+    link: { label: 'Purchases & ITC', to: '/app/gst?tab=purchases' },
+  },
+
+  {
+    id: 'gstr-3b',
+    title: 'The GSTR-3B working sheet',
+    audiences: OWNERS,
+    keywords: ['*gstr-3b', '*gstr3b', '*working sheet', 'worksheet', 'portal figures', 'output tax and credit', 'pay gst', 'file 3b'],
+    answer:
+      'Open **GST → Returns** and click **Working sheet** for a month. It puts output tax from your tax record and your approved credit into the 3.1, 3.2 and Table 4 rows, and each figure opens what is behind it. Type in **the portal’s figures** to see any differences beside yours: nothing changes your figures, and a difference tells you where to fix it. Then **Approve**, and pay and file on the GST portal, and **Record filing** with the ARN and proof. That locks the month’s purchases and closes GSTR-1A. The app doesn’t know whether the tax was paid, and doesn’t work out interest, late fees or ledger balances, so what you pay comes from the portal.',
     link: { label: 'Returns', to: '/app/gst?tab=returns' },
   },
 

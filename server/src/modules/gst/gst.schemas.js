@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { DateTime } from 'luxon';
 import { objectId, paise } from '../../utils/schemas.js';
 import { GST_RATES_BPS, LINE_KINDS } from '../../config/billing.js';
-import { GST_SCHEMES, ITC_TYPES, TAX_CODE_REGEX, TAX_ENTRY_TYPES, UNIT_CODES } from '../../config/gst.js';
+import { GST_SCHEMES, ITC_TYPES, PURCHASE_USES, TAX_CODE_REGEX, TAX_ENTRY_TYPES, UNIT_CODES } from '../../config/gst.js';
 
 const date = z.string().refine((v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && DateTime.fromISO(v).isValid, 'Choose a date');
 const state = z.string().regex(/^\d{2}$/, 'Choose a state');
@@ -77,3 +77,31 @@ export const filingSchema = z.object({ arn, filedOn: date });
 export const adjustmentSchema = z.object({ reason: z.string().trim().min(3, 'Say what needs correcting').max(500), invoiceId: objectId.optional() });
 export const unitsSchema = z.object({ units: z.record(z.string().trim().toLowerCase().regex(/^[a-z0-9 ]{1,20}$/), z.enum(UNIT_CODES)) });
 export const trailSchema = z.object({ row: z.string().min(1).max(200) });
+
+const heads = z.object({ igst: paise.default(0), cgst: paise.default(0), sgst: paise.default(0) });
+export const purchasesQuerySchema = z.object({ gstin: gstinField.optional(), period: month });
+export const addPurchaseSchema = z.object({
+  gstin: gstinField,
+  period: month,
+  supplierId: objectId.nullable().optional(),
+  supplierName: z.string().trim().min(2, 'Enter the supplier').max(120),
+  supplierGstin: gstinField,
+  billNumber: z.string().trim().min(1, 'Enter the bill number').max(40),
+  billDate: date,
+  taxable: paise,
+  igst: paise.default(0),
+  cgst: paise.default(0),
+  sgst: paise.default(0),
+  use: z.enum(PURCHASE_USES),
+  receiptId: objectId.nullable().optional(),
+  note: z.string().trim().max(300).optional(),
+});
+const reason = z.string().trim().min(3, 'Give a reason').max(500);
+export const cancelPurchaseSchema = z.object({ reason });
+export const decideSchema = z.object({ eligible: heads, reason });
+export const decideMissingSchema = z.object({ gstin: gstinField, period: month, rowKey: z.string().min(3).max(120), reason });
+export const import2bSchema = z.object({ gstin: gstinField, period: month });
+export const worksheetSchema = z.object({ gstin: gstinField, period: month });
+export const portalSchema = z.object({ rows: z.record(z.string().max(20), z.object({ taxable: paise.default(0), igst: paise.default(0), cgst: paise.default(0), sgst: paise.default(0) })) });
+export const approveSheetSchema = z.object({ differenceNote: z.string().trim().max(500).optional() });
+export const sheetTrailSchema = z.object({ row: z.string().min(1).max(20) });

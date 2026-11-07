@@ -573,7 +573,7 @@ describe('Corrections after filing', () => {
     await active();
     await bill();
     const { returnId } = await filedMonth();
-    await gstr1.recordGstr3b(owner, returnId, filing, key());
+    await GstReturn.updateOne({ _id: returnId }, { $set: { gstr3b: { arn: ARN, filedOn: filing.filedOn } } }); // recorded through the working sheet (Phase 5)
     await bill();
     const made = await gstr1.createAdjustment(owner, returnId, { reason: 'Bill left out' }, key());
     expect(made).toMatchObject({ route: 'LATER_AMENDMENT', status: 'NEEDS_REVIEW' });
@@ -588,13 +588,6 @@ describe('Corrections after filing', () => {
     await gstr1.recordFiling(owner, returnId, filing, proof, key());
     const made = await gstr1.createAdjustment(owner, returnId, { reason: 'Wrong customer', invoiceId: String(b._id) }, key());
     expect(made.status).toBe('NEEDS_REVIEW');
-  });
-
-  it('GSTR-3B needs GSTR-1 filed first', async () => {
-    await active();
-    await bill();
-    const { returnId } = await prepare();
-    await expect(gstr1.recordGstr3b(owner, returnId, filing, key())).rejects.toMatchObject({ code: 'NOT_FILED' });
   });
 });
 

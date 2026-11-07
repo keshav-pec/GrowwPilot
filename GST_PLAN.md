@@ -1,6 +1,6 @@
 # GST Engine: Build Plan
 
-Based on `GrowwPilot_GST_Engine_Technical_PRD_v1.pdf` (1 Nov 2026) and a check of the current code on 4 Nov 2026. **Phases 1 to 3 are built and committed. Phase 4 is built (6 Nov 2026), not yet committed.** Phase 5 is not built. **Still open from Phase 4: the file has not been uploaded to the GST portal or the offline tool, and no official sample file was available.**
+Based on `GrowwPilot_GST_Engine_Technical_PRD_v1.pdf` (1 Nov 2026) and a check of the current code on 4 Nov 2026. **Phases 1 to 4 are built and committed. Phase 5 is built (7 Nov 2026), not yet committed.** **Still open: no GSTR-1 file has been uploaded to the GST portal or offline tool, no real GSTR-2B file has been read, and no official sample files were available. A GST practitioner still has to review the tax rules.**
 
 **The goal:** a salon's bills become a correct, traceable GST record. From that record the owner can prepare GSTR-1, check purchases and input credit, and prepare a GSTR-3B working sheet. The owner still files on the GST portal.
 
@@ -128,7 +128,7 @@ GST Phase 1: GST setup screen, dated registrations and branch links, owner-appro
 - **Credit notes and voids** add new minus entries. The original stays untouched. A void in a filed month gets blocked once Phase 4 adds filing.
 - **Part refunds by amount:** for example ₹525 off a ₹1,050 haircut gives ₹500 taxable and ₹25 tax. A refund can't go above what is left on the line. Commission is taken back in the same share.
 - **Older bills:** GST bills from the start month onward are added to the record automatically, once only.
-- **GST menu** with tabs: Overview, Sales & Returns, Settings. Purchases & ITC is added in Phase 5, when it has something in it. Overview stays small: period, output tax and what needs attention. Each row opens the existing bill screen.
+- **GST menu** with tabs: Overview, Sales & Returns and Settings. Later phases add Advances, Purchases & ITC and Returns. Overview stays small: period, output tax and what needs attention. Each row opens the existing bill screen.
 - **Permissions:** the business owner sees everything. Branch owners see their own branches' data only if switched on, because they can't open other branches' bills. The front desk sees only the tax on bills. Other salons' data is never reachable.
 - **Nightly check:** compares issued bills with the tax record and lists any difference with a link to the bill.
 - **"GST collected" report:** reads the tax record for activated salons, so two screens can't disagree.
@@ -214,7 +214,7 @@ GST Phase 4: GSTR-1 preparation with Tables 11, 12 and 13, every figure traced t
 
 - **Supplier GSTIN** on suppliers.
 - **Purchase bills:** a new record, because the app has none today and deliveries hold only an invoice number. It stores supplier GSTIN, bill number, date, amounts, GST and how the goods are used. It can link to a delivery, but also works without the Inventory add-on. Duplicates are caught.
-- **Import GSTR-2B:** upload the file for a GSTIN and month. The same file twice is recognised and not counted again.
+- **Import GSTR-2B:** upload the file for a GSTIN and month. The same file twice is recognised and not counted again. The file's layout isn't published openly, so it is read tolerantly, with a simple CSV as the fallback.
 - **Matching:** Matched, Missing in 2B, Missing in books, Amount mismatch, Duplicate or Needs review, with the difference shown.
 - **ITC decisions:** the app suggests an amount based on use. A purchase used only for 5%-without-ITC services gets ₹0. Stock for resale is reviewed on its own. Mixed use needs a decision. The owner approves with a reason. A match alone never claims credit.
 - **Purchases & ITC grid** as in the PRD, with filters. Approve is disabled while something is unresolved.

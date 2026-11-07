@@ -76,7 +76,7 @@ export function useRunGstCheck() {
 }
 
 // ---- GSTR-1 ----
-const RETURN_KEYS = ['gst-returns', 'gst-return', 'gst-overview'];
+const RETURN_KEYS = ['gst-returns', 'gst-return', 'gst-overview', 'gst-purchases', 'gst-worksheet'];
 function useReturnChange(request) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -99,10 +99,9 @@ export function useReturnTrail(id, row) {
 export const usePrepareReturn = () => useReturnChange(({ key, ...body }) => send('post', '/gst/returns', key, body));
 export const useApproveReturn = () => useReturnChange(({ key, _id }) => send('post', `/gst/returns/${_id}/approve`, key));
 export const useRejectReturn = () => useReturnChange(({ key, _id, text }) => send('post', `/gst/returns/${_id}/reject`, key, { text }));
-export const useRecordGstr3b = () => useReturnChange(({ key, _id, ...body }) => send('post', `/gst/returns/${_id}/gstr3b`, key, body));
 export const useCreateAdjustment = () => useReturnChange(({ key, _id, ...body }) => send('post', `/gst/returns/${_id}/adjustments`, key, body));
 
-// Filing needs its proof, so it goes as a form. path: `returns/<id>` or `adjustments/<id>`
+// Filing needs its proof, so it goes as a form. path: `returns/<id>`, `adjustments/<id>` or `worksheets/<id>`
 export const useRecordFiling = () =>
   useReturnChange(({ key, path, arn, filedOn, proof }) => {
     const form = new FormData();
@@ -127,3 +126,32 @@ export const downloadReview = (id, kind) => downloadFile(`/gst/returns/${id}/rev
 export const downloadProof = (proofId, name) => downloadFile(`/gst/proofs/${proofId}`, {}, name ?? 'proof');
 
 export const useSaveUnits = () => useGstChange((body) => ['patch', '/gst/units', body]);
+
+// ---- Purchases & ITC ----
+// { gstins, gstin, period, rows, imported, summary, canWork, locked }. params: { gstin, period }
+export function useGstPurchases(params) {
+  return useQuery({ queryKey: ['gst-purchases', params], queryFn: () => api.get('/gst/purchases', { params }).then((res) => res.data), placeholderData: keepPreviousData });
+}
+export const useAddPurchase = () => useReturnChange(({ key, ...body }) => send('post', '/gst/purchases', key, body));
+export const useCancelPurchase = () => useReturnChange(({ key, _id, reason }) => send('post', `/gst/purchases/${_id}/cancel`, key, { reason }));
+export const useDecideItc = () => useReturnChange(({ key, _id, ...body }) => send('post', `/gst/purchases/${_id}/decision`, key, body));
+export const useDecideMissing = () => useReturnChange(({ key, ...body }) => send('post', '/gst/purchases/not-claimed', key, body));
+export const useImport2b = () =>
+  useReturnChange(({ key, gstin, period, file }) => {
+    const form = new FormData();
+    form.append('gstin', gstin);
+    form.append('period', period);
+    form.append('file', file);
+    return send('post', '/gst/purchases/import-2b', key, form);
+  });
+
+// ---- GSTR-3B working sheet ----
+export function useGstWorksheet(id) {
+  return useQuery({ queryKey: ['gst-worksheet', id], queryFn: () => api.get(`/gst/worksheets/${id}`).then((res) => res.data), enabled: Boolean(id) });
+}
+export function useWorksheetTrail(id, row) {
+  return useQuery({ queryKey: ['gst-worksheet-trail', id, row], queryFn: () => api.get(`/gst/worksheets/${id}/trail`, { params: { row } }).then((res) => res.data), enabled: Boolean(row) });
+}
+export const usePrepareWorksheet = () => useReturnChange(({ key, ...body }) => send('post', '/gst/worksheets', key, body));
+export const useSavePortalFigures = () => useReturnChange(({ key, _id, rows }) => send('put', `/gst/worksheets/${_id}/portal`, key, { rows }));
+export const useApproveWorksheet = () => useReturnChange(({ key, _id, ...body }) => send('post', `/gst/worksheets/${_id}/approve`, key, body));

@@ -32,7 +32,7 @@ export default function GstOverviewTab({ today, onOpenSettings }) {
   }
 
   const before = data.startMonth && data.month < data.startMonth;
-  const attention = [...data.check.differences.map((d) => ({ key: d.key, message: d.message, link: d.link })), ...data.setupProblems.map((p) => ({ key: p.key, message: p.message, link: p.link }))];
+  const attention = [...data.check.differences.map((d) => ({ key: d.key, message: d.message, link: d.link })), ...data.setupProblems.map((p) => ({ key: p.key, message: p.message, link: p.link })), ...(data.purchasesToDecide > 0 ? [{ key: 'purchases', message: `${data.purchasesToDecide} purchase bill${data.purchasesToDecide === 1 ? '' : 's'} this month ${data.purchasesToDecide === 1 ? 'needs' : 'need'} a credit decision.`, link: `/app/gst?tab=purchases&month=${data.month}` }] : [])];
 
   function checkNow() {
     runCheck.mutate(
