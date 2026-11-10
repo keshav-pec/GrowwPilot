@@ -1,38 +1,9 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, CircleAlert, CircleCheck, CircleDashed, OctagonAlert, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, OctagonAlert, RefreshCw } from 'lucide-react';
 import { useDashboard } from '../../api/dashboard';
 import { formatMoney } from '../../lib/money';
 import { formatTime } from '../../lib/time';
 import { Card, EmptyState, HEADLINE_TILE, PageHeader, PageSpinner, StatTile } from '../../components/ui';
-
-// Each status always has an icon AND a label, so colour is never the only signal
-const SIGNAL = {
-  good: { icon: CircleCheck, color: 'text-good', label: 'Good' },
-  watch: { icon: CircleAlert, color: 'text-gold-dark', label: 'Watch' },
-  action: { icon: OctagonAlert, color: 'text-danger', label: 'Act' },
-  neutral: { icon: CircleDashed, color: 'text-muted', label: 'No data' },
-};
-
-function SalonPulse({ signals }) {
-  return (
-    <Card className="mb-4">
-      <ul className="flex flex-col gap-2">
-        {signals.map((signal) => {
-          const s = SIGNAL[signal.status];
-          const SignalIcon = s.icon;
-          return (
-            <li key={signal.key} className="flex items-start gap-2 text-sm">
-              <SignalIcon size={18} className={`mt-0.5 shrink-0 ${s.color}`} aria-label={s.label} />
-              <p>
-                <span className="font-medium">{signal.label}:</span> <span className="text-muted">{signal.reason}</span>
-              </p>
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
-  );
-}
 
 function RequiresAttention({ items }) {
   return (
@@ -70,7 +41,7 @@ export default function DashboardPage() {
   if (dashboardQuery.isPending) return <PageSpinner />;
   if (dashboardQuery.isError) return <EmptyState title="Couldn’t load the dashboard" message={dashboardQuery.error.message} />;
 
-  const { branch, kpis, signals, attention, generatedAt } = dashboardQuery.data;
+  const { branch, kpis, attention, generatedAt } = dashboardQuery.data;
 
   return (
     <>
@@ -84,15 +55,11 @@ export default function DashboardPage() {
         }
       />
 
-      <SalonPulse signals={signals} />
-
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+      <div className="mb-4 grid gap-3 sm:grid-cols-2">
         <StatTile {...HEADLINE_TILE} label="Net sales today" value={formatMoney(kpis.todayRevenue)} hint={`Collected ${formatMoney(kpis.todayCollected)} · without GST`} />
         <StatTile {...HEADLINE_TILE} label="Appointments today" value={kpis.todayAppointments} />
-        <StatTile {...HEADLINE_TILE} label="Open leads" value={kpis.openLeads} />
       </div>
 
-      {/* Lead follow-ups are left out while the Leads page is hidden */}
       <RequiresAttention items={attention.filter((item) => item.kind !== 'FOLLOW_UP')} />
     </>
   );

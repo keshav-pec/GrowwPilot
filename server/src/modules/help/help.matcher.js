@@ -57,7 +57,8 @@ export function answerQuestion(question, who) {
 
   // Rank every topic: highest score first; on a tie, a specific topic beats a general one,
   // then the one with the strongest single keyword match
-  const ranked = KNOWLEDGE.map((entry) => ({ entry, ...scoreEntry(entry, questionWords) }))
+  const ranked = KNOWLEDGE.filter((entry) => !entry.hidden)
+    .map((entry) => ({ entry, ...scoreEntry(entry, questionWords) }))
     .filter((r) => r.score > 0)
     .sort((a, b) => b.score - a.score || Number(Boolean(a.entry.general)) - Number(Boolean(b.entry.general)) || b.best - a.best);
   const top = ranked[0];

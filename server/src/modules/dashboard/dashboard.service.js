@@ -2,7 +2,7 @@
 // Everything is calculated live from the database for the selected branch. Nothing is stored or hard-coded.
 import { DateTime } from 'luxon';
 import { Appointment, Attendance, Lead, Staff } from '../../models/index.js';
-import { OPEN_APPOINTMENT_STATUSES, SERVICE_STAFF } from '../../config/constants.js';
+import { OPEN_APPOINTMENT_STATUSES } from '../../config/constants.js';
 import { scoped } from '../../utils/scoped.js';
 import { formatMoney } from '../../utils/money.js';
 import { dayRangeUTC, formatTime } from '../../utils/time.js';
@@ -17,13 +17,6 @@ const AWAY = ['absent', 'leave'];
 // bookings, drafts and voided bills never count. Also what was collected (money in less money handed back).
 async function moneyBetween(ctx, branchId, from, to) {
   return (await moneyByBranch(ctx.orgId, [{ branchId, start: from, end: to }]))[String(branchId)];
-}
-
-// "5h 15m"
-function hoursAndMinutes(minutes) {
-  const h = Math.floor(minutes / 60);
-  const m = Math.round(minutes % 60);
-  return h ? `${h}h${m ? ` ${m}m` : ''}` : `${m}m`;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,70 +78,15 @@ async function getAttention(ctx, branch, now, todayAppointments) {
   return items.sort((x, y) => rank[x.severity] - rank[y.severity] || new Date(x.at) - new Date(y.at));
 }
 
-// ---------------------------------------------------------------------------
-// Salon Pulse: 2 simple signals, each with a one-line reason
-//    status: 'good' | 'watch' | 'action' | 'neutral' (not enough data)
-// ---------------------------------------------------------------------------
-async function getSignals(ctx, branch, now, today, todaySoFar, todayAppointments) {
-  const zone = branch.timezone;
-  const nowLocal = DateTime.fromJSDate(now, { zone });
-  const weekday = nowLocal.toFormat('cccc'); // "Monday"
-
-  // Net sales so far today vs the average of the same weekday in the last 4 weeks, up to the same time of day
-  const elapsed = now - today.start;
-  const pastWeeks = await Promise.all(
-    [1, 2, 3, 4].map(async (weeks) => {
-      const dayStart = DateTime.fromJSDate(today.start, { zone }).minus({ weeks }).toJSDate();
-      return (await moneyBetween(ctx, branch._id, dayStart, new Date(+dayStart + elapsed))).netSales;
-    })
-  );
-  const usual = Math.round(pastWeeks.reduce((sum, x) => sum + x, 0) / 4);
-  let revenue;
-  if (usual === 0) {
-    revenue = { status: 'neutral', reason: `Not enough history to compare with a usual ${weekday}.` };
-  } else {
-    const change = Math.round(((todaySoFar - usual) / usual) * 100);
-    const status = change >= -10 ? 'good' : change >= -30 ? 'watch' : 'action';
-    revenue = { status, reason: `Net sales are ${Math.abs(change)}% ${change >= 0 ? 'above' : 'below'} a usual ${weekday} by this time (${formatMoney(todaySoFar)} vs ${formatMoney(usual)}).` };
-  }
-
-  // Chairs filled = booked stylist-minutes / available stylist-minutes today
-  const [workingStaff, awayToday] = await Promise.all([
-    Staff.find(scoped(ctx, { branchId: branch._id, status: 'active', ...SERVICE_STAFF })).select('_id').lean(),
-    Attendance.find(scoped(ctx, { branchId: branch._id, date: nowLocal.toISODate(), status: { $in: AWAY } })).select('staffId').lean(),
-  ]);
-  const inToday = workingStaff.filter((s) => !awayToday.some((a) => String(a.staffId) === String(s._id))).length;
-  const opens = DateTime.fromISO(`${nowLocal.toISODate()}T${branch.openTime}`, { zone });
-  const closes = DateTime.fromISO(`${nowLocal.toISODate()}T${branch.closeTime}`, { zone });
-  const available = inToday * closes.diff(opens, 'minutes').minutes;
-  const booked = todayAppointments.filter((a) => a.status !== 'CANCELLED').flatMap((a) => a.items).reduce((sum, i) => sum + i.durationMinutes, 0);
-  let chairs;
-  if (available === 0) {
-    chairs = { status: 'neutral', reason: 'No stylists are working today.' };
-  } else {
-    const filled = Math.round((booked / available) * 100);
-    chairs = {
-      status: filled >= 60 ? 'good' : filled >= 30 ? 'watch' : 'action',
-      reason: `Chairs are ${filled}% booked today (${hoursAndMinutes(booked)} of ${hoursAndMinutes(available)} stylist time).`,
-    };
-  }
-
-  return [
-    { key: 'revenue', label: 'Revenue vs usual', ...revenue },
-    { key: 'chairs', label: 'Chairs filled', ...chairs },
-  ];
-}
-
 export async function getDashboard(ctx) {
   const branch = await activeBranch(ctx);
   const now = new Date();
   const todayDate = DateTime.fromJSDate(now, { zone: branch.timezone }).toISODate(); // "today" at the branch
   const today = dayRangeUTC(todayDate, branch.timezone);
 
-  const [todayAppointments, money, soFar, openLeads] = await Promise.all([
+  const [todayAppointments, money, openLeads] = await Promise.all([
     Appointment.find(scoped(ctx, { branchId: branch._id, startAt: { $gte: today.start, $lt: today.end } })).lean(),
     moneyBetween(ctx, branch._id, today.start, today.end),
-    moneyBetween(ctx, branch._id, today.start, now),
     Lead.countDocuments(scoped(ctx, { branchId: branch._id, status: { $in: OPEN_LEAD_STATUSES } })),
   ]);
 
@@ -158,10 +96,7 @@ export async function getDashboard(ctx) {
     todayAppointments: todayAppointments.filter((a) => a.status !== 'CANCELLED').length,
     openLeads,
   };
-  const [signals, attention] = await Promise.all([
-    getSignals(ctx, branch, now, today, soFar.netSales, todayAppointments),
-    getAttention(ctx, branch, now, todayAppointments),
-  ]);
+  const attention = await getAttention(ctx, branch, now, todayAppointments);
 
-  return { branch: { _id: branch._id, name: branch.name, timezone: branch.timezone }, date: todayDate, generatedAt: now, kpis, signals, attention };
+  return { branch: { _id: branch._id, name: branch.name, timezone: branch.timezone }, date: todayDate, generatedAt: now, kpis, attention };
 }

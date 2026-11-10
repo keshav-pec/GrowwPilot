@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { api } from './client';
 
-// { branch, date, generatedAt, kpis, signals, attention } for the selected branch, refreshed every minute
+// { branch, date, generatedAt, kpis, attention } for the selected branch, refreshed every minute
 export function useDashboard() {
   const { activeBranchId } = useAuth();
   return useQuery({

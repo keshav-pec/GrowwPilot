@@ -7,6 +7,7 @@
 // answer:     the reply. "for" gives a different reply to a specific audience.
 // denied:     the reply for someone OUTSIDE the audiences (they learn who can do it, not how).
 // link:       a button that opens the right screen (link.audiences: only for some of the topic's audiences).
+// hidden:     kept here but never answered (the screen is switched off)
 // general:    a broad topic (e.g. "booking"). On a tie it loses to a specific one (e.g. "cancel a booking").
 // Placeholders: {name} (first name), {branch} (selected branch), {salon} (salon name)
 
@@ -23,7 +24,7 @@ export const KNOWLEDGE = [
     title: 'Hello',
     audiences: ALL,
     keywords: ['*hi', '*hello', '*hey', 'good morning', 'good evening'],
-    answer: 'Hi {name}! I’m the GrowwPilot assistant. Ask me how to do anything in the app, like booking, checkout or leads.',
+    answer: 'Hi {name}! I’m the GrowwPilot assistant. Ask me how to do anything in the app, like booking, checkout or attendance.',
   },
   {
     id: 'thanks',
@@ -39,7 +40,7 @@ export const KNOWLEDGE = [
     keywords: ['what can you do', 'who are you', 'help', 'what you know'],
     answer: 'I know how every screen in GrowwPilot works, and I answer for your role.',
     for: {
-      FRONT_DESK: 'I can help with everything you do at {branch}: booking and rescheduling, the day board, customers, leads, checkout and split payments, and staff attendance.',
+      FRONT_DESK: 'I can help with everything you do at {branch}: booking and rescheduling, the day board, customers, checkout and split payments, and staff attendance.',
       PRIMARY_OWNER: 'I can help with the dashboard, analytics and the sales PDF, your team, services, combos and branches, plus everything the front desk does.',
       BRANCH_OWNER: 'I can help with the dashboard, analytics, your staff and front desk logins, plus everything the front desk does at your branches.',
       INVENTORY: 'I can help with stock at {branch}: products, issuing and finishing bottles, write-offs, purchase orders, deliveries and stock counts.',
@@ -156,6 +157,7 @@ export const KNOWLEDGE = [
   // ---------------------------------------------------------------- leads
   {
     id: 'lead-add',
+    hidden: true,
     title: 'Adding and following up leads',
     general: true,
     audiences: EVERYONE,
@@ -166,6 +168,7 @@ export const KNOWLEDGE = [
   },
   {
     id: 'lead-convert',
+    hidden: true,
     title: 'Converting a lead into an appointment',
     audiences: EVERYONE,
     keywords: ['convert lead', '*convert', 'lead appointment', 'lead to booking'],
@@ -238,6 +241,7 @@ export const KNOWLEDGE = [
 
   {
     id: 'cash-drawer',
+    hidden: true,
     title: 'Cash drawer (daily cash closing)',
     audiences: EVERYONE,
     keywords: ['*cash drawer', 'cash closing', 'close the day', 'close cash', 'float', 'petty cash', 'count cash', 'cash short', 'day end'],
@@ -375,7 +379,7 @@ export const KNOWLEDGE = [
     keywords: ['switch branch', 'change branch', 'other branch', 'branch switcher', 'different branch'],
     answer: 'Use the branch picker at the top right. Every screen then shows that branch.',
     for: {
-      FRONT_DESK: 'Your account works in **{branch}** only, so you always see its bookings, staff and leads. If you need to work at another branch, ask your owner to change your branch in **Team → Front desk logins**.',
+      FRONT_DESK: 'Your account works in **{branch}** only, so you always see its bookings and staff. If you need to work at another branch, ask your owner to change your branch in **Team → Front desk logins**.',
     },
   },
   {
@@ -437,11 +441,11 @@ export const KNOWLEDGE = [
   // ---------------------------------------------------------------- owner: insight
   {
     id: 'dashboard',
-    title: 'The dashboard and Salon Pulse',
+    title: 'The dashboard',
     audiences: OWNERS,
-    keywords: ['*dashboard', 'salon pulse', '*pulse', '*kpi', 'chairs filled'],
+    keywords: ['*dashboard', '*kpi', 'net sales today'],
     answer:
-      'The **Dashboard** answers *“is my salon doing fine?”* for the selected branch.\n- **Salon Pulse** shows 2 signals: net sales vs a usual same weekday by this time, and chairs filled today.\n- The tiles show today’s net sales, appointments and open leads.\n- Everything is live and refreshes every minute.',
+      'The **Dashboard** answers *“is my salon doing fine?”* for the selected branch.\n- The tiles show today’s net sales and appointments.\n- **Requires attention** lists what needs someone now.\n- Everything is live and refreshes every minute.',
     denied: 'The dashboard is only for owners, because it shows revenue. For today’s work at {branch}, the **Day board** shows everything that’s happening.',
     link: { label: 'Dashboard', to: '/app/dashboard' },
   },
@@ -451,7 +455,7 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['requires attention', 'needs attention', '*todo', '*urgent'],
     answer:
-      'The **Requires attention** list on the dashboard shows what needs someone now, most urgent first: customers waiting or not showing up, visits not billed, bookings whose stylist is absent or inactive, and overdue lead follow-ups. Each row has a one-click button (Open, Checkout, Reassign or Open lead).',
+      'The **Requires attention** list on the dashboard shows what needs someone now, most urgent first: customers waiting or not showing up, visits not billed, and bookings whose stylist is absent or inactive. Each row has a one-click button (Open, Checkout or Reassign).',
     denied: 'That list is on the owner’s dashboard. On the **Day board** you’ll see the same warnings (orange rings) for today’s bookings.',
     link: { label: 'Dashboard', to: '/app/dashboard' },
   },
@@ -809,8 +813,8 @@ export const KNOWLEDGE = [
 
 // Shown when the question doesn't match anything, and when the chat opens
 export const STARTER_QUESTIONS = {
-  PRIMARY_OWNER: ['What does Salon Pulse mean?', 'How do I add a new service?', 'How do I export the sales PDF?', 'How do I add a front desk login?'],
-  BRANCH_OWNER: ['What does Salon Pulse mean?', 'How do I add a stylist?', 'How do I export the sales PDF?', 'How do I reset a front desk password?'],
-  FRONT_DESK: ['How do I book an appointment?', 'How do I take a split payment?', 'How do I convert a lead?', 'How do I mark a stylist absent?'],
+  PRIMARY_OWNER: ['What does Requires attention show?', 'How do I add a new service?', 'How do I export the sales PDF?', 'How do I add a front desk login?'],
+  BRANCH_OWNER: ['What does Requires attention show?', 'How do I add a stylist?', 'How do I export the sales PDF?', 'How do I reset a front desk password?'],
+  FRONT_DESK: ['How do I book an appointment?', 'How do I take a split payment?', 'How do I add a new customer?', 'How do I mark a stylist absent?'],
   INVENTORY: ['How do I set up inventory?', 'How do I mark a bottle finished?', 'Why didn’t a service deduct stock?', 'How do I receive a delivery?'],
 };
