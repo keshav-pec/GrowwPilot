@@ -1,7 +1,8 @@
-// Wipes the database and fills it with a small demo: 2 salons, 3 branches, some history, a busy "today",
-// payroll, billing, birthday offers, a few emails, and the Inventory add-on at Glamour Studio's Andheri branch
-// (Bandra is left to show the setup guide). Today's appointments are placed around the CURRENT time, so the day
-// board and dashboard always look alive.
+// Wipes the database and fills it with a small demo: 2 salons, 3 branches, a few weeks of history, a busy "today",
+// payroll with last month paid, billing, a birthday offer, a couple of emails, and the Inventory add-on at
+// Glamour Studio. Everything is settled: nothing waits for approval and nothing is overdue. Glamour Studio is
+// GST registered, with GST setup left for the owner to do in GST → Settings (Save, then Activate).
+// Today's appointments are placed around the CURRENT time, so the day board and dashboard always look alive.
 //
 // Run with: npm run seed        (refuses to run in production unless you add -- --force)
 import mongoose from 'mongoose';
@@ -20,25 +21,17 @@ import { createLocation } from '../modules/inventory/locations/locations.service
 import { createSupplier } from '../modules/inventory/suppliers/suppliers.service.js';
 import { createSku } from '../modules/inventory/skus/skus.service.js';
 import { saveRecipe } from '../modules/inventory/recipes/recipes.service.js';
-import { finish, issue } from '../modules/inventory/allocations/allocations.service.js';
-import { writeOff } from '../modules/inventory/movements/movements.service.js';
-import { reportProblem } from '../modules/inventory/approvals/approvals.service.js';
+import { issue } from '../modules/inventory/allocations/allocations.service.js';
 import { createOrder, moveOrder, receiveOrder, submitOrder } from '../modules/inventory/purchasing/purchasing.service.js';
 import { markSetupStep } from '../modules/inventory/setup/setup.service.js';
 import { addImages } from '../modules/inventory/images/images.service.js';
 import { addProduct, createSaleDraft, issueInvoice, openDraft } from '../modules/invoices/invoices.service.js';
-import { takeAdvance } from '../modules/payments/payments.service.js';
-import { approveRefund, createRefund } from '../modules/refunds/refunds.service.js';
 import { closeCashDay, currentCashDay } from '../modules/cash/cash.service.js';
 import { createCampaign, publishCampaign } from '../modules/occasions/campaigns/campaigns.service.js';
 import { recordConsent } from '../modules/occasions/customers.service.js';
-import { recordContact } from '../modules/occasions/outreach/followup.service.js';
-import { setInvoiceOffer } from '../modules/occasions/checkout/checkout.service.js';
 import { runForOrg } from '../modules/occasions/engine/scheduler.js';
 import { migrateBilling } from './migrate-billing-v2.js';
 import { migrateOccasions } from './migrate-occasions-v1.js';
-import { saveSetup } from '../modules/gst/gst.service.js';
-import { addPurchase, import2b } from '../modules/gst/gst.purchases.js';
 import { DESERT_ROSE_CUSTOMERS, DESERT_ROSE_SERVICES, GLAMOUR_CUSTOMERS, GLAMOUR_SERVICES, LEADS } from './seed-data.js';
 
 const { Organization, Branch, User, Staff, Service, Combo, Customer, Appointment, Invoice, Lead, Attendance, Counter } = models;
@@ -121,7 +114,7 @@ const gc = byName(glamourCustomers);
 // 2. Appointments (built in memory first, then saved in one go)
 // ===========================================================================
 const appointments = [];
-const toBePaid = []; // { appointment, method, discountPercent?, split? }
+const toBePaid = []; // { appointment, method }
 
 // Status history that matches the final status (Booked -> Arrived -> In service -> Completed, or Cancelled)
 function historyFor(status, start, end, by) {
@@ -166,8 +159,15 @@ function appointmentDoc({ salon, branchName, customer, start, lines, status = 'B
     createdBy: desk._id,
   };
 }
+// After closing time "now" is held inside opening hours (see anchor), so a booking meant to be coming up or in the chair
+// may already be over: it is then saved as done and paid, so nothing looks late.
 function addAppointment({ pay, ...details }) {
-  const appointment = appointmentDoc(details);
+  let appointment = appointmentDoc(details);
+  const over = { BOOKED: appointment.startAt, IN_SERVICE: appointment.endAt }[appointment.status];
+  if (over && over <= new Date()) {
+    appointment = appointmentDoc({ ...details, status: 'COMPLETED' });
+    pay = { method: 'UPI' };
+  }
   appointments.push(appointment);
   if (pay) toBePaid.push({ appointment, ...pay });
   return appointment;
@@ -192,36 +192,35 @@ function anchor(branchName) {
   return t.minus({ minutes: t.minute % 5 }); // round to 5 minutes
 }
 
-// ----- 2a. History: the last week, plus the same weekday 2, 3 and 4 weeks ago for "revenue vs usual" -----
+// ----- 2a. History: the last few days, plus the same weekday 1 to 4 weeks ago for "revenue vs usual" -----
 const PAY_METHODS = ['CASH', 'UPI', 'CARD'];
 const customerInTurn = (d) => glamourCustomers[d % glamourCustomers.length];
-for (const d of [1, 2, 3, 4, 5, 6, 7, 14, 21, 28]) {
-  andheri({ customer: customerInTurn(d), start: at('Andheri', -d, '11:00'), lines: [[d % 2 ? gs.Haircut : gs['Hair Colour'], staff.Rahul]], status: 'COMPLETED', pay: { method: PAY_METHODS[d % 3], discountPercent: d % 7 === 0 ? 10 : 0, split: d % 5 === 0 } });
-  if (d % 2 === 0) andheri({ customer: customerInTurn(d + 1), start: at('Andheri', -d, '15:00'), lines: [[gs.Facial, staff.Neha]], status: 'COMPLETED', pay: { method: 'UPI' } });
-  if (d % 4 === 1) andheri({ customer: customerInTurn(d + 2), start: at('Andheri', -d, '13:00'), lines: comboLines, comboDoc: combo, status: 'COMPLETED', pay: { method: 'CASH' } });
-  if (d % 6 === 0) andheri({ customer: customerInTurn(d + 3), start: at('Andheri', -d, '17:00'), lines: [[gs['Beard Trim'], staff.Rahul]], status: 'CANCELLED' });
-  if (d % 3 === 0) bandra({ customer: customerInTurn(d + 4), start: at('Bandra', -d, '13:00'), lines: [[gs.Haircut, staff.Arjun], [gs['Hair Spa'], staff.Arjun]], status: 'COMPLETED', pay: { method: 'CARD', split: d % 2 === 0 } });
-  if (d % 3 === 1) marina({ customer: desertCustomers[d % 2], start: at('Dubai Marina', -d, '18:00'), lines: [[ds.Haircut, staff.Omar]], status: 'COMPLETED', pay: { method: 'CARD' } });
+for (const [i, d] of [1, 2, 3, 7, 14, 21, 28].entries()) {
+  andheri({ customer: customerInTurn(d), start: at('Andheri', -d, '11:00'), lines: [[d % 2 ? gs.Haircut : gs['Hair Colour'], staff.Rahul]], status: 'COMPLETED', pay: { method: PAY_METHODS[i % 3] } });
+}
+for (const d of [1, 7]) {
+  bandra({ customer: customerInTurn(d + 4), start: at('Bandra', -d, '13:00'), lines: [[gs.Haircut, staff.Arjun], [gs['Hair Spa'], staff.Arjun]], status: 'COMPLETED', pay: { method: 'CARD' } });
+  marina({ customer: desertCustomers[d % 2], start: at('Dubai Marina', -d, '11:00'), lines: [[ds.Haircut, staff.Omar]], status: 'COMPLETED', pay: { method: 'CARD' } });
 }
 
-// ----- 2b. Today, around the current time -----
+// ----- 2b. Today, around the current time: done and paid, in the chair, and coming up -----
 const A = anchor('Andheri');
 const B = anchor('Bandra');
 const D = anchor('Dubai Marina');
 const minutesFrom = (t, m) => t.plus({ minutes: m });
-andheri({ customer: gc['Priya Sharma'], start: minutesFrom(A, -150), lines: [[gs['Hair Colour'], staff.Rahul]], status: 'COMPLETED', pay: { method: 'CARD', split: true } });
-andheri({ customer: gc['Amit Verma'], start: minutesFrom(A, -120), lines: [[gs.Facial, staff.Neha]], status: 'COMPLETED' }); // not paid: shows in Requires attention
+andheri({ customer: gc['Priya Sharma'], start: minutesFrom(A, -150), lines: [[gs['Hair Colour'], staff.Rahul]], status: 'COMPLETED', pay: { method: 'CARD' } });
+andheri({ customer: gc['Amit Verma'], start: minutesFrom(A, -120), lines: [[gs.Facial, staff.Neha]], status: 'COMPLETED', pay: { method: 'UPI' } });
 andheri({ customer: gc['Karan Malhotra'], start: minutesFrom(A, -50), lines: comboLines, comboDoc: combo, status: 'IN_SERVICE' });
-andheri({ customer: gc['Sneha Kapoor'], start: minutesFrom(A, 45), lines: [[gs.Haircut, staff.Rahul]] });
 const poojaLeadId = new ObjectId();
-const poojaBooking = andheri({ customer: gc['Pooja Mehta'], start: minutesFrom(A, 90), lines: [[gs.Facial, staff.Neha]], source: 'lead', leadId: poojaLeadId });
-bandra({ customer: gc['Isha Patel'], start: minutesFrom(B, -60), lines: [[gs.Haircut, staff.Arjun]], status: 'COMPLETED', pay: { method: 'CASH' } });
-bandra({ customer: gc['Meera Nair'], start: minutesFrom(B, 15), lines: [[gs.Haircut, staff.Arjun]] });
-marina({ customer: desertCustomers[0], start: minutesFrom(D, -90), lines: [[ds.Haircut, staff.Omar]], status: 'COMPLETED', pay: { method: 'UPI' } });
-marina({ customer: desertCustomers[1], start: minutesFrom(D, 30), lines: [[ds['Blow Dry'], staff.Omar]] });
+const poojaBooking = andheri({ customer: gc['Pooja Mehta'], start: minutesFrom(A, 30), lines: [[gs.Facial, staff.Neha], [gs['Hair Spa'], staff.Neha]], source: 'lead', leadId: poojaLeadId });
+andheri({ customer: gc['Sneha Kapoor'], start: minutesFrom(A, 45), lines: [[gs['Hair Colour'], staff.Rahul]] });
+bandra({ customer: gc['Isha Patel'], start: minutesFrom(B, -120), lines: [[gs.Haircut, staff.Arjun], [gs['Hair Spa'], staff.Arjun]], status: 'COMPLETED', pay: { method: 'CASH' } });
+bandra({ customer: gc['Amit Verma'], start: minutesFrom(B, 15), lines: [[gs['Hair Colour'], staff.Arjun]] });
+marina({ customer: desertCustomers[0], start: minutesFrom(D, -120), lines: [[ds.Haircut, staff.Omar]], status: 'COMPLETED', pay: { method: 'UPI' } });
+marina({ customer: desertCustomers[1], start: minutesFrom(D, -75), lines: [[ds['Hair Colour'], staff.Omar]], status: 'IN_SERVICE' });
+marina({ customer: desertCustomers[2], start: minutesFrom(D, 25), lines: [[ds['Hair Colour'], staff.Omar], [ds['Blow Dry'], staff.Omar]] });
 
-// ----- 2c. Tomorrow (Neha is on leave, so her booking needs reassigning) -----
-andheri({ customer: gc['Amit Verma'], start: at('Andheri', 1, '11:00'), lines: [[gs.Haircut, staff.Rahul]] });
+// ----- 2c. Tomorrow -----
 andheri({ customer: gc['Priya Sharma'], start: at('Andheri', 1, '12:00'), lines: [[gs.Facial, staff.Neha]] });
 bandra({ customer: gc['Isha Patel'], start: at('Bandra', 1, '14:00'), lines: [[gs['Hair Spa'], staff.Arjun]] });
 
@@ -234,14 +233,9 @@ const counters = {};
 const invoices = [];
 
 toBePaid.sort((x, y) => x.appointment.endAt - y.appointment.endAt);
-for (const { appointment, method, discountPercent = 0, split = false } of toBePaid) {
+for (const { appointment, method } of toBePaid) {
   const name = branchNameOf(appointment.branchId);
   counters[name] = (counters[name] ?? 0) + 1;
-  const discount = Math.round((appointment.totalPrice * discountPercent) / 100);
-  const total = appointment.totalPrice - discount;
-  // A split payment: about half by card, the rest by UPI (like "₹1,000 card + ₹530 UPI")
-  const firstPart = Math.round(total / 2 / 100) * 100;
-  const payments = split ? [{ method: 'CARD', amount: firstPart }, { method: 'UPI', amount: total - firstPart, reference: `UPI${counters[name]}${name.length}` }] : [{ method, amount: total }];
 
   const invoice = {
     _id: new ObjectId(),
@@ -252,9 +246,9 @@ for (const { appointment, method, discountPercent = 0, split = false } of toBePa
     invoiceNumber: `GP-${CODE[name]}-${String(counters[name]).padStart(6, '0')}`,
     lines: appointment.items.map((i) => ({ serviceName: i.serviceName, staffName: i.staffName, price: i.price })),
     subtotal: appointment.totalPrice,
-    discount,
-    total,
-    payments,
+    discount: 0,
+    total: appointment.totalPrice,
+    payments: [{ method, amount: appointment.totalPrice }],
     paidAt: new Date(+appointment.endAt + 3 * 60 * 1000),
     createdBy: appointment.createdBy,
   };
@@ -264,13 +258,14 @@ for (const { appointment, method, discountPercent = 0, split = false } of toBePa
 
 await Appointment.insertMany(appointments);
 // Past bills are saved in the old shape, then moved onto the current bill records by the same migration real salons
-// get. This is what lets them keep past dates (and numbers like GP-AND-000012; new bills start at AND/26-27/00001).
+// get. This is what lets them keep past dates (and numbers like GP-AND-000008; new bills start at AND/26-27/00001).
 await Invoice.collection.insertMany(invoices);
 await Counter.insertMany(Object.entries(counters).map(([name, seq]) => ({ _id: `invoice:${branch[name]._id}`, seq })));
 await migrateBilling({ log: () => {} });
 await migrateOccasions({ log: () => {} }); // home branches and "not recorded" permission for the demo customers
 
-// Billing settings: Glamour Studio is GST registered in Maharashtra (prices include GST); Desert Rose isn't
+// Billing settings: Glamour Studio is GST registered in Maharashtra (prices include GST); Desert Rose isn't.
+// Pressing Save in GST → Settings moves these GSTINs over.
 const demoGstin = (first14) => first14 + gstinCheckChar(first14);
 await models.BillingSettings.create({
   orgId: glamour._id,
@@ -318,7 +313,7 @@ await Lead.collection.insertMany(
 );
 
 // ===========================================================================
-// 5. Attendance: one week at Andheri, today everywhere, and Neha on leave tomorrow
+// 5. Attendance: everyone present every day from the start of last month to today
 // ===========================================================================
 const attendance = [];
 const mark = (branchName, person, days, status) => {
@@ -327,209 +322,137 @@ const mark = (branchName, person, days, status) => {
   const checkOut = status === 'present' && days < 0 ? at(branchName, days, b.closeTime).minus({ minutes: 10 }).toJSDate() : null;
   attendance.push({ orgId: person.orgId, branchId: b._id, staffId: person._id, date: at(branchName, days, '00:00').toISODate(), status, checkInAt: checkIn, checkOutAt: checkOut, markedBy: deskOf[branchName]._id });
 };
-for (let d = 1; d <= 7; d++) {
-  mark('Andheri', staff.Rahul, -d, d === 3 ? 'absent' : 'present');
-  mark('Andheri', staff.Neha, -d, d === 5 ? 'leave' : 'present');
+const team = { Andheri: [staff.Rahul, staff.Neha, staff.Kavya], Bandra: [staff.Arjun, staff.Ritu], 'Dubai Marina': [staff.Omar] };
+for (const [branchName, people] of Object.entries(team)) {
+  const today = at(branchName, 0, '00:00');
+  const daysBack = Math.round(today.diff(today.minus({ months: 1 }).startOf('month'), 'days').days);
+  for (let d = daysBack; d >= 0; d--) for (const person of people) mark(branchName, person, -d, 'present');
 }
-for (const person of [staff.Rahul, staff.Neha, staff.Kavya]) mark('Andheri', person, 0, 'present');
-mark('Bandra', staff.Arjun, 0, 'present');
-mark('Dubai Marina', staff.Omar, 0, 'present');
-mark('Andheri', staff.Neha, 1, 'leave');
 await Attendance.insertMany(attendance);
 
 // ===========================================================================
-// 6. Payroll, made through the real payroll rules. Desert Rose has no pay setup, to show that state.
+// 6. Payroll, made through the real payroll rules: everyone has a pay setup from the start of last month,
+//    last month is locked at every branch and paid in full, and this month is still running.
 // ===========================================================================
 // What tenantContext would build for a logged-in user
+const branchesOfOrg = (orgId) => Object.values(branch).filter((b) => String(b.orgId) === String(orgId));
 const asUser = (user) => ({
   orgId: String(user.orgId),
   userId: String(user._id),
   userName: user.name,
   role: user.role,
   isPrimaryOwner: user.role === 'OWNER' && user.allBranches,
-  allowedBranchIds: (user.allBranches ? [branch.Andheri, branch.Bandra] : user.branchIds.map((id) => ({ _id: id }))).map((b) => String(b._id)),
+  allowedBranchIds: (user.allBranches ? branchesOfOrg(user.orgId) : user.branchIds.map((id) => ({ _id: id }))).map((b) => String(b._id)),
 });
-const monthStart = (monthsAgo) => A.minus({ months: monthsAgo }).startOf('month').toISODate();
+const lastMonthStart = A.minus({ months: 1 }).startOf('month').toISODate();
 
-await payroll.createPlan(asUser(anita), staff.Rahul._id, { model: 'FIXED', monthlyBase: toPaise(20000), effectiveFrom: monthStart(3) });
-await payroll.setServiceRate(asUser(anita), staff.Rahul._id, gs['Hair Colour']._id, { rateBps: 1500 }); // colour pays more
-await payroll.createPlan(asUser(anita), staff.Rahul._id, { model: 'FIXED_COMMISSION', monthlyBase: toPaise(22000), commissionBps: 1000, effectiveFrom: monthStart(1), note: 'Promoted to senior stylist' });
-await payroll.createPlan(asUser(anita), staff.Neha._id, { model: 'FIXED', monthlyBase: toPaise(18000), effectiveFrom: monthStart(3) });
-await payroll.createPlan(asUser(vikram), staff.Arjun._id, { model: 'HYBRID', dailyRate: toPaise(700), commissionBps: 800, effectiveFrom: monthStart(2) });
-await payroll.createPlan(asUser(anita), staff.Kavya._id, { model: 'FIXED', monthlyBase: toPaise(15000), effectiveFrom: monthStart(3) });
-await payroll.createPlan(asUser(vikram), staff.Ritu._id, { model: 'DAILY', dailyRate: toPaise(600), effectiveFrom: monthStart(2) });
-// A front desk request waiting for approval
-await payroll.createRequest(asUser(kavya), { staffId: String(staff.Neha._id), model: 'FIXED', monthlyBase: toPaise(20000), effectiveFrom: A.plus({ months: 1 }).startOf('month').toISODate(), note: 'Neha completed one year; raise agreed at the review' });
+await payroll.createPlan(asUser(anita), staff.Rahul._id, { model: 'FIXED_COMMISSION', monthlyBase: toPaise(22000), commissionBps: 1000, effectiveFrom: lastMonthStart });
+await payroll.createPlan(asUser(anita), staff.Neha._id, { model: 'FIXED', monthlyBase: toPaise(18000), effectiveFrom: lastMonthStart });
+await payroll.createPlan(asUser(anita), staff.Kavya._id, { model: 'FIXED', monthlyBase: toPaise(15000), effectiveFrom: lastMonthStart });
+await payroll.createPlan(asUser(vikram), staff.Arjun._id, { model: 'HYBRID', dailyRate: toPaise(700), commissionBps: 800, effectiveFrom: lastMonthStart });
+await payroll.createPlan(asUser(vikram), staff.Ritu._id, { model: 'DAILY', dailyRate: toPaise(600), effectiveFrom: lastMonthStart });
+await payroll.createPlan(asUser(fatima), staff.Omar._id, { model: 'FIXED', monthlyBase: toPaise(9000), effectiveFrom: lastMonthStart });
 
-// Two months ago is locked at Andheri: Rahul paid in full, Neha in part. Last month is a draft with a bonus. Neha has an advance.
-const anitaAtAndheri = { ...asUser(anita), activeBranchId: String(branch.Andheri._id) };
-const lockedMonth = A.minus({ months: 2 }).toFormat('yyyy-MM');
-await monthlyPayroll.lockRun(anitaAtAndheri, lockedMonth);
-const lockedItem = (person) => models.PayrollItem.findOne({ month: lockedMonth, staffId: person._id }).lean();
-const paidOn = A.minus({ months: 1 }).startOf('month').plus({ days: 2 }).toISODate();
-await salaryPayments.recordPayment(anitaAtAndheri, (await lockedItem(staff.Rahul))._id, { amount: toPaise(20000), method: 'BANK', reference: 'NEFT 88231', paidOn }, 'seed-pay-rahul');
-await salaryPayments.recordPayment(anitaAtAndheri, (await lockedItem(staff.Neha))._id, { amount: toPaise(10000), method: 'CASH', paidOn }, 'seed-pay-neha');
-await salaryPayments.giveAdvance(anitaAtAndheri, staff.Neha._id, { amount: toPaise(6000), monthlyRepayment: toPaise(2000), method: 'UPI', givenOn: A.toISODate(), firstMonth: A.plus({ months: 1 }).toFormat('yyyy-MM'), reason: 'Rent deposit' }, 'seed-advance-neha');
-await monthlyPayroll.addAdjustment(anitaAtAndheri, { staffId: String(staff.Neha._id), month: A.minus({ months: 1 }).toFormat('yyyy-MM'), kind: 'bonus', amount: toPaise(1500), reason: 'Best customer reviews' });
+const lastMonth = A.minus({ months: 1 }).toFormat('yyyy-MM');
+for (const [user, branchName] of [[anita, 'Andheri'], [anita, 'Bandra'], [fatima, 'Dubai Marina']]) {
+  const ctx = { ...asUser(user), activeBranchId: String(branch[branchName]._id) };
+  await monthlyPayroll.lockRun(ctx, lastMonth);
+  const paidOn = at(branchName, 0, '00:00').startOf('month').toISODate();
+  for (const item of await models.PayrollItem.find({ branchId: branch[branchName]._id, month: lastMonth }).lean()) {
+    if (item.net > 0) await salaryPayments.recordPayment(ctx, item._id, { amount: item.net, method: 'BANK', paidOn }, `seed-pay-${item._id}`);
+  }
+}
 
 // ===========================================================================
-// 7. Inventory add-on: Glamour Studio has it (Andheri is set up, Bandra isn't); Desert Rose doesn't.
+// 7. Inventory add-on: Glamour Studio has it, set up at both branches; Desert Rose doesn't.
 //    Made through the real inventory code, so every stock change is a movement in the history.
 // ===========================================================================
 await Organization.updateOne({ _id: glamour._id }, { $set: { 'addons.inventory.enabled': true, 'addons.inventory.enabledAt': new Date() } });
 const suresh = await User.create({ orgId: glamour._id, role: 'INVENTORY', name: 'Suresh (Andheri stock)', email: 'inventory.andheri@glamour.com', passwordHash, branchIds: [branch.Andheri._id] });
-const atAndheri = (user) => ({ ...asUser(user), activeBranchId: String(branch.Andheri._id), allowedBranchIds: user.allBranches ? asUser(user).allowedBranchIds : [String(branch.Andheri._id)], addons: ['inventory'] });
-const owner = atAndheri(anita);
-const keeper = atAndheri(suresh);
-const desk = atAndheri(kavya);
+const atBranch = (user, branchName) => ({ ...asUser(user), activeBranchId: String(branch[branchName]._id), allowedBranchIds: user.allBranches ? asUser(user).allowedBranchIds : [String(branch[branchName]._id)], addons: ['inventory'] });
+const owner = atBranch(anita, 'Andheri');
+const keeper = atBranch(suresh, 'Andheri');
+const desk = atBranch(kavya, 'Andheri');
 let seedKey = 0;
 const key = () => `seed-${++seedKey}`; // a fresh Idempotency-Key for each change
 
-const colourBar = (await createLocation(owner, { kind: 'STATION', name: 'Colour bar' }, key())).location;
 const lakme = (await createSupplier(owner, { name: 'Lakme Pro Distributors', contactName: 'Sanjay', phone: '9819900011', paymentTerms: '30 days', leadTimeDays: 3 }, key())).supplier;
 
-// One product for each way stock is used, and one for sale on bills
+// Three products: one used in the salon, one a service uses, one for sale on bills
 const product = async (input) => (await createSku(owner, input, key())).sku;
 const sku = {
   shampoo: await product({ name: 'Loreal Shampoo 1L', category: 'Hair care', brand: 'Loreal', stockUnit: 'bottle', wayOfUse: 'FINISH', openingQty: 8, openingUnitCost: toPaise(650), reorderPoint: 3, reorderQty: 6, preferredSupplierId: String(lakme._id), barcodes: ['8901030703461'] }),
   facialKit: await product({ name: 'Gold facial kit', category: 'Skin', stockUnit: 'kit', wayOfUse: 'SERVICE_UNITS', openingQty: 12, openingUnitCost: toPaise(480), reorderPoint: 4, reorderQty: 10, preferredSupplierId: String(lakme._id) }),
-  developer: await product({ name: 'Developer 6% (1 L)', category: 'Colour', stockUnit: 'bottle', wayOfUse: 'SERVICE_MEASURED', baseUnit: 'ml', unitsPerStockUnit: 1000, openingQty: 3400, openingUnitCost: toPaise(550), reorderPoint: 1000, reorderQty: 3000, preferredSupplierId: String(lakme._id) }),
-  gloves: await product({ name: 'Disposable gloves', category: 'Supplies', stockUnit: 'box', wayOfUse: 'MANUAL', openingQty: 6, openingUnitCost: toPaise(250) }),
   serum: await product({ name: 'Argan hair serum 100 ml', category: 'Retail', brand: 'Moroccanoil', type: 'RETAIL', stockUnit: 'bottle', wayOfUse: 'MANUAL', sellPrice: toPaise(1180), hsnCode: '3305', openingQty: 12, openingUnitCost: toPaise(620), reorderPoint: 3, reorderQty: 12, barcodes: ['8904099412001'] }),
 };
 
-// What services use: a facial takes one kit; hair colour takes developer
+// A facial takes one kit
 await saveRecipe(owner, { serviceId: String(gs.Facial._id), scope: 'salon', lines: [{ skuId: String(sku.facialKit._id), qty: 1, deducts: true }] }, key());
-await saveRecipe(owner, { serviceId: String(gs['Hair Colour']._id), scope: 'salon', lines: [{ skuId: String(sku.developer._id), qty: 60, deducts: true }] }, key());
 
-// Hand-outs: shampoo with Rahul (one already finished and replaced), developer at the colour bar
+// A shampoo bottle with Rahul, and an order from Lakme that has arrived in full
 const mainStore = (await models.InventoryLocation.findOne({ branchId: branch.Andheri._id, isMain: true }).lean())._id;
-const firstShampoo = (await issue(keeper, { skuId: String(sku.shampoo._id), locationId: String(mainStore), recipient: { kind: 'STAFF', id: String(staff.Rahul._id) }, qty: 1 }, key())).allocation;
-await finish(keeper, String(firstShampoo._id), { qty: 1, replacement: { qty: 1 } }, key());
-await issue(keeper, { skuId: String(sku.developer._id), locationId: String(mainStore), recipient: { kind: 'STATION', id: String(colourBar._id) }, qty: 1000 }, key());
-
-// A part-delivered order, a draft, a write-off waiting for approval (₹2,400) and a front desk problem report
-const lakmeOrder = (await createOrder(owner, { supplierId: String(lakme._id), lines: [{ skuId: String(sku.shampoo._id), qty: 6, unitCost: toPaise(650) }, { skuId: String(sku.developer._id), qty: 3000, unitCost: toPaise(560) }], note: 'Monthly order' }, key())).order;
+await issue(keeper, { skuId: String(sku.shampoo._id), locationId: String(mainStore), recipient: { kind: 'STAFF', id: String(staff.Rahul._id) }, qty: 1 }, key());
+const lakmeOrder = (await createOrder(owner, { supplierId: String(lakme._id), lines: [{ skuId: String(sku.shampoo._id), qty: 6, unitCost: toPaise(650) }], note: 'Monthly order' }, key())).order;
 await submitOrder(owner, String(lakmeOrder._id), key());
 await moveOrder(owner, String(lakmeOrder._id), 'order', {}, key());
 const orderedLines = (await models.InventoryPurchaseOrder.findById(lakmeOrder._id).lean()).lines;
 await receiveOrder(keeper, String(lakmeOrder._id), { invoiceNumber: 'LPD-20431', lines: [{ lineId: String(orderedLines[0]._id), qty: 6 }] }, key());
-await createOrder(keeper, { supplierId: String(lakme._id), lines: [{ skuId: String(sku.gloves._id), qty: 4 }] }, key());
-await writeOff(keeper, { skuId: String(sku.facialKit._id), locationId: String(mainStore), qty: 5, reason: 'EXPIRY', direction: 'REMOVE', note: 'Batch expired last week' }, key());
-await reportProblem(desk, { skuId: String(sku.gloves._id), locationId: String(mainStore), reason: 'DAMAGE', qty: 1, note: 'Box got wet near the sink' }, key());
 
 // Simple generated photos, so the catalogue has pictures
 const photoOf = (label, colour) =>
   sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"><rect width="800" height="800" fill="${colour}"/><text x="400" y="420" font-family="Arial, sans-serif" font-size="64" fill="#ffffff" text-anchor="middle">${label}</text></svg>`))
     .png()
     .toBuffer();
-for (const [item, label, colour] of [[sku.shampoo, 'Shampoo', '#6b4226'], [sku.facialKit, 'Facial kit', '#c9a227']]) {
+for (const [item, label, colour] of [[sku.shampoo, 'Shampoo', '#6b4226'], [sku.facialKit, 'Facial kit', '#c9a227'], [sku.serum, 'Hair serum', '#8a5a44']]) {
   await addImages(owner, String(item._id), [{ buffer: await photoOf(label, colour), originalname: `${item.code}.png` }], key());
 }
-await markSetupStep(owner, 'locations', key());
-await markSetupStep(owner, 'done', key());
+for (const branchName of ['Andheri', 'Bandra']) {
+  await markSetupStep(atBranch(anita, branchName), 'locations', key());
+  await markSetupStep(atBranch(anita, branchName), 'done', key());
+}
 
 // ===========================================================================
-// 8. Billing, made through the real billing code, like a day at the desk.
-//    Glamour Studio is GST registered; Desert Rose is not (plain bills).
+// 8. Billing, made through the real billing code, like a day at the desk: a visit checked out and a product sold,
+//    both paid in full. Then yesterday's cash days, counted and closed.
 // ===========================================================================
-const atMarina = { ...asUser(fatima), allowedBranchIds: [String(branch['Dubai Marina']._id)], activeBranchId: String(branch['Dubai Marina']._id), addons: [] };
-// A finished visit earlier today, ready for checkout
-const visit = (salon, branchName, customer, line) => Appointment.create(appointmentDoc({ salon, branchName, customer, start: A.minus({ minutes: 165 }), lines: [line], status: 'COMPLETED', source: 'walk-in' }));
-const bill = async (ctx, appointment, payments) => {
-  const draft = await openDraft(ctx, { appointmentId: appointment._id });
-  return issueInvoice(ctx, draft._id, { version: draft.version, payments }, key());
-};
-const serumSale = async (customer, qty, payments) => {
-  let draft = await createSaleDraft(desk, { customerId: String(customer._id) });
-  draft = await addProduct(desk, draft._id, { version: draft.version, skuId: String(sku.serum._id), qty });
-  return issueInvoice(desk, draft._id, { version: draft.version, payments: payments(draft.grandTotal) }, key());
-};
-
-// Part paid: ₹1,000 now, the rest due. And one billed with nothing paid ("pay later").
-await bill(desk, await visit(glamour, 'Andheri', gc['Priya Sharma'], [gs['Hair Colour'], staff.Rahul]), [{ method: 'UPI', amount: toPaise(1000), reference: 'UPI 4821' }]);
-await bill(desk, await visit(glamour, 'Andheri', gc['Karan Malhotra'], [gs.Haircut, staff.Rahul]), []);
-// An advance, to be used at checkout at any branch
-await takeAdvance(desk, { customerId: String(gc['Sneha Kapoor']._id), method: 'UPI', amount: toPaise(2000), reference: 'UPI 7730', note: 'Bridal package deposit' }, key());
-// Product sales: one serum returned (approved, with a GST credit note); another return waiting for the owner
-const twoSerums = await serumSale(gc['Amit Verma'], 2, (total) => [{ method: 'CARD', amount: total, reference: 'Card ••4417' }]);
-const asked = await createRefund(desk, { invoiceId: twoSerums._id, lines: [{ lineId: String(twoSerums.lines[0]._id), qty: 1, restock: 'SELLABLE' }], reason: 'Bought one too many', method: 'CARD' }, key());
-await approveRefund(owner, asked.refund._id, {}, key());
-const oneSerum = await serumSale(gc['Isha Patel'], 1, (total) => [{ method: 'CASH', amount: total }]);
-await createRefund(desk, { invoiceId: oneSerum._id, lines: [{ lineId: String(oneSerum.lines[0]._id), qty: 1, restock: 'DAMAGED' }], reason: 'Bottle was cracked when opened at home', method: 'CASH' }, key());
-// Desert Rose: a plain bill (not GST registered), paid in cash
-await bill(atMarina, await visit(desertRose, 'Dubai Marina', desertCustomers[1], [ds.Haircut, staff.Omar]), [{ method: 'CASH', amount: ds.Haircut.price }]);
-
-// GST setup, started but not activated, to try out: Glamour Studio's GSTINs are now dated registrations and the starter
-// 5% rule waits for approval. One customer is a business from another state. Bills stay as they are until the owner activates.
-await saveSetup(owner, { scheme: 'REGULAR', startMonth: now.setZone('Asia/Kolkata').toFormat('yyyy-MM') }, key());
-// A part refund to look at: half of a haircut, by amount. Activating GST setup adds these bills to the tax record.
-const halfRefunded = await bill(desk, await visit(glamour, 'Andheri', gc['Karan Malhotra'], [gs.Haircut, staff.Rahul]), [{ method: 'CASH', amount: gs.Haircut.price }]);
-await createRefund(owner, { invoiceId: halfRefunded._id, lines: [{ lineId: String(halfRefunded.lines[0]._id), partAmount: Math.round(gs.Haircut.price / 2) }], reason: 'Customer only wanted half the cut redone' }, key());
+const atMarina = { ...asUser(fatima), activeBranchId: String(branch['Dubai Marina']._id), addons: [] };
+const meeraVisit = await Appointment.create(appointmentDoc({ salon: glamour, branchName: 'Andheri', customer: gc['Meera Nair'], start: minutesFrom(A, -60), lines: [[gs['Hair Spa'], staff.Neha]], status: 'COMPLETED', source: 'walk-in' }));
+const meeraDraft = await openDraft(desk, { appointmentId: meeraVisit._id });
+const meeraBill = await issueInvoice(desk, meeraDraft._id, { version: meeraDraft.version, payments: [{ method: 'UPI', amount: meeraDraft.grandTotal, reference: 'UPI 5512' }] }, key());
+let serumDraft = await createSaleDraft(desk, { customerId: String(gc['Priya Sharma']._id) });
+serumDraft = await addProduct(desk, serumDraft._id, { version: serumDraft.version, skuId: String(sku.serum._id), qty: 1 });
+await issueInvoice(desk, serumDraft._id, { version: serumDraft.version, payments: [{ method: 'CARD', amount: serumDraft.grandTotal, reference: 'Card ••4417' }] }, key());
 await models.BillingSettings.updateOne({ orgId: glamour._id }, { $set: { 'branchOwners.viewGst': true } }); // Vikram can see GST for Bandra
-// Purchases to try out: one bill that matches GSTR-2B and one that doesn't, and a GSTR-2B row that isn't in the books
-const gstMonth = now.setZone('Asia/Kolkata').toFormat('yyyy-MM');
-const billDay = now.setZone('Asia/Kolkata').toISODate();
-const andheriGstin = demoGstin('27AAKCG4821M1Z');
-const supplierGstin = demoGstin('27AABCS1429B1Z');
-const demoBill = (billNumber, taxable, use) => addPurchase(owner, { gstin: andheriGstin, period: gstMonth, supplierName: 'Glow Salon Supplies', supplierGstin, billNumber, billDate: billDay, taxable: toPaise(taxable), igst: 0, cgst: toPaise(taxable * 0.09), sgst: toPaise(taxable * 0.09), use }, key());
-await demoBill('GSS-009', 500, 'NO_ITC_SERVICES');
-await demoBill('GSS-111', 1000, 'RESALE');
-const demo2b = { data: { gstin: andheriGstin, rtnprd: now.setZone('Asia/Kolkata').toFormat('MMyyyy'), docdata: { b2b: [{ ctin: supplierGstin, trdnm: 'Glow Salon Supplies', inv: [
-  { inum: 'GSS-009', dt: now.setZone('Asia/Kolkata').toFormat('dd-MM-yyyy'), val: 590, pos: '27', typ: 'R', itcavl: 'Y', items: [{ num: 1, rt: 18, txval: 500, igst: 0, cgst: 45, sgst: 45, cess: 0 }] },
-  { inum: 'GSS-222', dt: now.setZone('Asia/Kolkata').toFormat('dd-MM-yyyy'), val: 236, pos: '27', typ: 'R', itcavl: 'Y', items: [{ num: 1, rt: 18, txval: 200, igst: 0, cgst: 18, sgst: 18, cess: 0 }] },
-] }] } } };
-await import2b(owner, { gstin: andheriGstin, period: gstMonth }, { originalname: 'GSTR2B-demo.json', buffer: Buffer.from(JSON.stringify(demo2b)) }, key());
-await Customer.updateOne({ _id: gc['Amit Verma']._id }, { $set: { gstin: demoGstin('29AABCT3518Q1Z'), gstLegalName: 'Verma Traders LLP' } });
 
-// Yesterday's cash days, counted and closed (Andheri was ₹50 short); today's are left for the desk to open
-for (const [branchName, ctx, float, gap, note] of [['Andheri', desk, toPaise(3000), -toPaise(50), 'Gave change twice to one customer'], ['Dubai Marina', atMarina, toPaise(1500), 0, undefined]]) {
+// Yesterday's cash days, counted and closed with the drawer matching; today's are left for the desk to open
+for (const [branchName, ctx, float] of [['Andheri', desk, toPaise(3000)], ['Dubai Marina', atMarina, toPaise(1500)]]) {
   await models.CashSession.create({ orgId: branch[branchName].orgId, branchId: branch[branchName]._id, day: at(branchName, -1, '00:00').toISODate(), openingFloat: float, openedBy: deskOf[branchName]._id, openedByName: deskOf[branchName].name, openedAt: at(branchName, -1, '09:30').toJSDate() });
   const { session } = await currentCashDay(ctx); // yesterday's day, with what the drawer should hold
-  await closeCashDay(ctx, String(session._id), { countedCash: session.expectedCash + gap, note }, key());
+  await closeCashDay(ctx, String(session._id), { countedCash: session.expectedCash }, key());
 }
 
 // ===========================================================================
-// 9. Birthday & Anniversary Offers. Months are worked out from today, so the demo always looks live.
+// 9. Birthday Offers. Months are worked out from today, so the demo always looks live.
 //    Glamour Studio has the feature on; Desert Rose has it off.
 // ===========================================================================
-const occasionsOn = { ...anitaAtAndheri, occasionOffers: true };
+const occasionsOn = { ...asUser(anita), activeBranchId: String(branch.Andheri._id), occasionOffers: true };
 const deskOccasions = { ...desk, occasionOffers: true };
 await Organization.updateOne({ _id: glamour._id }, { $set: { 'occasionOffers.enabled': true, 'occasionOffers.enabledAt': new Date(), 'occasionOffers.enabledBy': anita._id } });
-for (const input of [
-  { type: 'BIRTHDAY', scope: 'BUSINESS_DEFAULT', name: 'Birthday Month Hair Spa', rules: { discountType: 'PERCENT', value: 1500, maxDiscount: toPaise(500), minSubtotal: 0, serviceIds: [String(gs['Hair Spa']._id)] } },
-  { type: 'ANNIVERSARY', scope: 'BUSINESS_DEFAULT', name: 'Anniversary Month Treat', rules: { discountType: 'FLAT', value: toPaise(300), minSubtotal: toPaise(1500), serviceIds: Object.values(gs).map((service) => String(service._id)) } },
-]) {
-  const { campaign } = await createCampaign(occasionsOn, input, key());
-  await publishCampaign(occasionsOn, String(campaign._id), key());
-}
-// This month: Priya (birthday, WhatsApp allowed, to contact), Meera (birthday offer already used),
-// Simran (anniversary, no permission: in-salon only, one call with no answer)
-const occasion = (day) => ({ month: A.month, day, source: 'STAFF', updatedAt: new Date() });
-await Customer.updateOne({ _id: gc['Priya Sharma']._id }, { $set: { 'occasions.birthday': occasion(Math.min(A.day + 3, 28)) } });
-await Customer.updateOne({ _id: gc['Meera Nair']._id }, { $set: { homeBranchId: branch.Andheri._id, 'occasions.birthday': occasion(Math.max(A.day - 2, 1)) } });
-const simran = await Customer.create({ orgId: glamour._id, name: 'Simran Kaur', phone: '9820011021', homeBranchId: branch.Andheri._id, occasions: { anniversary: occasion(Math.min(A.day + 5, 28)) } });
+const { campaign } = await createCampaign(occasionsOn, { type: 'BIRTHDAY', scope: 'BUSINESS_DEFAULT', name: 'Birthday Month Hair Spa', rules: { discountType: 'PERCENT', value: 1500, maxDiscount: toPaise(500), minSubtotal: 0, serviceIds: [String(gs['Hair Spa']._id)] } }, key());
+await publishCampaign(occasionsOn, String(campaign._id), key());
+// Priya's birthday is in a few days and she is happy to hear about it on WhatsApp
+await Customer.updateOne({ _id: gc['Priya Sharma']._id }, { $set: { 'occasions.birthday': { month: A.month, day: Math.min(A.day + 3, 28), source: 'STAFF', updatedAt: new Date() } } });
 await recordConsent(deskOccasions, String(gc['Priya Sharma']._id), { channel: 'WHATSAPP', status: 'OPTED_IN', source: 'IN_SALON', agreed: true, customerAsked: true, note: 'Asked at the counter' }, key());
-await migrateOccasions({ log: () => {} }); // permission "not recorded" for Simran
 await runForOrg(glamour._id, { force: true, by: 'MANUAL' });
-const simranOffer = await models.OfferIssue.findOne({ customerId: simran._id, type: 'ANNIVERSARY' }).lean();
-await recordContact(deskOccasions, String(simranOffer._id), { outcome: 'NO_ANSWER' }, key());
-// Meera came in for a Hair Spa and used her birthday offer
-const meeraOffer = await models.OfferIssue.findOne({ customerId: gc['Meera Nair']._id, type: 'BIRTHDAY' }).lean();
-const spaDraft = await openDraft(deskOccasions, { appointmentId: (await visit(glamour, 'Andheri', gc['Meera Nair'], [gs['Hair Spa'], staff.Neha]))._id });
-const withOffer = await setInvoiceOffer(deskOccasions, spaDraft._id, { offerIssueId: String(meeraOffer._id), version: spaDraft.version });
-await issueInvoice(deskOccasions, spaDraft._id, { version: withOffer.version, payments: [{ method: 'UPI', amount: withOffer.grandTotal, reference: 'UPI 5512' }] }, key());
 
 // ===========================================================================
-// 10. Email: a few emails already sent or failed, for Email → Recent emails and the bill page.
+// 10. Email: two emails already sent, for Email → Recent emails and the bill page.
 //     Saved as finished rows, so nothing is really sent.
 // ===========================================================================
 const minutesAgo = (m) => new Date(Date.now() - m * 60_000);
-const meeraBill = await models.Invoice.findById(spaDraft._id).select('invoiceNumber').lean();
 const emailRow = (org, fields) => ({ orgId: org._id, html: '<p>Demo email</p>', text: 'Demo email', fromName: org.name, replyTo: org.contactEmail, attempts: 1, nextAttemptAt: fields.createdAt, ...fields });
 const demoEmails = [
-  emailRow(glamour, { kind: 'BILL', priority: 3, to: 'meera.nair@example.com', subject: `Your bill ${meeraBill.invoiceNumber} from Glamour Studio`, branchId: branch.Andheri._id, attachment: { type: 'INVOICE', id: spaDraft._id }, ref: { invoiceId: spaDraft._id }, dedupeKey: 'seed:bill', status: 'SENT', via: 'SMTP', createdAt: minutesAgo(90), sentAt: minutesAgo(89), createdBy: { id: kavya._id, name: kavya.name } }),
-  emailRow(glamour, { kind: 'OCCASION_OFFER', priority: 4, to: 'priya.sharma@exmaple.com', subject: 'A birthday treat from Glamour Studio', branchId: branch.Andheri._id, dedupeKey: 'seed:offer-failed', status: 'FAILED', errorKind: 'BAD_ADDRESS', lastError: 'The email address isn’t valid.', errorDetail: 'Invalid email: priya.sharma@exmaple.com', createdAt: minutesAgo(60), createdBy: { id: kavya._id, name: kavya.name } }),
+  emailRow(glamour, { kind: 'BILL', priority: 3, to: 'meera.nair@example.com', subject: `Your bill ${meeraBill.invoiceNumber} from Glamour Studio`, branchId: branch.Andheri._id, attachment: { type: 'INVOICE', id: meeraBill._id }, ref: { invoiceId: meeraBill._id }, dedupeKey: 'seed:bill', status: 'SENT', via: 'SMTP', createdAt: minutesAgo(2), sentAt: minutesAgo(1), createdBy: { id: kavya._id, name: kavya.name } }),
   emailRow(desertRose, { kind: 'TEST', priority: 2, to: 'owner@desertrose.com', subject: 'Test email from Desert Rose Salon', dedupeKey: 'seed:test', status: 'SENT', via: 'APPS_SCRIPT', createdAt: minutesAgo(200), sentAt: minutesAgo(200) }),
 ];
 // Checked like any email, then saved as they are (so the demo times are kept)
@@ -539,9 +462,9 @@ await models.EmailOutbox.collection.insertMany(demoEmails.map((row) => ({ ...row
 // ===========================================================================
 // Done
 // ===========================================================================
-const [customerCount, appointmentCount, billCount, offerCount] = await Promise.all([Customer.countDocuments(), Appointment.countDocuments(), Invoice.countDocuments(), models.OfferIssue.countDocuments()]);
+const [customerCount, appointmentCount, billCount] = await Promise.all([Customer.countDocuments(), Appointment.countDocuments(), Invoice.countDocuments()]);
 console.log(`\nSeeded: 2 salons, 3 branches, ${Object.keys(staff).length} staff, ${GLAMOUR_SERVICES.length + DESERT_ROSE_SERVICES.length} services, 1 combo, ${customerCount} customers, ${LEADS.length} leads,`);
-console.log(`        ${appointmentCount} appointments, ${billCount} bills, ${attendance.length} attendance records, ${Object.keys(sku).length} products, ${offerCount} offers, ${demoEmails.length} emails`);
+console.log(`        ${appointmentCount} appointments, ${billCount} bills, ${Object.keys(sku).length} products, ${demoEmails.length} emails`);
 console.log(`Today is centred on ${A.toFormat('h:mm a')} at Andheri (${A.zoneName}).`);
 console.log('\nEvery account uses the password:', DEMO_PASSWORD);
 console.table([

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { CheckCircle2, CircleAlert, Info } from 'lucide-react';
 import { refusalText, useActivateGst, useSaveGstSetup } from '../../api/gst';
+import { ITC_LABEL, percentLabel } from '../../lib/billing';
 import { formatDateTime, formatMonth } from '../../lib/time';
 import { newRequestKey } from '../../lib/requestKey';
 import { Badge, Button, Card, ConfirmDialog, Input, Select } from '../../components/ui';
@@ -19,7 +20,7 @@ const SCHEMES = [
   { value: 'QRMP', label: 'QRMP', unsupported: true },
 ];
 
-// The Settings tab: registration type, registrations, tax rules, a test bill, then Activate.
+// The Settings tab: registration type, registrations, tax rules and a sample bill, with Activate at the top.
 // The business owner changes things; branch owners can look.
 export default function GstSettingsTab({ setup }) {
   return (
@@ -106,7 +107,17 @@ function Status({ setup }) {
         loading={activate.isPending}
         title="Activate GST setup"
         confirmLabel="Activate"
-        message="Every bill issued from now on takes its tax from your approved rules and goes in the permanent tax record, and a bill with no approved rule can’t be issued. GST bills from your start month on are added to the record too. Bills already issued don’t change."
+        message={
+          <>
+            {setup.toApprove.length > 0 && (
+              <span className="mb-2 block">
+                This approves your tax rules:{' '}
+                {setup.toApprove.map((rule) => `${rule.name} (${rule.kind === 'PRODUCT' ? 'HSN' : 'SAC'} ${rule.code}, ${percentLabel(rule.rateBps)} ${ITC_LABEL[rule.itcType]})`).join(' and ')}.
+              </span>
+            )}
+            Every bill issued from now on takes its tax from your rules and goes in the permanent tax record. GST bills from your start month on are added to the record too. Bills already issued don’t change.
+          </>
+        }
       />
     </Card>
   );
@@ -116,7 +127,7 @@ function Status({ setup }) {
 function SchemeCard({ setup }) {
   const save = useSaveGstSetup();
   const [scheme, setScheme] = useState(setup.scheme);
-  const [startMonth, setStartMonth] = useState(setup.startMonth);
+  const [startMonth, setStartMonth] = useState(setup.startMonth || setup.today.slice(0, 7));
   const [pricesIncludeTax, setPricesIncludeTax] = useState(setup.pricesIncludeTax);
   const [askingReason, setAskingReason] = useState(false);
 

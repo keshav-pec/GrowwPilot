@@ -6,17 +6,18 @@ import { scoped } from '../../utils/scoped.js';
 import { todayInZone } from '../../utils/time.js';
 import { runOnce } from '../../middleware/idempotency.js';
 import { GST_STATES, isValidGstin } from '../../config/billing.js';
-import { STARTER_RULE, SUPPORTED_GST_SCHEMES, UNIT_CODES, UNIT_SUGGESTIONS } from '../../config/gst.js';
+import { STARTER_PRODUCT_RULE, STARTER_RULE, SUPPORTED_GST_SCHEMES, TAX_CODE_REGEX, UNIT_CODES, UNIT_SUGGESTIONS } from '../../config/gst.js';
 import { logActivity } from '../activity/activity.service.js';
 import { getBillingSettings } from '../billing/settings.service.js';
 import { computeBill } from '../billing/tax.rules.js';
 import { billContext, gstSetupActive, ruleTax } from './gst.billing.js';
 import { addOlderDocuments } from './gst.ledger.js';
-import { clashingRules, dayBefore, niceDate, periodsOverlap, registrationFor, ruleFor, setupChecks } from './gst.rules.js';
+import { clashingRules, dayBefore, draftsToApprove, niceDate, periodsOverlap, registrationFor, ruleFor, setupChecks } from './gst.rules.js';
 
 // ---------------------------------------------------------------------------
-// GST setup: the business owner chooses Not registered or Regular, adds dated GST registrations and links branches,
-// approves dated tax rules, tries test bills, and activates. Branch owners can look. Nobody else gets in.
+// GST setup: the business owner chooses Regular and presses Save (branch GSTINs move over, ready-made tax rules are added
+// and linked), checks the rules, and activates, which approves them. Registrations, rules and test bills can be changed
+// or tried on the way. Branch owners can look. Nobody else gets in.
 // Until a salon activates, its bills work exactly as before.
 // ---------------------------------------------------------------------------
 
@@ -38,9 +39,52 @@ async function chargeableItems(ctx, session = null) {
 }
 
 async function checksFor(ctx, settings, session = null) {
-  const [branches, registrations, rules, items] = [await branchesOf(ctx, session), await GstRegistration.find(scoped(ctx)).session(session).lean(), await GstTaxRule.find(scoped(ctx, { status: 'APPROVED' })).session(session).lean(), await chargeableItems(ctx, session)];
+  const [branches, registrations, rules, items] = [await branchesOf(ctx, session), await GstRegistration.find(scoped(ctx)).session(session).lean(), await GstTaxRule.find(scoped(ctx)).session(session).lean(), await chargeableItems(ctx, session)];
   const today = todayInZone(branches[0]?.timezone ?? INDIA);
   return setupChecks({ settings, today, branches, registrations, rules, ...items });
+}
+
+// The draft rules that activating approves
+function rulesToApprove(rules, { services, products }, today) {
+  return draftsToApprove(rules, [...services, ...products], today).map((r) => ({ _id: r._id, name: r.name, kind: r.kind, code: r.code, rateBps: r.rateBps, itcType: r.itcType }));
+}
+
+// Every service (or product for sale) with no rule yet gets this rule group
+async function linkItems(ctx, kind, groupId, session) {
+  const result = kind === 'SERVICE'
+    ? await Service.updateMany(scoped(ctx, { status: 'active', taxRuleGroupId: null }), { $set: { taxRuleGroupId: groupId } }, { session })
+    : await InventorySku.updateMany(scoped(ctx, { ...SALE_PRODUCTS, taxRuleGroupId: null }), { $set: { taxRuleGroupId: groupId }, $inc: { version: 1 } }, { session });
+  return result.modifiedCount;
+}
+
+// The HSN code most products for sale already have
+async function commonHsnCode(ctx, session) {
+  const codes = (await InventorySku.find(scoped(ctx, SALE_PRODUCTS)).select('hsnCode').session(session).lean()).map((p) => p.hsnCode).filter((code) => TAX_CODE_REGEX.test(code ?? ''));
+  const counts = new Map();
+  for (const code of codes) counts.set(code, (counts.get(code) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+}
+
+// A ready-made draft rule for services, and one for products for sale when there are any, each linked to every item
+// with no rule yet. A kind that already has exactly one rule gets its unlinked items linked to it instead.
+async function addStarterRules(ctx, settings, session) {
+  const rules = await GstTaxRule.find(scoped(ctx)).session(session).lean();
+  const { products } = await chargeableItems(ctx, session);
+  const starters = [{ ...STARTER_RULE, code: settings.defaultSacCode || STARTER_RULE.code }];
+  if (products.length > 0) starters.push({ ...STARTER_PRODUCT_RULE, code: (await commonHsnCode(ctx, session)) ?? STARTER_PRODUCT_RULE.code });
+  const added = [];
+  for (const starter of starters) {
+    const groups = [...new Set(rules.filter((r) => r.kind === starter.kind).map((r) => String(r.groupId)))];
+    if (groups.length > 1) continue;
+    let groupId = groups[0];
+    if (!groupId) {
+      groupId = new mongoose.Types.ObjectId();
+      await GstTaxRule.create([{ ...starter, orgId: ctx.orgId, groupId, createdBy: ctx.userId }], { session });
+      added.push(starter.name);
+    }
+    await linkItems(ctx, starter.kind, groupId, session);
+  }
+  return added;
 }
 
 // The units products for sale are counted in, each with its official code for Table 12 (or a suggestion to confirm)
@@ -53,7 +97,7 @@ async function unitsForSetup(ctx, settings) {
 
 // What the Overview lists as needing attention
 export async function setupStateFor(ctx, settings) {
-  return { problems: (await checksFor(ctx, settings)).filter((c) => !c.ok && c.key !== 'testBill') };
+  return { problems: (await checksFor(ctx, settings)).filter((c) => !c.ok) };
 }
 
 // ---- moving existing branch GSTINs -----------------------------------------
@@ -142,6 +186,7 @@ export async function getSetup(ctx) {
     groups: rulesByGroup(rules, today),
     unlinked: { SERVICE: noGroup(items.services), PRODUCT: noGroup(items.products) },
     checks: await checksFor(ctx, settings),
+    toApprove: gstSetupActive(settings) ? [] : rulesToApprove(rules, items, today),
     canEdit: Boolean(ctx.isPrimaryOwner),
     canViewTax: Boolean(ctx.isPrimaryOwner || settings.branchOwners?.viewGst),
     units: await unitsForSetup(ctx, settings),
@@ -172,12 +217,11 @@ export async function saveSetup(ctx, { scheme, startMonth, pricesIncludeTax, rea
     const set = { 'gst.scheme': scheme };
     if (pricesIncludeTax !== undefined) set.pricesIncludeTax = pricesIncludeTax;
     if (scheme === 'REGULAR') {
-      if (startMonth) set['gst.startMonth'] = startMonth;
+      // No start month sent and none saved yet: this month
+      const month = startMonth === undefined && !before.gst?.startMonth ? DateTime.now().setZone(INDIA).toFormat('yyyy-MM') : startMonth;
+      if (month) set['gst.startMonth'] = month;
       await moveBranchGstins(ctx.orgId, session);
-      if (!(await GstTaxRule.exists(scoped(ctx)).session(session))) {
-        const code = before.defaultSacCode || STARTER_RULE.code;
-        await GstTaxRule.create([{ ...STARTER_RULE, code, orgId: ctx.orgId, groupId: new mongoose.Types.ObjectId(), createdBy: ctx.userId }], { session });
-      }
+      await addStarterRules(ctx, before, session);
     } else {
       set.gstRegistered = false;
       set['gst.status'] = 'NOT_ACTIVE';
@@ -328,8 +372,9 @@ export async function deleteRule(ctx, id, key) {
   });
 }
 
-// The business owner approves a draft and says who reviewed it. An older rule with no end date ends the day before.
+// The business owner approves a draft, and can say who reviewed it. An older rule with no end date ends the day before.
 export async function approveRule(ctx, id, { reviewedBy }, key) {
+  const reviewer = reviewedBy?.trim() || null;
   assertBusinessOwner(ctx);
   return runOnce(ctx, { key, operation: 'gst.rule.approve' }, async (session) => {
     const rule = await GstTaxRule.findOne(scoped(ctx, { _id: id })).session(session).lean();
@@ -344,10 +389,10 @@ export async function approveRule(ctx, id, { reviewedBy }, key) {
     }
     await GstTaxRule.updateOne(
       scoped(ctx, { _id: id, status: 'DRAFT' }),
-      { $set: { status: 'APPROVED', reviewedBy: reviewedBy.trim(), approvedBy: ctx.userId, approvedByName: ctx.userName, approvedAt: new Date() } },
+      { $set: { status: 'APPROVED', reviewedBy: reviewer, approvedBy: ctx.userId, approvedByName: ctx.userName, approvedAt: new Date() } },
       { session }
     );
-    await logActivity(ctx, { action: 'billing.gst_rule_approved', summary: `Approved the tax rule ${rule.name}: ${rule.code}, ${rule.rateBps / 100}% from ${rule.from} (reviewed by ${reviewedBy.trim()})`, after: { ruleId: id, reviewedBy: reviewedBy.trim() } }, session);
+    await logActivity(ctx, { action: 'billing.gst_rule_approved', summary: `Approved the tax rule ${rule.name}: ${rule.code}, ${rule.rateBps / 100}% from ${rule.from}${reviewer ? ` (reviewed by ${reviewer})` : ''}`, after: { ruleId: id, reviewedBy: reviewer } }, session);
     return { approved: true };
   });
 }
@@ -358,17 +403,15 @@ export async function linkUnlinked(ctx, groupId, key) {
   return runOnce(ctx, { key, operation: 'gst.rule.link' }, async (session) => {
     const rule = await GstTaxRule.findOne(scoped(ctx, { groupId })).session(session).lean();
     if (!rule) throw new AppError(404, 'NOT_FOUND', 'Tax rule not found');
-    const result = rule.kind === 'SERVICE'
-      ? await Service.updateMany(scoped(ctx, { status: 'active', taxRuleGroupId: null }), { $set: { taxRuleGroupId: groupId } }, { session })
-      : await InventorySku.updateMany(scoped(ctx, { ...SALE_PRODUCTS, taxRuleGroupId: null }), { $set: { taxRuleGroupId: groupId }, $inc: { version: 1 } }, { session });
-    await logActivity(ctx, { action: 'billing.gst_rule_linked', summary: `Linked ${result.modifiedCount} ${rule.kind === 'SERVICE' ? 'services' : 'products'} to the tax rule ${rule.name}`, after: { groupId, count: result.modifiedCount } }, session);
-    return { linked: result.modifiedCount };
+    const linked = await linkItems(ctx, rule.kind, groupId, session);
+    await logActivity(ctx, { action: 'billing.gst_rule_linked', summary: `Linked ${linked} ${rule.kind === 'SERVICE' ? 'services' : 'products'} to the tax rule ${rule.name}`, after: { groupId, count: linked } }, session);
+    return { linked };
   });
 }
 
 // ---- test bills and activation ---------------------------------------------
 
-// A sample bill worked out exactly like a real one. Nothing is saved except that a working test bill was tried.
+// A sample bill worked out exactly like a real one, with the approved rules. Nothing is saved.
 // input: { branchId, placeOfSupply?, date?, billDiscount?, lines: [{ groupId, name?, unitPrice, qty }] }
 export async function testBill(ctx, { branchId, placeOfSupply, date, billDiscount, lines }) {
   assertBusinessOwner(ctx);
@@ -390,7 +433,6 @@ export async function testBill(ctx, { branchId, placeOfSupply, date, billDiscoun
     billDiscount ?? null,
     { gstRegistered: true, pricesIncludeTax: settings.pricesIncludeTax, useTaxRules: true, interstate: gst.interstate }
   );
-  if (blockers.length === 0) await BillingSettings.updateOne(scoped(ctx), { $set: { 'gst.testBillAt': new Date() } }, { upsert: true });
   return {
     date: gst.taxDate,
     gstin: gst.registration?.gstin ?? null,
@@ -404,7 +446,8 @@ export async function testBill(ctx, { branchId, placeOfSupply, date, billDiscoun
   };
 }
 
-// Every check must pass. Bills issued from now on use the approved rules. The configuration is kept in the activity log.
+// Every check must pass. The draft rules services and products point to for today are approved, and bills issued from
+// now on use the approved rules. The configuration is kept in the activity log.
 // Older GST bills from the start month on are then added to the tax record (the nightly check finishes the job if the server stops).
 export async function activate(ctx, key) {
   assertBusinessOwner(ctx);
@@ -416,6 +459,12 @@ export async function activate(ctx, key) {
     if (failed.length > 0) throw new AppError(409, failed.some((c) => c.code === 'REGISTRATION_INVALID') ? 'REGISTRATION_INVALID' : 'GST_CONFIGURATION_INCOMPLETE', failed[0].message, { checks: failed });
 
     const now = new Date();
+    const branches = await branchesOf(ctx, session);
+    const drafts = rulesToApprove(await GstTaxRule.find(scoped(ctx)).session(session).lean(), await chargeableItems(ctx, session), todayInZone(branches[0]?.timezone ?? INDIA));
+    for (const rule of drafts) {
+      await GstTaxRule.updateOne(scoped(ctx, { _id: rule._id, status: 'DRAFT' }), { $set: { status: 'APPROVED', approvedBy: ctx.userId, approvedByName: ctx.userName, approvedAt: now } }, { session });
+      await logActivity(ctx, { action: 'billing.gst_rule_approved', summary: `Approved the tax rule ${rule.name} on activating: ${rule.code}, ${rule.rateBps / 100}%`, after: { ruleId: rule._id } }, session);
+    }
     const registrations = await GstRegistration.find(scoped(ctx)).session(session).lean();
     const rules = await GstTaxRule.find(scoped(ctx, { status: 'APPROVED' })).session(session).lean();
     const first = registrations.find((r) => !r.to);

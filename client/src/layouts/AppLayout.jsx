@@ -23,17 +23,17 @@ import { useAuth } from '../auth/AuthContext';
 import { hasAddon } from '../lib/constants';
 
 // Sidebar menu. `roles` says who sees each item; `addon` hides it unless the salon has that add-on;
-// `businessOwner` shows it only to the owner who sees every branch.
+// `businessOwner` shows it only to the owner who sees every branch; `hidden` takes it off the menu (code kept).
 const APP_NAV = [
   { to: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['OWNER'] },
   { to: '/app/today', label: 'Day board', icon: CalendarClock, roles: ['OWNER', 'FRONT_DESK'] },
+  { to: '/app/attendance', label: 'Attendance', icon: ClipboardCheck, roles: ['OWNER', 'FRONT_DESK'] },
   { to: '/app/appointments', label: 'Appointments', icon: CalendarDays, roles: ['OWNER', 'FRONT_DESK'] },
   { to: '/app/bills', label: 'Bills', icon: Receipt, roles: ['OWNER', 'FRONT_DESK'] },
-  { to: '/app/cash', label: 'Cash drawer', icon: Banknote, roles: ['OWNER', 'FRONT_DESK'] },
+  { to: '/app/cash', label: 'Cash drawer', icon: Banknote, roles: ['OWNER', 'FRONT_DESK'], hidden: true },
   { to: '/app/gst', label: 'GST', icon: Landmark, roles: ['OWNER'] },
   { to: '/app/customers', label: 'Customers', icon: Users, roles: ['OWNER', 'FRONT_DESK'] },
-  { to: '/app/leads', label: 'Leads', icon: Target, roles: ['OWNER', 'FRONT_DESK'] },
-  { to: '/app/attendance', label: 'Attendance', icon: ClipboardCheck, roles: ['OWNER', 'FRONT_DESK'] },
+  { to: '/app/leads', label: 'Leads', icon: Target, roles: ['OWNER', 'FRONT_DESK'], hidden: true },
   { to: '/app/inventory', label: 'Inventory', icon: Package, roles: ['OWNER', 'FRONT_DESK', 'INVENTORY'], addon: 'inventory' },
   { to: '/app/analytics', label: 'Analytics', icon: ChartColumn, roles: ['OWNER'] },
   { to: '/app/team', label: 'Team', icon: UserCog, roles: ['OWNER'] },
@@ -52,7 +52,7 @@ export default function AppLayout() {
   const { user } = useAuth();
   const occasionsOn = Boolean(user.org?.occasionOffers?.enabled);
   const navItems = APP_NAV.filter(
-    (item) => item.roles.includes(user.role) && (!item.addon || hasAddon(user, item.addon)) && (item.occasions === undefined || item.occasions === occasionsOn) && (!item.businessOwner || user.allBranches)
+    (item) => !item.hidden && item.roles.includes(user.role) && (!item.addon || hasAddon(user, item.addon)) && (item.occasions === undefined || item.occasions === occasionsOn) && (!item.businessOwner || user.allBranches)
   );
 
   return (

@@ -95,10 +95,10 @@ I will build with my suggestion unless you choose differently. Decisions 2 and 3
 - **GST setup screen:** the owner picks Not registered or Regular. Composition and QRMP show "Not supported" and can't file.
 - **GST registrations:** GSTIN, legal name, state, monthly filing and a start date. Each branch links to one GSTIN for any given date, and overlaps are refused. Fixing a GSTIN adds a new dated row. Current branch GSTINs move here automatically, so there is one place to edit them.
 - **Start month:** the first month this salon's returns come from the app. Earlier months stay out of it.
-- **Tax rules:** name, SAC or HSN code, rate, ITC type, and from/to dates. Only the business owner approves a rule, and records who reviewed it. An approved rule can't be edited; a change is a new dated rule. Overlapping dates are refused.
-- **Starter rule:** salon services at 5% without ITC from 22 Sep 2025. There is no ready-made product rate, because rates depend on the HSN code.
+- **Tax rules:** name, SAC or HSN code, rate, ITC type, and from/to dates. Only the business owner approves a rule, and can record who reviewed it. An approved rule can't be edited; a change is a new dated rule. Overlapping dates are refused.
+- **Starter rules:** salon services at 5% without ITC from 22 Sep 2025, and products for sale at 18% with ITC, using the HSN code most products have. A GST practitioner should check both.
 - **Services and products** point to a tax rule. Staff never choose a rate.
-- **Test bills and Activate:** the owner tries sample bills, sees the tax, then activates.
+- **Save and Activate:** Save adds ready-made rules for services and products, linked to everything; Activate approves them. Test bills are there to try the tax.
 - **After activation:** a line with no approved rule or code can't be issued, and the error links to the service or product to fix.
 - **Bills:** the rule is chosen by the issue date and saved on the line. Rounding follows decision 3.
 - **Buyer and place of supply:** a GSTIN on the customer for business bills. Place of supply defaults to the branch's state. Another state means IGST on the bill, tax table and PDF. If the place can't be worked out, the bill is blocked.

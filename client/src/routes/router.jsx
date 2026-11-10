@@ -19,8 +19,9 @@ import AppointmentsPage from '../features/appointments/AppointmentsPage';
 import BookingPage from '../features/appointments/BookingPage';
 import CustomersPage from '../features/customers/CustomersPage';
 import CustomerProfilePage from '../features/customers/CustomerProfilePage';
-import LeadsPage from '../features/leads/LeadsPage';
-import LeadConvertPage from '../features/leads/LeadConvertPage';
+// Leads and Cash drawer are hidden for now; their pages are kept. Put these imports and routes back to show them again.
+// import LeadsPage from '../features/leads/LeadsPage';
+// import LeadConvertPage from '../features/leads/LeadConvertPage';
 import CheckoutPage from '../features/checkout/CheckoutPage';
 import InvoicePage from '../features/checkout/InvoicePage';
 import BillsListPage from '../features/billing/BillsListPage';
@@ -37,7 +38,7 @@ import OccasionReportsPage from '../features/occasions/reports/OccasionReportsPa
 import SaleEditPage from '../features/billing/SaleEditPage';
 import RefundPage from '../features/billing/RefundPage';
 import AdvancePage from '../features/billing/AdvancePage';
-import CashPage from '../features/billing/CashPage';
+// import CashPage from '../features/billing/CashPage'; // hidden for now, see above
 import DuesPage from '../features/billing/DuesPage';
 import BillingReportsPage from '../features/billing/BillingReportsPage';
 import AttendancePage from '../features/attendance/AttendancePage';
@@ -110,15 +111,15 @@ export const router = createBrowserRouter([
               { path: 'appointments/:id/edit', element: <BookingPage /> },
               { path: 'customers', element: <CustomersPage /> },
               { path: 'customers/:id', element: <CustomerProfilePage /> },
-              { path: 'leads', element: <LeadsPage /> },
-              { path: 'leads/:id/convert', element: <LeadConvertPage /> },
+              // { path: 'leads', element: <LeadsPage /> }, // hidden for now
+              // { path: 'leads/:id/convert', element: <LeadConvertPage /> },
               { path: 'checkout/:appointmentId', element: <CheckoutPage /> },
               { path: 'invoices/:id', element: <InvoicePage /> },
               { path: 'bills', element: <BillsListPage /> },
               { path: 'bills/:id/edit', element: <SaleEditPage /> }, // a product-only sale while it's a draft
               { path: 'refunds/:id', element: <RefundPage /> }, // credit note or refund receipt
               { path: 'advances/:id', element: <AdvancePage /> }, // receipt voucher
-              { path: 'cash', element: <CashPage /> },
+              // { path: 'cash', element: <CashPage /> }, // hidden for now
               { path: 'dues', element: <DuesPage /> },
               { path: 'billing/reports', element: <BillingReportsPage /> }, // front desk: today's collections only
               { path: 'attendance', element: <AttendancePage /> },

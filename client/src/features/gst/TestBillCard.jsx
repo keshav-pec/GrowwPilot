@@ -6,7 +6,8 @@ import { formatMoney, isValidRupees, toPaise } from '../../lib/money';
 import { formatDate } from '../../lib/time';
 import { Button, Card, Input, Select, SummaryRow } from '../../components/ui';
 
-// Try sample bills and see the tax, worked out exactly like a real bill. No bill is saved.
+// Try sample bills and see the tax, worked out exactly like a real bill with the approved rules. No bill is saved.
+// Shown once a rule is approved for today.
 export default function TestBillCard({ setup }) {
   const test = useTestBill();
   const branches = setup.branches.filter((b) => b.status !== 'archived');
@@ -20,6 +21,7 @@ export default function TestBillCard({ setup }) {
   const qtyOk = (line) => /^[1-9]\d{0,2}$/.test(line.qty);
   const valid = branchId && date && lines.every((l) => l.groupId && isValidRupees(l.price) && qtyOk(l));
   const result = test.data;
+  if (ruleOptions.length === 0) return null;
 
   function tryIt() {
     test.mutate({ branchId, placeOfSupply: place, date, lines: lines.map((l) => ({ groupId: l.groupId, unitPrice: toPaise(l.price), qty: Number(l.qty) })) });
@@ -27,37 +29,33 @@ export default function TestBillCard({ setup }) {
 
   return (
     <Card title="Test bill">
-      {ruleOptions.length === 0 ? (
-        <p className="text-sm text-muted">Approve a tax rule first, then try a sample bill here.</p>
-      ) : (
-        <div className="flex flex-col gap-4 text-sm">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Select label="Branch" options={branches.map((b) => ({ value: b._id, label: b.name }))} value={branchId} onChange={(e) => setBranchId(e.target.value)} />
-            <Select label="Place of supply" options={[{ value: '', label: 'This branch’s state' }, ...GST_STATES]} value={place} onChange={(e) => setPlace(e.target.value)} />
-            <Input label="Bill date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          {lines.map((line, i) => (
-            <div key={i} className="grid items-end gap-2 sm:grid-cols-[1fr_8rem_5rem_auto]">
-              <Select label="Tax rule" placeholder="Choose a rule" options={ruleOptions} value={line.groupId} onChange={(e) => setLine(i, { groupId: e.target.value })} />
-              <Input label="Price (₹)" inputMode="decimal" placeholder="1050" value={line.price} onChange={(e) => setLine(i, { price: e.target.value })} />
-              <Input label="Qty" inputMode="numeric" value={line.qty} onChange={(e) => setLine(i, { qty: e.target.value })} />
-              <Button variant="ghost" aria-label="Remove line" disabled={lines.length === 1} onClick={() => setLines((rows) => rows.filter((_, n) => n !== i))}>
-                <Trash2 size={14} />
-              </Button>
-            </div>
-          ))}
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setLines((rows) => [...rows, newLine()])}>
-              <Plus size={14} /> Add a line
-            </Button>
-            <Button size="sm" disabled={!valid} loading={test.isPending} onClick={tryIt}>
-              Work out the tax
-            </Button>
-          </div>
-          {test.isError && <p className="text-danger">{refusalText(test.error)}</p>}
-          {result && <TestResult result={result} />}
+      <div className="flex flex-col gap-4 text-sm">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Select label="Branch" options={branches.map((b) => ({ value: b._id, label: b.name }))} value={branchId} onChange={(e) => setBranchId(e.target.value)} />
+          <Select label="Place of supply" options={[{ value: '', label: 'This branch’s state' }, ...GST_STATES]} value={place} onChange={(e) => setPlace(e.target.value)} />
+          <Input label="Bill date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
-      )}
+        {lines.map((line, i) => (
+          <div key={i} className="grid items-end gap-2 sm:grid-cols-[1fr_8rem_5rem_auto]">
+            <Select label="Tax rule" placeholder="Choose a rule" options={ruleOptions} value={line.groupId} onChange={(e) => setLine(i, { groupId: e.target.value })} />
+            <Input label="Price (₹)" inputMode="decimal" placeholder="1050" value={line.price} onChange={(e) => setLine(i, { price: e.target.value })} />
+            <Input label="Qty" inputMode="numeric" value={line.qty} onChange={(e) => setLine(i, { qty: e.target.value })} />
+            <Button variant="ghost" aria-label="Remove line" disabled={lines.length === 1} onClick={() => setLines((rows) => rows.filter((_, n) => n !== i))}>
+              <Trash2 size={14} />
+            </Button>
+          </div>
+        ))}
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setLines((rows) => [...rows, newLine()])}>
+            <Plus size={14} /> Add a line
+          </Button>
+          <Button size="sm" disabled={!valid} loading={test.isPending} onClick={tryIt}>
+            Work out the tax
+          </Button>
+        </div>
+        {test.isError && <p className="text-danger">{refusalText(test.error)}</p>}
+        {result && <TestResult result={result} />}
+      </div>
     </Card>
   );
 }

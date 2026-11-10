@@ -40,13 +40,9 @@ export const useApproveRule = () => useGstChange(({ _id, ...body }) => ['post', 
 export const useLinkUnlinked = () => useGstChange(({ groupId }) => ['post', `/gst/rule-groups/${groupId}/link-unlinked`]);
 export const useActivateGst = () => useGstChange(() => ['post', '/gst/activate']);
 
-// A sample bill, worked out by the server. Trying one also ticks that step, so the checks reload.
+// A sample bill, worked out by the server. Nothing is saved.
 export function useTestBill() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (body) => send('post', '/gst/test-bill', null, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['gst-setup'] }),
-  });
+  return useMutation({ mutationFn: (body) => send('post', '/gst/test-bill', null, body) });
 }
 
 // The first screen: { active, month, gstins, net, bills, creditNotes, voided, check, setupProblems }. params: { month, gstin }

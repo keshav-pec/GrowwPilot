@@ -14,9 +14,11 @@ export const ITC_TYPES = ['WITHOUT_ITC', 'WITH_ITC']; // can input tax credit be
 // SAC (services) and HSN (products) codes
 export const TAX_CODE_REGEX = /^\d{4,8}$/;
 
-// The ready-made rule a salon starts with. It is a draft: the owner checks it and approves it.
-// Standard salon services are 5% without input tax credit from 22 Sep 2025.
+// The ready-made rules a salon starts with, as drafts: activating approves them, unless the owner changes them first.
+// Standard salon services are 5% without input tax credit from 22 Sep 2025. Products for sale take the HSN code
+// most of them already have.
 export const STARTER_RULE = { name: 'Salon services', kind: 'SERVICE', code: '999721', rateBps: 500, itcType: 'WITHOUT_ITC', from: '2025-09-22' };
+export const STARTER_PRODUCT_RULE = { name: 'Products for sale', kind: 'PRODUCT', code: '3305', rateBps: 1800, itcType: 'WITH_ITC', from: '2025-09-22' };
 
 // Where to fix a problem found during setup or on a bill
 export const GST_SETUP_LINK = '/app/gst?tab=settings';

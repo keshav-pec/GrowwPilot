@@ -13,7 +13,8 @@ const KINDS = [
 ];
 const NOUN = { SERVICE: { one: 'service', many: 'services', code: 'SAC' }, PRODUCT: { one: 'product', many: 'products', code: 'HSN' } };
 
-// Tax rules: a draft until the business owner approves it. An approved rule can't change; a new rate is a new dated row.
+// Tax rules: a draft until the business owner approves it (activating approves the ones in use). An approved rule can't
+// change; a new rate is a new dated row.
 export default function TaxRulesCard({ setup }) {
   const [editing, setEditing] = useState(null); // { rule?, group? }: new rule, new dated row, or a draft being changed
   const [approving, setApproving] = useState(null);
@@ -72,7 +73,7 @@ export default function TaxRulesCard({ setup }) {
                       </p>
                       <p className="text-xs text-muted">
                         {formatDate(rule.from)} to {rule.to ? formatDate(rule.to) : 'now'}
-                        {rule.reviewedBy && ` · reviewed by ${rule.reviewedBy}, approved by ${rule.approvedByName}`}
+                        {rule.status === 'APPROVED' && rule.approvedByName && ` · ${rule.reviewedBy ? `reviewed by ${rule.reviewedBy}, ` : ''}approved by ${rule.approvedByName}`}
                       </p>
                     </div>
                     {setup.canEdit && rule.status === 'DRAFT' && (
@@ -192,7 +193,7 @@ function ApproveModal({ rule, group, onClose }) {
 
   function submit() {
     approve.mutate(
-      { key, _id: rule._id, reviewedBy: reviewedBy.trim() },
+      { key, _id: rule._id, ...(reviewedBy.trim() && { reviewedBy: reviewedBy.trim() }) },
       {
         onSuccess: () => {
           toast.success('Rule approved');
@@ -208,7 +209,7 @@ function ApproveModal({ rule, group, onClose }) {
       onClose={onClose}
       title={`Approve ${group.name}`}
       footer={
-        <ModalFooter onClose={onClose} loading={approve.isPending} disabled={reviewedBy.trim().length < 2} onClick={submit}>
+        <ModalFooter onClose={onClose} loading={approve.isPending} onClick={submit}>
           Approve rule
         </ModalFooter>
       }
@@ -218,7 +219,7 @@ function ApproveModal({ rule, group, onClose }) {
           {NOUN[group.kind].code} {rule.code} · {percentLabel(rule.rateBps)} {ITC_LABEL[rule.itcType]}, from {formatDate(rule.from)}
           {rule.to && ` to ${formatDate(rule.to)}`}. Once approved, this row can’t be changed.
         </p>
-        <Input label="Who reviewed it?" placeholder="e.g. CA Mehta" value={reviewedBy} onChange={(e) => setReviewedBy(e.target.value)} />
+        <Input label="Who reviewed it? (optional)" placeholder="e.g. CA Mehta" value={reviewedBy} onChange={(e) => setReviewedBy(e.target.value)} />
         {approve.isError && <p className="text-danger">{refusalText(approve.error)}</p>}
       </div>
     </Modal>

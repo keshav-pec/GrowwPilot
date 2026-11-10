@@ -38,7 +38,7 @@ function RequiresAttention({ items }) {
   return (
     <Card title={`Requires attention${items.length ? ` (${items.length})` : ''}`}>
       {items.length === 0 ? (
-        <EmptyState icon={CheckCircle2} title="All clear" message="No late appointments, unpaid visits or overdue follow-ups." />
+        <EmptyState icon={CheckCircle2} title="All clear" message="No late appointments or unpaid visits." />
       ) : (
         <ul className="divide-y divide-border">
           {items.map((item) => (
@@ -92,7 +92,8 @@ export default function DashboardPage() {
         <StatTile {...HEADLINE_TILE} label="Open leads" value={kpis.openLeads} />
       </div>
 
-      <RequiresAttention items={attention} />
+      {/* Lead follow-ups are left out while the Leads page is hidden */}
+      <RequiresAttention items={attention.filter((item) => item.kind !== 'FOLLOW_UP')} />
     </>
   );
 }

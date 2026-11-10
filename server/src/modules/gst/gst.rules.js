@@ -37,12 +37,21 @@ const names = (items) => {
   return items.length > 3 ? `${list} and ${items.length - 3} more` : list;
 };
 
+// Draft rows that cover `date` in groups with no approved row for that date, and that some item points to.
+// Activating approves these.
+export function draftsToApprove(rules, items, date) {
+  const waiting = new Set(items.filter((i) => i.taxRuleGroupId && !ruleFor(rules, i.taxRuleGroupId, date)).map((i) => String(i.taxRuleGroupId)));
+  return rules.filter((r) => r.status === 'DRAFT' && waiting.has(String(r.groupId)) && coversDate(r, date));
+}
+
+// rules: every rule of the salon. Before activating, a draft for today counts, because activating approves it.
 export function setupChecks({ settings, today, branches, registrations, rules, services, products }) {
   const gst = settings.gst ?? {};
   const checks = [];
   const add = (key, label, problem, link = GST_SETUP_LINK) => checks.push({ key, label, ok: !problem, ...(problem ? { code: problem.code, message: problem.message, link } : {}) });
 
-  add('scheme', 'Registration type is Regular', gst.scheme === 'REGULAR' ? null : { code: 'REGIME_NOT_SUPPORTED', message: 'Choose Regular and press Save. That also adds the starter 5% tax rule.' });
+  add('scheme', 'Registration type is Regular', gst.scheme === 'REGULAR' ? null : { code: 'REGIME_NOT_SUPPORTED', message: 'Choose Regular and press Save. That also adds ready-made tax rules for your services and products.' });
+  if (gst.scheme !== 'REGULAR') return checks; // Save moves the GSTINs over and adds the rules, so nothing else can be checked yet
   add('startMonth', 'Start month chosen', gst.startMonth ? null : { code: 'START_MONTH_MISSING', message: 'Choose the first month your returns will come from the app.' });
 
   const active = branches.filter((b) => b.status !== 'archived');
@@ -56,12 +65,19 @@ export function setupChecks({ settings, today, branches, registrations, rules, s
   }
   if (active.length === 0) add('branches', 'At least one active branch', { code: 'BRANCH_MAPPING_MISSING', message: 'Add a branch first.' }, '/app/branches');
 
-  const unruled = (items) => items.filter((item) => !ruleFor(rules, item.taxRuleGroupId, today));
-  const noRuleServices = unruled(services);
-  add('services', 'Every service has an approved tax rule', noRuleServices.length ? { code: 'TAX_CLASSIFICATION_MISSING', message: `No approved tax rule: ${names(noRuleServices)}.` } : null, CATALOG_LINK);
-  const noRuleProducts = unruled(products);
-  if (products.length > 0) add('products', 'Every product for sale has an approved tax rule', noRuleProducts.length ? { code: 'TAX_CLASSIFICATION_MISSING', message: `No approved tax rule: ${names(noRuleProducts)}.` } : null, PRODUCTS_LINK);
-
-  add('testBill', 'A test bill was tried', gst.testBillAt ? null : { code: 'TEST_BILL_MISSING', message: 'Try a test bill below and check the tax.' });
+  const setupActive = gst.status === 'ACTIVE';
+  const hasDraft = (item) => rules.some((r) => r.status === 'DRAFT' && String(r.groupId) === String(item.taxRuleGroupId) && coversDate(r, today));
+  const unruled = (items) => items.filter((item) => !ruleFor(rules, item.taxRuleGroupId, today) && (setupActive || !hasDraft(item)));
+  const ruleCheck = (key, label, items, kind, fixLink) => {
+    const missing = unruled(items);
+    if (missing.length === 0) return add(key, label, null);
+    // Nothing linked yet: the Link button in Tax rules fixes it here. Linked to a rule with no row for today: fix the rule.
+    const linked = missing.some((item) => item.taxRuleGroupId);
+    const hasRuleOfKind = rules.some((r) => r.kind === kind);
+    const fix = linked ? 'Add a rate for today to its tax rule below.' : hasRuleOfKind ? 'Link them in Tax rules below.' : 'Press Save above to add a ready-made tax rule for them.';
+    add(key, label, { code: 'TAX_CLASSIFICATION_MISSING', message: `No tax rule: ${names(missing)}. ${fix}` }, setupActive ? fixLink : GST_SETUP_LINK);
+  };
+  ruleCheck('services', 'Every service has a tax rule', services, 'SERVICE', CATALOG_LINK);
+  if (products.length > 0) ruleCheck('products', 'Every product for sale has a tax rule', products, 'PRODUCT', PRODUCTS_LINK);
   return checks;
 }

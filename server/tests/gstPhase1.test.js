@@ -83,15 +83,14 @@ async function productRule() {
   return rule;
 }
 
-// Everything done, ready to activate
+// Everything done, ready to activate: Save added both ready-made rules, linked; they are approved here
 async function ready({ prices } = {}) {
   await regular(prices === undefined ? {} : { pricesIncludeTax: prices });
   await register();
   const rule = await starter();
   await approve(rule._id);
-  await gst.linkUnlinked(owner, String(rule.groupId), key());
-  const product = await productRule();
-  await gst.testBill(owner, { branchId: String(f.andheri._id), lines: [{ groupId: String(rule.groupId), unitPrice: 105000, qty: 1 }] });
+  const product = await GstTaxRule.findOne({ orgId: f.ctxGlamour.orgId, kind: 'PRODUCT' }).lean();
+  await approve(product._id);
   return { rule, product };
 }
 async function active(options) {
@@ -141,12 +140,32 @@ describe('Registration type', () => {
     expect(await BillingSettings.countDocuments({ 'gst.scheme': { $in: ['COMPOSITION', 'QRMP'] } })).toBe(0);
   });
 
-  it('choosing Regular adds the starter rule as a draft, once', async () => {
+  it('choosing Regular adds ready-made draft rules for services and products, once, linked to everything', async () => {
     await regular();
     await regular();
-    const rules = await GstTaxRule.find({ orgId: f.ctxGlamour.orgId }).lean();
-    expect(rules).toHaveLength(1);
-    expect(rules[0]).toMatchObject({ name: 'Salon services', rateBps: 500, itcType: 'WITHOUT_ITC', from: '2025-09-22', status: 'DRAFT', code: '999721' });
+    const rules = await GstTaxRule.find({ orgId: f.ctxGlamour.orgId }).sort({ kind: -1 }).lean();
+    expect(rules).toHaveLength(2);
+    expect(rules[0]).toMatchObject({ name: 'Salon services', kind: 'SERVICE', rateBps: 500, itcType: 'WITHOUT_ITC', from: '2025-09-22', status: 'DRAFT', code: '999721' });
+    expect(rules[1]).toMatchObject({ name: 'Products for sale', kind: 'PRODUCT', rateBps: 1800, itcType: 'WITH_ITC', from: '2025-09-22', status: 'DRAFT', code: '3305' });
+    expect((await gst.getSetup(owner)).unlinked).toEqual({ SERVICE: 0, PRODUCT: 0 });
+    expect((await InventorySku.findById(shampoo._id).lean()).taxRuleGroupId).toEqual(rules[1].groupId);
+  });
+
+  it('the product rule takes the HSN code products already have, and Save fills in this month when none is sent', async () => {
+    const sku = await InventorySku.findById(shampoo._id).lean();
+    await updateSku(owner, shampoo._id, { version: sku.version, hsnCode: '33059011' }, key());
+    await gst.saveSetup(owner, { scheme: 'REGULAR' }, key());
+    expect((await GstTaxRule.findOne({ orgId: f.ctxGlamour.orgId, kind: 'PRODUCT' }).lean()).code).toBe('33059011');
+    expect((await gst.getSetup(owner)).startMonth).toBe(DateTime.now().setZone('Asia/Kolkata').toFormat('yyyy-MM'));
+    const after = await InventorySku.findById(shampoo._id).lean();
+    await updateSku(owner, shampoo._id, { version: after.version, hsnCode: null }, key());
+  });
+
+  it('before Save, the only thing asked is to choose Regular', async () => {
+    await BillingSettings.create({ orgId: f.ctxGlamour.orgId, legalName: 'Glamour Pvt Ltd', gstRegistered: true, branches: [{ branchId: f.andheri._id, gstin: MAHARASHTRA, stateCode: '27' }] });
+    const { scheme, checks } = await gst.getSetup(owner);
+    expect(scheme).toBe('REGULAR');
+    expect(checks.map((c) => c.code)).toEqual(['REGIME_NOT_SUPPORTED']);
   });
 
   it('choosing Regular does not change billing until the salon activates', async () => {
@@ -284,6 +303,7 @@ describe('Tax rules', () => {
   it('links every service with no rule yet, in one go', async () => {
     await regular();
     const { groupId } = await starter();
+    await Service.updateMany({}, { $set: { taxRuleGroupId: null } });
     const { linked } = await gst.linkUnlinked(owner, String(groupId), key());
     expect(linked).toBe(3);
     expect((await gst.getSetup(owner)).unlinked.SERVICE).toBe(0);
@@ -299,7 +319,6 @@ describe('Test bills and activation', () => {
     const lines = [{ groupId: String(rule.groupId), unitPrice: 105000, qty: 1 }];
     const draftRule = await gst.testBill(owner, { branchId: String(f.andheri._id), lines });
     expect(draftRule.blockers.map((b) => b.code)).toEqual(['TAX_CLASSIFICATION_MISSING']);
-    expect((await BillingSettings.findOne({ orgId: f.ctxGlamour.orgId }).lean()).gst.testBillAt).toBeUndefined();
 
     await approve(rule._id);
     const sample = await gst.testBill(owner, { branchId: String(f.andheri._id), lines });
@@ -309,17 +328,35 @@ describe('Test bills and activation', () => {
     expect(away).toMatchObject({ interstate: true, placeOfSupply: { stateCode: '29', stateName: 'Karnataka' } });
     expect(away.totals).toMatchObject({ cgstTotal: 0, sgstTotal: 0, igstTotal: 5000 });
     expect(await Invoice.countDocuments()).toBe(0);
-    expect((await BillingSettings.findOne({ orgId: f.ctxGlamour.orgId }).lean()).gst.testBillAt).toBeTruthy();
   });
 
   it('activation is refused until every check passes, and says what is wrong', async () => {
     await expect(gst.activate(owner, key())).rejects.toMatchObject({ code: 'GST_CONFIGURATION_INCOMPLETE' });
     await regular({ startMonth: '' });
+    await Service.updateMany({}, { $set: { taxRuleGroupId: null } });
     const { checks } = await gst.getSetup(owner);
     const failed = checks.filter((c) => !c.ok).map((c) => c.code);
-    expect(failed).toEqual(expect.arrayContaining(['START_MONTH_MISSING', 'BRANCH_MAPPING_MISSING', 'TAX_CLASSIFICATION_MISSING', 'TEST_BILL_MISSING']));
+    expect(failed).toEqual(expect.arrayContaining(['START_MONTH_MISSING', 'BRANCH_MAPPING_MISSING', 'TAX_CLASSIFICATION_MISSING']));
     await expect(gst.activate(owner, key())).rejects.toMatchObject({ code: 'GST_CONFIGURATION_INCOMPLETE' });
     expect((await gst.getSetup(owner)).active).toBe(false);
+  });
+
+  it('Save, then Activate: activating approves the ready-made rules, and the reviewer is optional', async () => {
+    await regular();
+    await register();
+    const setup = await gst.getSetup(owner);
+    expect(setup.checks.every((c) => c.ok)).toBe(true);
+    expect(setup.toApprove.map((r) => r.name).sort()).toEqual(['Products for sale', 'Salon services']);
+    await gst.activate(owner, key());
+    const rules = await GstTaxRule.find({ orgId: f.ctxGlamour.orgId }).lean();
+    expect(rules.every((r) => r.status === 'APPROVED' && r.approvedByName === 'Anita')).toBe(true);
+    expect((await gst.getSetup(owner)).toApprove).toEqual([]);
+    const bill = await checkout(owner, await completed());
+    expect(bill).toMatchObject({ gstSetupActive: true, taxTotal: 5000 });
+    // Once active, a new draft has to be approved by hand
+    const { ruleId } = await gst.createRule(owner, { groupId: String(rules.find((r) => r.kind === 'SERVICE').groupId), code: '999721', rateBps: 1800, itcType: 'WITH_ITC', from: tomorrow() }, key());
+    await gst.approveRule(owner, ruleId, {}, key());
+    expect(await GstTaxRule.findById(ruleId).lean()).toMatchObject({ status: 'APPROVED', reviewedBy: null });
   });
 
   it('a bad GSTIN that came from old settings blocks activation by name (G02)', async () => {

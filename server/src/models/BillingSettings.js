@@ -45,7 +45,6 @@ const billingSettingsSchema = new mongoose.Schema(
       scheme: { type: String, enum: [...GST_SCHEMES, null], default: null }, // empty = not chosen yet
       status: { type: String, enum: GST_SETUP_STATUSES, default: 'NOT_ACTIVE' },
       startMonth: { type: String, match: /^\d{4}-(0[1-9]|1[0-2])$/ }, // the first month returns come from the app
-      testBillAt: Date, // when the owner last tried a sample bill that worked
       activatedAt: Date,
       activatedBy: ref('User'),
       activatedByName: String,

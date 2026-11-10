@@ -44,7 +44,7 @@ export const updateRuleSchema = z
   .partial()
   .refine(beforeEnd, datesInOrder);
 
-export const approveRuleSchema = z.object({ reviewedBy: z.string().trim().min(2, 'Say who reviewed this rule').max(120) });
+export const approveRuleSchema = z.object({ reviewedBy: z.string().trim().max(120).optional() });
 
 export const testBillSchema = z.object({
   branchId: objectId,

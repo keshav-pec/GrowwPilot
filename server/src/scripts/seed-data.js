@@ -7,7 +7,7 @@ export const GLAMOUR_CUSTOMERS = [
 ];
 
 // Priya's phone also exists at Glamour Studio: allowed, because it's a different salon
-export const DESERT_ROSE_CUSTOMERS = [['Priya Sharma', '9876543210'], ['Aisha Rahman', '9123400001']];
+export const DESERT_ROSE_CUSTOMERS = [['Priya Sharma', '9876543210'], ['Aisha Rahman', '9123400001'], ['Noor Ali', '9123400002']];
 
 // [name, category, minutes (null = branch default), price in ₹, offered at (branch names, [] = all)]
 export const GLAMOUR_SERVICES = [
@@ -21,14 +21,13 @@ export const GLAMOUR_SERVICES = [
 export const DESERT_ROSE_SERVICES = [
   ['Haircut', 'Hair', 30, 800, []],
   ['Blow Dry', 'Hair', 30, 600, []],
+  ['Hair Colour', 'Hair', 90, 2000, []],
 ];
 
 // Leads: [name, phone, branch, source, status, created (hours ago), next follow-up (hours from now, null = none), interested in, note]
-// Covers every status; one follow-up is overdue. Pooja becomes a customer with a booking (see seed.js).
+// Every follow-up is in the future. Pooja becomes a customer with a booking (see seed.js).
 export const LEADS = [
   ['Tara Singh', '9811100003', 'Andheri', 'Instagram', 'NEW', 2, 24, 'Hair Colour', 'Saw our balayage reel'],
-  ['Sana Khan', '9811100005', 'Andheri', 'WhatsApp', 'CONTACTED', 96, -20, 'Facial', 'Asked for weekend slots'],
-  ['Neel Chopra', '9811100008', 'Andheri', 'Walk-in', 'LOST', 290, null, 'Haircut', 'Found it too far from office'],
   ['Pooja Mehta', '9820011001', 'Andheri', 'Google', 'APPOINTMENT_BOOKED', 70, null, 'Facial', 'Booked a facial'],
   ['Kunal Bhatt', '9811100014', 'Bandra', 'Referral', 'INTERESTED', 80, 26, 'Hair Spa', null],
   ['Sophia Lee', '9811100018', 'Dubai Marina', 'Facebook', 'INTERESTED', 70, 40, 'Blow Dry', 'Wedding on the 15th'],

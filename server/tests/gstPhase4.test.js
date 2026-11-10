@@ -74,13 +74,9 @@ async function active() {
   await gst.saveSetup(owner, { scheme: 'REGULAR', startMonth: thisMonth() }, key());
   await gst.addRegistration(owner, { gstin: ANDHERI_GSTIN, legalName: 'Glamour Pvt Ltd', stateCode: '27', from: '2025-01-01', branchIds: [String(f.andheri._id)] }, key());
   await gst.addRegistration(owner, { gstin: BANDRA_GSTIN, legalName: 'Glamour Pvt Ltd', stateCode: '27', from: '2025-01-01', branchIds: [String(f.bandra._id)] }, key());
-  const rule = await GstTaxRule.findOne({ orgId: f.ctxGlamour.orgId }).lean();
-  await gst.approveRule(owner, String(rule._id), { reviewedBy: 'CA Mehta' }, key());
-  await gst.linkUnlinked(owner, String(rule.groupId), key());
-  const { ruleId } = await gst.createRule(owner, { name: 'Hair products', kind: 'PRODUCT', code: '330510', rateBps: 1800, itcType: 'WITH_ITC', from: '2025-09-22' }, key());
-  await gst.approveRule(owner, ruleId, { reviewedBy: 'CA Mehta' }, key());
-  await gst.linkUnlinked(owner, String((await GstTaxRule.findById(ruleId).lean()).groupId), key());
-  await gst.testBill(owner, { branchId: String(f.andheri._id), lines: [{ groupId: String(rule.groupId), unitPrice: 105000, qty: 1 }] });
+  // Save added a rule for services and one for products, already linked: check them, then activate approves them
+  const products = await GstTaxRule.findOne({ orgId: f.ctxGlamour.orgId, kind: 'PRODUCT' }).lean();
+  await gst.updateRule(owner, String(products._id), { name: 'Hair products', code: '330510' }, key());
   await gst.activate(owner, key());
 }
 

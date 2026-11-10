@@ -280,7 +280,7 @@ export const KNOWLEDGE = [
     audiences: OWNERS,
     keywords: ['gst setup', 'gstin', 'activate gst', 'tax rule', 'approve rule', 'sac code', 'hsn', 'start month', 'gst registration', 'change gstin', 'test bill', 'composition', 'qrmp'],
     answer:
-      'Open **GST → Settings** (the business owner changes it; branch owners can look). 1. Choose **Regular** and a start month. 2. Check your **GSTINs**: each branch has one GSTIN on any date, and replacing one adds a new dated row. 3. **Approve your tax rules**: a salon starts with a draft rule of 5% without ITC from 22 Sep 2025, which your GST practitioner should check. An approved rule can’t change; a new rate is a new dated row. 4. **Link** services and products to a rule. 5. Try a **test bill**, then **Activate**. From then on each bill uses the rule for its date, and old bills never change. Composition and QRMP aren’t supported.',
+      'Open **GST → Settings** (the business owner changes it; branch owners can look). 1. Choose **Regular**, check the start month and press **Save**. Your branch GSTINs move over, and ready-made tax rules are added and linked to every service and product for sale: services at 5% without ITC from 22 Sep 2025, products at 18%. 2. Check the **GSTINs** and the **tax rules** with your GST practitioner, and edit a rule if needed. 3. Press **Activate**: it approves the rules. From then on each bill uses the rule for its date, and old bills never change. An approved rule can’t change; a new rate is a new dated row. You can try a **test bill** any time after that. Composition and QRMP aren’t supported.',
     link: { label: 'GST setup', to: '/app/gst?tab=settings' },
   },
 
